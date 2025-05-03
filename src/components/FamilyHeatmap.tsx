@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-leaflet';
+import { LatLngExpression } from 'leaflet';
 
 // Mock family locations with heatmap data
 const familyLocations = [
@@ -22,7 +23,7 @@ interface FamilyHeatmapProps {
 
 const FamilyHeatmap: React.FC<FamilyHeatmapProps> = ({ institution, period }) => {
   const [filteredLocations, setFilteredLocations] = useState(familyLocations);
-  const mapCenter: [number, number] = [-23.55, -46.63]; // São Paulo coordinates
+  const mapCenter: LatLngExpression = [-23.55, -46.63]; // São Paulo coordinates
 
   // Filter locations based on props (in a real app, this would use actual filters)
   useEffect(() => {
@@ -44,13 +45,13 @@ const FamilyHeatmap: React.FC<FamilyHeatmapProps> = ({ institution, period }) =>
         zoom={11} 
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         {filteredLocations.map((location) => (
           <CircleMarker 
             key={location.id}
-            center={[location.lat, location.lng]}
+            center={[location.lat, location.lng] as LatLngExpression}
             pathOptions={{
               fillColor: "#ef4444",
               fillOpacity: 0.6,
