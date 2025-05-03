@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { LogOut, Menu, X, Building, Users, FileText } from "lucide-react";
+import { LogOut, Menu, X, Building, Users, FileText, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -14,7 +14,8 @@ const Header = ({ username }: HeaderProps) => {
 
   return (
     <header className="bg-primary text-white py-4 px-6 shadow-md flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <Package className="h-6 w-6" />
         <h1 className="text-xl font-bold">Controle de Cestas Básicas</h1>
       </div>
 
