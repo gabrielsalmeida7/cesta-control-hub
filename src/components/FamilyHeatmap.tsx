@@ -1,7 +1,7 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup } from 'react-leaflet';
 
 // Mock family locations with heatmap data
 const familyLocations = [
@@ -22,6 +22,7 @@ interface FamilyHeatmapProps {
 
 const FamilyHeatmap: React.FC<FamilyHeatmapProps> = ({ institution, period }) => {
   const [filteredLocations, setFilteredLocations] = useState(familyLocations);
+  const mapCenter: [number, number] = [-23.55, -46.63]; // São Paulo coordinates
 
   // Filter locations based on props (in a real app, this would use actual filters)
   useEffect(() => {
@@ -38,9 +39,9 @@ const FamilyHeatmap: React.FC<FamilyHeatmapProps> = ({ institution, period }) =>
   return (
     <div className="h-[400px] w-full rounded-lg overflow-hidden border border-gray-200">
       <MapContainer 
-        center={[-23.55, -46.63]} 
+        className="h-full w-full"
+        center={mapCenter}
         zoom={11} 
-        style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -50,11 +51,13 @@ const FamilyHeatmap: React.FC<FamilyHeatmapProps> = ({ institution, period }) =>
           <CircleMarker 
             key={location.id}
             center={[location.lat, location.lng]}
+            pathOptions={{
+              fillColor: "#ef4444",
+              fillOpacity: 0.6,
+              color: "#b91c1c",
+              weight: 1,
+            }}
             radius={location.density * 2}
-            fillOpacity={0.6}
-            fillColor="#ef4444"
-            color="#b91c1c"
-            weight={1}
           >
             <Tooltip>
               <div className="p-1">
