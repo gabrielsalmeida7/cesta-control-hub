@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import Institutions from "./pages/Institutions";
 import Families from "./pages/Families";
 import Reports from "./pages/Reports";
-import Heatmap from "./pages/Heatmap";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,7 +26,6 @@ const App = () => {
               <Route path="/institutions" element={<Institutions />} />
               <Route path="/families" element={<Families />} />
               <Route path="/reports" element={<Reports />} />
-              <Route path="/heatmap" element={<Heatmap />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

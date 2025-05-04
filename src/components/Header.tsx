@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { LogOut, Menu, X, Building, Users, FileText, Package, MapPin } from "lucide-react";
+import { LogOut, Menu, X, Building, Users, FileText, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -39,10 +39,6 @@ const Header = ({ username }: HeaderProps) => {
               <Link to="/reports" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-100">
                 <FileText className="h-5 w-5" />
                 <span>Gerar Relatórios</span>
-              </Link>
-              <Link to="/heatmap" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-100">
-                <MapPin className="h-5 w-5" />
-                <span>Mapa de Calor</span>
               </Link>
             </nav>
           </CollapsibleContent>
