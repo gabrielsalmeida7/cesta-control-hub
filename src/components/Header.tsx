@@ -16,7 +16,9 @@ const Header = ({ username }: HeaderProps) => {
     <header className="bg-primary text-white py-4 px-6 shadow-md flex justify-between items-center fixed top-0 left-0 right-0 z-10">
       <div className="flex items-center gap-3">
         <Package className="h-6 w-6" />
-        <h1 className="text-xl font-bold">Controle de Cestas Básicas</h1>
+        <Link to="/" className="hover:text-white/80 transition-colors">
+          <h1 className="text-xl font-bold">Controle de Cestas Básicas</h1>
+        </Link>
       </div>
 
       <div className="flex items-center gap-4">
