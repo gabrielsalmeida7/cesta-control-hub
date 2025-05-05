@@ -1,9 +1,12 @@
 
 import Header from "@/components/Header";
-import { FileText, Download, Calendar } from "lucide-react";
+import { FileText, Download, Calendar, AlertTriangle, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 
 const Reports = () => {
   // Mock data
@@ -15,11 +18,195 @@ const Reports = () => {
     { id: 4, title: "Instituições por Desempenho", description: "Ranking de instituições por número de entregas realizadas", icon: FileText },
   ];
 
+  // Mock data for alerts
+  const alerts = [
+    { 
+      id: 1, 
+      type: 'fraude', 
+      severity: 'alta', 
+      title: 'Possível tentativa de fraude detectada', 
+      description: 'A família Silva solicitou cestas em 3 instituições diferentes no mesmo mês.', 
+      familyId: 123, 
+      institutionId: 2, 
+      createdAt: '2025-05-01', 
+      resolved: false 
+    },
+    { 
+      id: 2, 
+      type: 'duplicado', 
+      severity: 'média', 
+      title: 'Solicitação duplicada', 
+      description: 'A família Oliveira aparece registrada em múltiplas instituições.', 
+      familyId: 456, 
+      institutionId: 1, 
+      createdAt: '2025-05-02', 
+      resolved: false 
+    },
+    { 
+      id: 3, 
+      type: 'expirado', 
+      severity: 'baixa', 
+      title: 'Cestas prestes a expirar', 
+      description: '15 cestas básicas estão próximas da data de validade na instituição Centro Comunitário São José.', 
+      institutionId: 1, 
+      createdAt: '2025-05-03', 
+      resolved: false 
+    },
+    { 
+      id: 4, 
+      type: 'outro', 
+      severity: 'média', 
+      title: 'Aumento anormal de solicitações', 
+      description: 'Detectamos um aumento de 40% nas solicitações na região Norte da cidade.', 
+      createdAt: '2025-05-04', 
+      resolved: false 
+    },
+  ];
+
+  // State for alert filter
+  const [alertFilter, setAlertFilter] = useState('todos');
+
+  // Filter alerts based on selected type
+  const filteredAlerts = alertFilter === 'todos' 
+    ? alerts 
+    : alerts.filter(alert => alert.type === alertFilter);
+
+  // Get alert count by severity
+  const highSeverityCount = alerts.filter(alert => alert.severity === 'alta').length;
+  const mediumSeverityCount = alerts.filter(alert => alert.severity === 'média').length;
+  const lowSeverityCount = alerts.filter(alert => alert.severity === 'baixa').length;
+
+  // Function to get badge color based on severity
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case 'alta': return "bg-destructive text-destructive-foreground hover:bg-destructive/80";
+      case 'média': return "bg-orange-500 text-white hover:bg-orange-600";
+      case 'baixa': return "bg-blue-500 text-white hover:bg-blue-600";
+      default: return "";
+    }
+  };
+
+  // Function to get icon based on alert type
+  const getAlertIcon = (type) => {
+    switch (type) {
+      case 'fraude': 
+      case 'duplicado': return <AlertTriangle className="h-5 w-5 text-destructive" />;
+      case 'expirado': return <BellRing className="h-5 w-5 text-orange-500" />;
+      default: return <BellRing className="h-5 w-5 text-blue-500" />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
       <Header username={username} />
       
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto">
+        {/* Alerts Section */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Painel de Alertas</h2>
+          <p className="text-gray-600 mb-6">
+            Monitore possíveis tentativas de fraude, solicitações duplicadas e outros alertas do sistema
+          </p>
+          
+          <div className="flex flex-wrap gap-3 mb-4">
+            <Button 
+              variant={alertFilter === 'todos' ? "default" : "outline"}
+              onClick={() => setAlertFilter('todos')}
+              className="flex items-center gap-2"
+            >
+              Todos <Badge>{alerts.length}</Badge>
+            </Button>
+            <Button 
+              variant={alertFilter === 'fraude' ? "default" : "outline"}
+              onClick={() => setAlertFilter('fraude')}
+              className="flex items-center gap-2"
+            >
+              Fraudes <AlertTriangle className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant={alertFilter === 'duplicado' ? "default" : "outline"}
+              onClick={() => setAlertFilter('duplicado')}
+              className="flex items-center gap-2"
+            >
+              Duplicados
+            </Button>
+            <Button 
+              variant={alertFilter === 'expirado' ? "default" : "outline"}
+              onClick={() => setAlertFilter('expirado')}
+              className="flex items-center gap-2"
+            >
+              Expirados <BellRing className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <Card className="bg-gradient-to-br from-red-50 to-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Alta Prioridade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-red-600">{highSeverityCount}</div>
+                <p className="text-sm text-gray-500">Alertas que precisam de atenção imediata</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-orange-50 to-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Média Prioridade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-500">{mediumSeverityCount}</div>
+                <p className="text-sm text-gray-500">Alertas que precisam ser verificados</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-blue-50 to-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Baixa Prioridade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-500">{lowSeverityCount}</div>
+                <p className="text-sm text-gray-500">Alertas informativos</p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="space-y-4">
+            {filteredAlerts.length > 0 ? filteredAlerts.map(alert => (
+              <Alert key={alert.id} className="border-l-4 relative" style={{ borderLeftColor: alert.severity === 'alta' ? '#dc2626' : alert.severity === 'média' ? '#f97316' : '#3b82f6' }}>
+                <div className="flex items-start">
+                  <div className="mr-3 mt-0.5">
+                    {getAlertIcon(alert.type)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <AlertTitle className="text-base flex items-center gap-2">
+                        {alert.title}
+                        <Badge className={getSeverityColor(alert.severity)}>
+                          {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
+                        </Badge>
+                      </AlertTitle>
+                      <span className="text-xs text-gray-500">
+                        {new Date(alert.createdAt).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                    <AlertDescription className="text-sm">
+                      {alert.description}
+                    </AlertDescription>
+                    <div className="flex justify-end mt-2">
+                      <Button variant="outline" size="sm">Resolver</Button>
+                      <Button variant="ghost" size="sm" className="ml-2">Ver Detalhes</Button>
+                    </div>
+                  </div>
+                </div>
+              </Alert>
+            )) : (
+              <div className="text-center py-8 text-gray-500">
+                Nenhum alerta encontrado para o filtro selecionado
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Standard Reports Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Gerar Relatórios</h2>
           
