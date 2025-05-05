@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const Families = () => {
   // Mock data
-  const username = "Admin Silva";
+  const username = "Gabriel Admin";
   const families = [
     { id: 1, name: "Silva", cpf: "123.456.789-00", address: "Rua A, 123", members: 4, lastDelivery: "10/04/2025" },
     { id: 2, name: "Santos", cpf: "987.654.321-00", address: "Rua B, 456", members: 3, lastDelivery: "05/04/2025" },
