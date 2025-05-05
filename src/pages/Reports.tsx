@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const Reports = () => {
   // Mock data
-  const username = "Admin Silva";
+  const username = "Gabriel Admin";
   const reportTypes = [
     { id: 1, title: "Entregas por Período", description: "Relatório detalhado de todas as entregas em um período específico", icon: Calendar },
     { id: 2, title: "Famílias Atendidas por Instituição", description: "Análise das famílias atendidas por cada instituição cadastrada", icon: FileText },

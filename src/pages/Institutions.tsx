@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Institutions = () => {
   // Mock data
-  const username = "Admin Silva";
+  const username = "Gabriel Admin";
   const institutions = [
     { id: 1, name: "Centro Comunitário São José", address: "Rua das Flores, 123", phone: "(11) 9999-8888", deliveries: 42 },
     { id: 2, name: "Associação Bem-Estar", address: "Av. Principal, 456", phone: "(11) 7777-6666", deliveries: 37 },
