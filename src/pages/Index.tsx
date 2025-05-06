@@ -8,7 +8,7 @@ import RecentDeliveriesTable from "@/components/RecentDeliveriesTable";
 
 const Index = () => {
   // Mock data
-  const username = "Admin Silva";
+  const username = "Gabriel Admin";
   const monthlyDeliveries = 128;
   const totalInstitutions = 12;
   const familiesServed = 85;
@@ -16,6 +16,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
+      {/* Header component with username */}
       <Header username={username} />
       
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto w-full flex-grow">
