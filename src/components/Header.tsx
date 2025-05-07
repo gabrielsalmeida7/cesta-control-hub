@@ -38,6 +38,10 @@ const Header = ({ username }: HeaderProps) => {
                 <Users className="h-5 w-5" />
                 <span>Ver Famílias</span>
               </Link>
+              <Link to="/delivery" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-100">
+                <Package className="h-5 w-5" />
+                <span>Gerenciar Entregas</span>
+              </Link>
               <Link to="/reports" className="flex items-center gap-2 px-4 py-3 hover:bg-gray-100">
                 <FileText className="h-5 w-5" />
                 <span>Gerar Relatórios</span>
