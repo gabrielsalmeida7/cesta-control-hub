@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -18,7 +17,7 @@ interface Institution {
   name: string;
   address: string; 
   phone: string;
-  deliveries: number;
+  availableBaskets: number; // Changed from deliveries to availableBaskets
   color: string;
   inventory?: {
     baskets: number;
@@ -34,6 +33,7 @@ interface Institution {
 const Institutions = () => {
   // Mock data
   const username = "Gabriel Admin";
+  const isAdmin = true; // Mock user role - would be from authentication context in a real app
   
   // State for dialog controls
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -46,7 +46,7 @@ const Institutions = () => {
       name: "",
       address: "",
       phone: "",
-      deliveries: 0,
+      availableBaskets: 0,
     }
   });
 
@@ -57,7 +57,7 @@ const Institutions = () => {
       name: "Centro Comunitário São José", 
       address: "Rua das Flores, 123", 
       phone: "(11) 9999-8888", 
-      deliveries: 42, 
+      availableBaskets: 42, 
       color: "bg-primary",
       inventory: {
         baskets: 42,
@@ -74,7 +74,7 @@ const Institutions = () => {
       name: "Associação Bem-Estar", 
       address: "Av. Principal, 456", 
       phone: "(11) 7777-6666", 
-      deliveries: 37, 
+      availableBaskets: 37, 
       color: "bg-green-500",
       inventory: {
         baskets: 37,
@@ -91,7 +91,7 @@ const Institutions = () => {
       name: "Igreja Nossa Senhora", 
       address: "Praça Central, 789", 
       phone: "(11) 5555-4444", 
-      deliveries: 25, 
+      availableBaskets: 25, 
       color: "bg-red-500",
       inventory: {
         baskets: 25,
@@ -108,7 +108,7 @@ const Institutions = () => {
       name: "Instituto Esperança", 
       address: "Rua dos Sonhos, 101", 
       phone: "(11) 3333-2222", 
-      deliveries: 31, 
+      availableBaskets: 31, 
       color: "bg-primary/80",
       inventory: {
         baskets: 31,
@@ -131,7 +131,7 @@ const Institutions = () => {
       name: institution.name,
       address: institution.address,
       phone: institution.phone,
-      deliveries: institution.deliveries,
+      availableBaskets: institution.availableBaskets,
       color: institution.color
     });
     setIsEditDialogOpen(true);
@@ -181,7 +181,7 @@ const Institutions = () => {
                 <CardContent className="pt-4">
                   <p className="mb-2"><strong>Endereço:</strong> {institution.address}</p>
                   <p className="mb-2"><strong>Telefone:</strong> {institution.phone}</p>
-                  <p className="mb-4"><strong>Cestas entregues:</strong> {institution.deliveries}</p>
+                  <p className="mb-4"><strong>Cestas disponíveis:</strong> {institution.availableBaskets}</p>
                   {/* Action buttons */}
                   <div className="flex gap-2">
                     <Button 
@@ -261,16 +261,17 @@ const Institutions = () => {
               
               <FormField
                 control={form.control}
-                name="deliveries"
+                name="availableBaskets"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cestas Entregues</FormLabel>
+                    <FormLabel>Cestas Disponíveis</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
                         {...field} 
                         value={field.value} 
                         onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                        disabled={!isAdmin} // Only admins can edit this field
                       />
                     </FormControl>
                     <FormMessage />
