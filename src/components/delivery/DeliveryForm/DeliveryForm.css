@@ -1,0 +1,62 @@
+
+.delivery-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.family-info {
+  background-color: var(--muted);
+  padding: 0.75rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 0.5rem;
+}
+
+.family-name {
+  font-weight: 600;
+}
+
+.family-members,
+.family-cpf {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.block-notice {
+  background-color: rgb(254, 252, 232);
+  border: 1px solid rgb(253, 230, 138);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+}
+
+.block-notice p {
+  font-size: 0.875rem;
+  color: rgb(146, 64, 14);
+  display: flex;
+  align-items: center;
+}
+
+.notice-icon {
+  height: 1rem;
+  width: 1rem;
+  margin-right: 0.25rem;
+  display: inline-block;
+}
+
+.button-icon {
+  height: 1rem;
+  width: 1rem;
+  margin-right: 0.25rem;
+}
+
+.confirm-button {
+  background-color: var(--primary);
+}
+
+.confirm-button:hover {
+  background-color: var(--primary-hover);
+}
+
+.cancel-button {
+  margin-right: 0.5rem;
+}

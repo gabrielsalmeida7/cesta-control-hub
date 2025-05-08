@@ -1,0 +1,29 @@
+
+.delivery-table-container {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.table-wrapper {
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.details-button {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-secondary);
+}

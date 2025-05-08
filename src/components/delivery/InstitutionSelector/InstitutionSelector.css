@@ -1,0 +1,21 @@
+
+.institution-selector {
+  margin-bottom: 1.5rem;
+}
+
+.selector-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.selector-trigger {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .selector-trigger {
+    width: 300px;
+  }
+}
