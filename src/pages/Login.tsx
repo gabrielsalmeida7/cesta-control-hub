@@ -31,28 +31,25 @@ const Login = () => {
       {/* Marca d'água da imagem */}
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
-        style={{ 
-          backgroundImage: "url('/lovable-uploads/1cb439f6-d870-455d-a7a7-2ab401d03c6b.png')",
-          backgroundSize: "contain",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center" 
-        }}
+        //style={{ 
+          //backgroundImage: "url('/lovable-uploads/1cb439f6-d870-455d-a7a7-2ab401d03c6b.png')",
+          //backgroundSize: "contain",
+          //backgroundRepeat: "no-repeat",
+          //backgroundPosition: "center" 
+        //}}
       />
       
       <div className="flex-1 flex items-center justify-center p-4 z-10">
         <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
           <CardHeader className="space-y-1 text-center">
             <img 
-              src="/CestaCerta.png" 
+              src="/lovable-uploads/CestaJusta.PNG" 
               alt="Logo" 
-              className="w-24 h-24 mx-auto mb-4"
+              className="w-[330px] h-[130px] mx-auto mb-0"
             />
-            <CardTitle className="text-2xl font-bold tracking-tight">
-              Sistema de Controle de Cestas Básicas
+             <CardTitle className="text-2xl font-bold tracking-tight">
+              Sistema de Controle de Alimentos
             </CardTitle>
-            <CardDescription>
-              
-            </CardDescription>
           </CardHeader>
           
           <CardContent>
