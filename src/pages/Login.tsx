@@ -42,11 +42,16 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center p-4 z-10">
         <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
           <CardHeader className="space-y-1 text-center">
+            <img 
+              src="/CestaCerta.png" 
+              alt="Logo" 
+              className="w-24 h-24 mx-auto mb-4"
+            />
             <CardTitle className="text-2xl font-bold tracking-tight">
               Sistema de Controle de Cestas Básicas
             </CardTitle>
             <CardDescription>
-              Prefeitura Municipal de Araguari
+              
             </CardDescription>
           </CardHeader>
           
@@ -100,13 +105,13 @@ const Login = () => {
           
           <CardFooter className="flex justify-center">
             <div className="text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} - Secretaria de Assistência Social
+              © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de alimentos - Prefeitura Municipal de Araguari
             </div>
           </CardFooter>
         </Card>
       </div>
       
-      <Footer />
+      
     </div>
   );
 };
