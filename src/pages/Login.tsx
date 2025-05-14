@@ -102,7 +102,7 @@ const Login = () => {
           
           <CardFooter className="flex justify-center">
             <div className="text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de alimentos - Prefeitura Municipal de Araguari
+              © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de Alimentos - Prefeitura Municipal de Araguari
             </div>
           </CardFooter>
         </Card>

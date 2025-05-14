@@ -75,7 +75,7 @@ const Institutions = () => {
       address: "Av. Principal, 456", 
       phone: "(11) 7777-6666", 
       availableBaskets: 37, 
-      color: "bg-green-500",
+      color: "bg-primary",
       inventory: {
         baskets: 37,
         milk: 43,
@@ -92,7 +92,7 @@ const Institutions = () => {
       address: "Praça Central, 789", 
       phone: "(11) 5555-4444", 
       availableBaskets: 25, 
-      color: "bg-red-500",
+      color: "bg-primary",
       inventory: {
         baskets: 25,
         milk: 32,
@@ -109,7 +109,7 @@ const Institutions = () => {
       address: "Rua dos Sonhos, 101", 
       phone: "(11) 3333-2222", 
       availableBaskets: 31, 
-      color: "bg-primary/80",
+      color: "bg-primary",
       inventory: {
         baskets: 31,
         milk: 40,
