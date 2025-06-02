@@ -9,16 +9,272 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      deliveries: {
+        Row: {
+          blocking_period_days: number
+          created_at: string
+          delivered_by_user_id: string
+          delivery_date: string
+          family_id: string
+          id: string
+          institution_id: string
+          notes: string | null
+        }
+        Insert: {
+          blocking_period_days?: number
+          created_at?: string
+          delivered_by_user_id: string
+          delivery_date?: string
+          family_id: string
+          id?: string
+          institution_id: string
+          notes?: string | null
+        }
+        Update: {
+          blocking_period_days?: number
+          created_at?: string
+          delivered_by_user_id?: string
+          delivery_date?: string
+          family_id?: string
+          id?: string
+          institution_id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_delivered_by_user_id_fkey"
+            columns: ["delivered_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_items: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          id: string
+          item_name: string
+          quantity: number
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          id?: string
+          item_name: string
+          quantity?: number
+          unit?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          item_name?: string
+          quantity?: number
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      families: {
+        Row: {
+          address: string
+          block_reason: string | null
+          blocked_by_institution_id: string | null
+          blocked_until: string | null
+          created_at: string
+          family_name: string
+          id: string
+          is_blocked: boolean
+          main_cpf: string
+          members_count: number
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          block_reason?: string | null
+          blocked_by_institution_id?: string | null
+          blocked_until?: string | null
+          created_at?: string
+          family_name: string
+          id?: string
+          is_blocked?: boolean
+          main_cpf: string
+          members_count?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          block_reason?: string | null
+          blocked_by_institution_id?: string | null
+          blocked_until?: string | null
+          created_at?: string
+          family_name?: string
+          id?: string
+          is_blocked?: boolean
+          main_cpf?: string
+          members_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "families_blocked_by_institution_id_fkey"
+            columns: ["blocked_by_institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          cpf: string
+          created_at: string
+          family_id: string
+          id: string
+          is_main_member: boolean
+          name: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          family_id: string
+          id?: string
+          is_main_member?: boolean
+          name: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          family_id?: string
+          id?: string
+          is_main_member?: boolean
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_members_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutions: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          responsible_person: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          responsible_person?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          responsible_person?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          institution_id: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          institution_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          institution_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_institution: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
-      [_ in never]: never
+      blocking_period: "7" | "15" | "20" | "30" | "45"
+      user_role: "admin" | "institution"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +389,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      blocking_period: ["7", "15", "20", "30", "45"],
+      user_role: ["admin", "institution"],
+    },
   },
 } as const

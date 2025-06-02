@@ -1,29 +1,37 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import Footer from "@/components/Footer";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn, user } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulando uma autenticação
-    setTimeout(() => {
-      if (username && password) {
-        navigate("/");
-      }
-      setLoading(false);
-    }, 1500);
+    const { error } = await signIn(email, password);
+    
+    if (!error) {
+      navigate("/");
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -55,12 +63,13 @@ const Login = () => {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Nome de Usuário</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  placeholder="Digite seu nome de usuário"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Digite seu email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
                 />
@@ -74,7 +83,7 @@ const Login = () => {
                     className="text-sm text-primary hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert("Função de recuperação de senha será implementada em breve.");
+                      alert("Entre em contato com o administrador para recuperar sua senha.");
                     }}
                   >
                     Esqueceu a senha?
@@ -107,8 +116,6 @@ const Login = () => {
           </CardFooter>
         </Card>
       </div>
-      
-      
     </div>
   );
 };
