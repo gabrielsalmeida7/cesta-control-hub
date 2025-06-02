@@ -1,4 +1,3 @@
-
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Users, UserPlus, Search, Lock, Unlock } from "lucide-react";
@@ -29,7 +28,6 @@ interface Family {
 
 const Families = () => {
   // Mock data
-  const username = "Gabriel Admin";
   const isAdmin = true; // Simulating admin privileges
 
   // Dialog states
@@ -139,7 +137,7 @@ const Families = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
-      <Header username={username} />
+      <Header />
       
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
         <div className="mb-8">
