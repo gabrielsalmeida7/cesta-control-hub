@@ -13,6 +13,10 @@ import Institutions from "./pages/Institutions";
 import Families from "./pages/Families";
 import Reports from "./pages/Reports";
 import DeliveryManagement from "./pages/DeliveryManagement";
+import InstitutionDashboard from "./pages/institution/InstitutionDashboard";
+import InstitutionFamilies from "./pages/institution/InstitutionFamilies";
+import InstitutionReports from "./pages/institution/InstitutionReports";
+import InstitutionDelivery from "./pages/institution/InstitutionDelivery";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +40,8 @@ const App = () => {
                     </ProtectedRoute>
                   } 
                 />
+                
+                {/* Admin Routes */}
                 <Route 
                   path="/institutions" 
                   element={
@@ -47,7 +53,7 @@ const App = () => {
                 <Route 
                   path="/families" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute allowedRoles={['admin']}>
                       <Families />
                     </ProtectedRoute>
                   } 
@@ -55,7 +61,7 @@ const App = () => {
                 <Route 
                   path="/reports" 
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute allowedRoles={['admin']}>
                       <Reports />
                     </ProtectedRoute>
                   } 
@@ -63,11 +69,46 @@ const App = () => {
                 <Route 
                   path="/delivery" 
                   element={
-                    <ProtectedRoute allowedRoles={['institution']}>
+                    <ProtectedRoute allowedRoles={['admin']}>
                       <DeliveryManagement />
                     </ProtectedRoute>
                   } 
                 />
+
+                {/* Institution Routes */}
+                <Route 
+                  path="/institution/dashboard" 
+                  element={
+                    <ProtectedRoute allowedRoles={['institution']}>
+                      <InstitutionDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/institution/families" 
+                  element={
+                    <ProtectedRoute allowedRoles={['institution']}>
+                      <InstitutionFamilies />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/institution/reports" 
+                  element={
+                    <ProtectedRoute allowedRoles={['institution']}>
+                      <InstitutionReports />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/institution/delivery" 
+                  element={
+                    <ProtectedRoute allowedRoles={['institution']}>
+                      <InstitutionDelivery />
+                    </ProtectedRoute>
+                  } 
+                />
+                
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AuthProvider>

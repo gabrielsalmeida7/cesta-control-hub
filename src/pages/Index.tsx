@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import NavigationButtons from '@/components/NavigationButtons';
 import DashboardCard from '@/components/DashboardCard';
@@ -10,8 +11,21 @@ import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
 
 const Index = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Redirecionar usuários instituição para seu dashboard específico
+    if (profile?.role === 'institution') {
+      navigate('/institution/dashboard');
+    }
+  }, [profile, navigate]);
 
   if (!profile) {
+    return null;
+  }
+
+  // Se for instituição, não renderizar nada (será redirecionado)
+  if (profile.role === 'institution') {
     return null;
   }
 
@@ -24,7 +38,7 @@ const Index = () => {
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Dashboard - {profile.role === 'admin' ? 'Administrador' : 'Instituição'}
+              Dashboard - Administrador
             </h2>
             <p className="text-gray-600">
               Bem-vindo(a), {profile.full_name}! Aqui você pode acompanhar as principais métricas do sistema.
@@ -40,14 +54,12 @@ const Index = () => {
               icon={<Users className="h-6 w-6" />}
             />
             
-            {profile.role === 'admin' && (
-              <DashboardCard
-                title="Instituições Ativas"
-                value="0"
-                description="Instituições cadastradas"
-                icon={<Building2 className="h-6 w-6" />}
-              />
-            )}
+            <DashboardCard
+              title="Instituições Ativas"
+              value="0"
+              description="Instituições cadastradas"
+              icon={<Building2 className="h-6 w-6" />}
+            />
             
             <DashboardCard
               title="Entregas Este Mês"
