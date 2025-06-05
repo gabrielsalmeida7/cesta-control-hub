@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import DashboardCard from '@/components/DashboardCard';
 import { useAuth } from '@/hooks/useAuth';
-import { Users, Package, AlertTriangle, Calendar } from 'lucide-react';
+import { Users, Package, AlertTriangle, Calendar, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const InstitutionDashboard = () => {
