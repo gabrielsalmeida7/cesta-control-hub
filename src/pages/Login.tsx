@@ -34,6 +34,30 @@ const Login = () => {
     setLoading(false);
   };
 
+  // Bypass functions for testing
+  const handleBypassAdmin = () => {
+    // Simulate admin login by navigating directly
+    localStorage.setItem('bypass_user', JSON.stringify({
+      id: '11111111-2222-4333-8444-555555555555',
+      email: 'admin@araguari.mg.gov.br',
+      full_name: 'Administrador Sistema',
+      role: 'admin'
+    }));
+    navigate("/");
+  };
+
+  const handleBypassInstitution = () => {
+    // Simulate institution login by navigating directly
+    localStorage.setItem('bypass_user', JSON.stringify({
+      id: '22222222-3333-4444-8555-666666666666',
+      email: 'instituicao@casesperanca.org.br',
+      full_name: 'Responsável Instituição',
+      role: 'institution',
+      institution_id: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890'
+    }));
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-blue-600 relative">
       {/* Marca d'água da imagem */}
@@ -107,6 +131,32 @@ const Login = () => {
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
+
+            {/* Seção de Bypass para Testes */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-center text-sm text-gray-600 mb-4">
+                🧪 Acesso de Teste (Bypass)
+              </p>
+              <div className="space-y-2">
+                <Button 
+                  onClick={handleBypassAdmin}
+                  variant="outline" 
+                  className="w-full text-sm"
+                >
+                  🔧 Entrar como Administrador
+                </Button>
+                <Button 
+                  onClick={handleBypassInstitution}
+                  variant="outline" 
+                  className="w-full text-sm"
+                >
+                  🏢 Entrar como Instituição
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Para testes e desenvolvimento
+              </p>
+            </div>
           </CardContent>
           
           <CardFooter className="flex justify-center">

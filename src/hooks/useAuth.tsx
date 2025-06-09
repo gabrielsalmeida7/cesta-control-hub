@@ -31,6 +31,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check for bypass user first
+    const bypassUser = localStorage.getItem('bypass_user');
+    if (bypassUser) {
+      try {
+        const parsedUser = JSON.parse(bypassUser);
+        setProfile(parsedUser);
+        // Create a mock user object for bypass
+        setUser({
+          id: parsedUser.id,
+          email: parsedUser.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          app_metadata: {},
+          user_metadata: { full_name: parsedUser.full_name },
+          aud: 'authenticated',
+          role: 'authenticated'
+        } as User);
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.error('Error parsing bypass user:', error);
+        localStorage.removeItem('bypass_user');
+      }
+    }
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -107,6 +132,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      // Clear bypass user if exists
+      localStorage.removeItem('bypass_user');
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast({
@@ -120,6 +148,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: "Você foi desconectado com sucesso.",
         });
       }
+      
+      // Reset states
+      setUser(null);
+      setSession(null);
+      setProfile(null);
     } catch (error) {
       console.error('Error signing out:', error);
     }
