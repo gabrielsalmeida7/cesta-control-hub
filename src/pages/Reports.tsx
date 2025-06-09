@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import NavigationButtons from "@/components/NavigationButtons";
 import { FileText, Download, Calendar, AlertTriangle, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,6 +99,7 @@ const Reports = () => {
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
       <Header />
+      <NavigationButtons />
       
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto">
         {/* Alerts Section */}

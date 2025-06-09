@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Header from "@/components/Header";
+import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
 import { Building, Edit, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -154,8 +155,8 @@ const Institutions = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
-      {/* Header component without username prop */}
       <Header />
+      <NavigationButtons />
       
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
         <div className="mb-8">
