@@ -9,6 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      deliveries: {
+        Row: {
+          blocking_period_days: number
+          created_at: string | null
+          delivered_by_user_id: string | null
+          delivery_date: string | null
+          family_id: string
+          id: string
+          institution_id: string
+          notes: string | null
+        }
+        Insert: {
+          blocking_period_days?: number
+          created_at?: string | null
+          delivered_by_user_id?: string | null
+          delivery_date?: string | null
+          family_id: string
+          id?: string
+          institution_id: string
+          notes?: string | null
+        }
+        Update: {
+          blocking_period_days?: number
+          created_at?: string | null
+          delivered_by_user_id?: string | null
+          delivery_date?: string | null
+          family_id?: string
+          id?: string
+          institution_id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       families: {
         Row: {
           block_reason: string | null
@@ -53,6 +101,39 @@ export type Database = {
           {
             foreignKeyName: "families_blocked_by_institution_id_fkey"
             columns: ["blocked_by_institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institution_families: {
+        Row: {
+          created_at: string | null
+          family_id: string
+          institution_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          family_id: string
+          institution_id: string
+        }
+        Update: {
+          created_at?: string | null
+          family_id?: string
+          institution_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_families_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "institution_families_institution_id_fkey"
+            columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
