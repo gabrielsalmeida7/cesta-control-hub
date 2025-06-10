@@ -2,21 +2,27 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023"],
-    "module": "ESNext",
+    "module": "NodeNext", // Changed from ESNext to NodeNext
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    /* Output options */
+    "outDir": "./dist_scripts", // Specify output directory for compiled JS
+    "emitDeclarationOnly": false, // Make sure JS files are emitted
+    "declaration": true, // Optionally, emit declaration files too
+
+    /* Module resolution */
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+
+    /* Strictness & Linting */
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules"]
 }

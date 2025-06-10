@@ -1,170 +1,190 @@
-
-import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, createContext, useContext, SetStateAction, Dispatch } from 'react';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import { db } from '@/integrations/local-db/client'; // Import local DB client
 import { useToast } from '@/hooks/use-toast';
 
+const JWT_SECRET = 'your-jwt-secret-key-here'; // Replace with a strong secret, preferably from env variables
+
+// UserProfile remains the primary source of user details
 interface UserProfile {
   id: string;
   email: string;
   full_name: string;
   role: 'admin' | 'institution';
   institution_id?: string;
+  // password_hash is in the DB but shouldn't be part of UserProfile in context
 }
 
+type User = UserProfile | null;
+type Session = { token: string } | null; // Session will store the JWT
+
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  profile: UserProfile | null;
+  user: User;
+  session: Session;
+  profile: UserProfile | null; // Kept for consistency, essentially same as 'user'
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  setProfile: Dispatch<SetStateAction<UserProfile | null>>; // May not be needed if profile is always derived from user
+  signIn: (email: string, password: string) => Promise<{ error: { message: string } | null }>;
   signOut: () => Promise<void>;
+  signUp: (userData: Omit<UserProfile, 'id'> & { password_raw: string }) => Promise<{ error: { message: string } | null }>; // Placeholder
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User>(null);
+  const [session, setSession] = useState<Session>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for bypass user first
-    const bypassUser = localStorage.getItem('bypass_user');
-    if (bypassUser) {
+    const token = localStorage.getItem('authToken');
+    const bypassUserJson = localStorage.getItem('bypass_user');
+
+    if (bypassUserJson) {
       try {
-        const parsedUser = JSON.parse(bypassUser);
-        setProfile(parsedUser);
-        // Create a mock user object for bypass
-        setUser({
-          id: parsedUser.id,
-          email: parsedUser.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: { full_name: parsedUser.full_name },
-          aud: 'authenticated',
-          role: 'authenticated'
-        } as User);
-        setLoading(false);
-        return;
+        const parsedProfile: UserProfile = JSON.parse(bypassUserJson);
+        setProfile(parsedProfile);
+        setUser(parsedProfile);
+        setSession({ token: 'bypass_token' }); // Mock session for bypass
+        console.log('Bypass user loaded:', parsedProfile);
       } catch (error) {
         console.error('Error parsing bypass user:', error);
         localStorage.removeItem('bypass_user');
       }
+      setLoading(false);
+      return;
     }
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Fetch user profile data
-          setTimeout(async () => {
-            try {
-              const { data: profileData, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as UserProfile & { exp: number };
 
-              if (error) {
-                console.error('Error fetching profile:', error);
-                return;
-              }
-
-              setProfile(profileData);
-            } catch (error) {
-              console.error('Error in profile fetch:', error);
-            }
-          }, 0);
-        } else {
-          setProfile(null);
+        if (decoded.exp * 1000 < Date.now()) {
+          console.log('Token expired');
+          localStorage.removeItem('authToken');
+          setLoading(false);
+          return;
         }
         
+        // Fetch full profile from DB to ensure data is fresh
+        // This is important if roles or other details can change
+        db.query('SELECT id, email, full_name, role, institution_id FROM profiles WHERE id = $1', [decoded.id])
+          .then(result => {
+            if (result.rows.length > 0) {
+              const userProfileFromDb: UserProfile = result.rows[0];
+              setUser(userProfileFromDb);
+              setProfile(userProfileFromDb);
+              setSession({ token });
+              console.log('Session restored from token for user:', userProfileFromDb.email);
+            } else {
+              console.error('User from token not found in DB');
+              localStorage.removeItem('authToken');
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching profile during session restore:', err);
+            localStorage.removeItem('authToken');
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } catch (error) {
+        console.error('Invalid token:', error);
+        localStorage.removeItem('authToken');
         setLoading(false);
       }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: "Erro no login",
-          description: error.message,
-          variant: "destructive",
-        });
+      const { rows } = await db.query('SELECT id, email, full_name, role, institution_id, password_hash FROM profiles WHERE email = $1', [email]);
+      if (rows.length === 0) {
+        toast({ title: "Erro no login", description: "Credenciais inválidas.", variant: "destructive" });
+        setLoading(false);
+        return { error: { message: 'Credenciais inválidas.' } };
       }
 
-      return { error };
+      const dbUser = rows[0];
+      const passwordMatch = bcrypt.compareSync(password, dbUser.password_hash);
+
+      if (passwordMatch) {
+        const userProfile: UserProfile = {
+          id: dbUser.id,
+          email: dbUser.email,
+          full_name: dbUser.full_name,
+          role: dbUser.role,
+          institution_id: dbUser.institution_id,
+        };
+        const token = jwt.sign(userProfile, JWT_SECRET, { expiresIn: '1h' }); // Adjust expiration as needed
+
+        localStorage.setItem('authToken', token);
+        setUser(userProfile);
+        setProfile(userProfile); // profile state is essentially the same as user
+        setSession({ token });
+        toast({ title: "Login realizado com sucesso!" });
+        setLoading(false);
+        return { error: null };
+      } else {
+        toast({ title: "Erro no login", description: "Credenciais inválidas.", variant: "destructive" });
+        setLoading(false);
+        return { error: { message: 'Credenciais inválidas.' } };
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({
-        title: "Erro no login",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      return { error };
+      console.error('Sign in error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no servidor.';
+      toast({ title: "Erro no login", description: errorMessage, variant: "destructive" });
+      setLoading(false);
+      return { error: { message: errorMessage } };
     }
   };
 
   const signOut = async () => {
-    try {
-      // Clear bypass user if exists
-      localStorage.removeItem('bypass_user');
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast({
-          title: "Erro ao sair",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Logout realizado",
-          description: "Você foi desconectado com sucesso.",
-        });
-      }
-      
-      // Reset states
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+    setLoading(true);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('bypass_user'); // Also clear bypass on explicit signout
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    toast({ title: "Logout realizado", description: "Você foi desconectado com sucesso." });
+    setLoading(false);
   };
+
+  // Placeholder signUp function
+  const signUp = async (userData: Omit<UserProfile, 'id'> & { password_raw: string }) => {
+    setLoading(true);
+    console.log('Attempting sign up for:', userData.email);
+    // 1. Check if user already exists by email
+    // 2. Hash the password_raw using bcrypt.hashSync(userData.password_raw, 10)
+    // 3. Insert new user into 'profiles' table with the hashed password and other details
+    //    (id can be generated using uuid_generate_v4() if not provided or handle in DB)
+    // 4. Optionally, sign them in by generating a JWT and setting session state
+
+    // Placeholder logic:
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockError = { message: "SignUp not implemented yet." };
+    // const mockSuccess = { user: { ... }, session: { ... }, profile: { ... } }
+    toast({ title: "Erro no cadastro", description: mockError.message, variant: "destructive" });
+    setLoading(false);
+    return { error: mockError };
+  };
+
 
   const value = {
     user,
     session,
     profile,
     loading,
+    setProfile,
     signIn,
     signOut,
+    signUp, // Add signUp to context
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
