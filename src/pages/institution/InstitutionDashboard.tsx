@@ -4,11 +4,13 @@ import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import DashboardCard from '@/components/DashboardCard';
 import { useAuth } from '@/hooks/useAuth';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { Users, Package, AlertTriangle, Calendar, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const InstitutionDashboard = () => {
   const { profile } = useAuth();
+  const { data: stats, isLoading } = useDashboardStats();
 
   if (!profile) {
     return null;
@@ -34,29 +36,29 @@ const InstitutionDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <DashboardCard
               title="Famílias Atendidas"
-              value="0"
+              value={isLoading ? "..." : (stats?.associatedFamilies || 0).toString()}
               description="Total de famílias atendidas"
               icon={<Users className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Entregas Este Mês"
-              value="0"
+              value={isLoading ? "..." : (stats?.recentDeliveries || 0).toString()}
               description="Cestas entregues no mês"
               icon={<Package className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Famílias Bloqueadas"
-              value="0"
-              description="Aguardando liberação"
+              value={isLoading ? "..." : (stats?.blockedByInstitution || 0).toString()}
+              description="Bloqueadas por esta instituição"
               icon={<AlertTriangle className="h-6 w-6" />}
             />
 
             <DashboardCard
-              title="Próximos Desbloqueios"
-              value="0"
-              description="Famílias liberadas esta semana"
+              title="Total de Entregas"
+              value={isLoading ? "..." : (stats?.institutionDeliveries || 0).toString()}
+              description="Entregas realizadas"
               icon={<Calendar className="h-6 w-6" />}
             />
           </div>
