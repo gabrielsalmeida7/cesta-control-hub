@@ -14,7 +14,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirecionar usuários instituição para seu dashboard específico
+    // Only redirect institution users, don't redirect admin users automatically
     if (profile?.role === 'institution') {
       navigate('/institution/dashboard');
     }

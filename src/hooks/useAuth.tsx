@@ -30,6 +30,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Helper function to redirect user based on role
+  const redirectUserBasedOnRole = (role: 'admin' | 'institution') => {
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      
+      if (role === 'admin' && !currentPath.startsWith('/institution')) {
+        // Admin users go to main dashboard if not already there
+        if (currentPath === '/login') {
+          window.location.href = '/';
+        }
+      } else if (role === 'institution') {
+        // Institution users go to institution dashboard
+        if (!currentPath.startsWith('/institution')) {
+          window.location.href = '/institution/dashboard';
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     // Check for bypass user first
     const bypassUser = localStorage.getItem('bypass_user');
@@ -49,6 +68,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           role: 'authenticated'
         } as User);
         setLoading(false);
+        
+        // Redirect bypass user based on role
+        redirectUserBasedOnRole(parsedUser.role);
         return;
       } catch (error) {
         console.error('Error parsing bypass user:', error);
@@ -64,25 +86,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile data
-          setTimeout(async () => {
-            try {
-              const { data: profileData, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
+          // Fetch user profile data with better error handling
+          try {
+            const { data: profileData, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .maybeSingle();
 
-              if (error) {
-                console.error('Error fetching profile:', error);
-                return;
-              }
-
+            if (error) {
+              console.error('Error fetching profile:', error);
+              setProfile(null);
+            } else if (profileData) {
               setProfile(profileData);
-            } catch (error) {
-              console.error('Error in profile fetch:', error);
+              // Redirect based on user role after profile is loaded
+              redirectUserBasedOnRole(profileData.role);
+            } else {
+              console.log('No profile found for user');
+              setProfile(null);
             }
-          }, 0);
+          } catch (error) {
+            console.error('Error in profile fetch:', error);
+            setProfile(null);
+          }
         } else {
           setProfile(null);
         }

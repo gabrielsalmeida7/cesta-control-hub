@@ -28,7 +28,8 @@ const Login = () => {
     const { error } = await signIn(email, password);
     
     if (!error) {
-      navigate("/");
+      // Let the auth state change handle the redirect
+      // No need to navigate manually here
     }
     
     setLoading(false);
@@ -36,26 +37,30 @@ const Login = () => {
 
   // Bypass functions for testing
   const handleBypassAdmin = () => {
-    // Simulate admin login by navigating directly
-    localStorage.setItem('bypass_user', JSON.stringify({
+    const adminProfile = {
       id: '11111111-2222-4333-8444-555555555555',
       email: 'admin@araguari.mg.gov.br',
       full_name: 'Administrador Sistema',
       role: 'admin'
-    }));
-    navigate("/");
+    };
+    localStorage.setItem('bypass_user', JSON.stringify(adminProfile));
+    
+    // Force page reload to trigger auth state change
+    window.location.href = '/';
   };
 
   const handleBypassInstitution = () => {
-    // Simulate institution login by navigating directly
-    localStorage.setItem('bypass_user', JSON.stringify({
+    const institutionProfile = {
       id: '22222222-3333-4444-8555-666666666666',
       email: 'instituicao@casesperanca.org.br',
       full_name: 'Responsável Instituição',
       role: 'institution',
-      institution_id: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890'
-    }));
-    navigate("/");
+      institution_id: 'b9e546e9-6443-460c-a6e1-d8d86efb0971'
+    };
+    localStorage.setItem('bypass_user', JSON.stringify(institutionProfile));
+    
+    // Force page reload to trigger auth state change
+    window.location.href = '/institution/dashboard';
   };
 
   return (
