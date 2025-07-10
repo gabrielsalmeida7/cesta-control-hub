@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart2, Eye, EyeOff, Filter } from "lucide-react";
 import { 
   Select, 
@@ -20,54 +21,54 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-
-// Sample data for the chart
-const data = [
-  { name: 'Jan', Instituição_A: 40, Instituição_B: 24 },
-  { name: 'Fev', Instituição_A: 30, Instituição_B: 28 },
-  { name: 'Mar', Instituição_A: 20, Instituição_B: 26 },
-  { name: 'Abr', Instituição_A: 27, Instituição_B: 20 },
-  { name: 'Mai', Instituição_A: 18, Instituição_B: 19 },
-  { name: 'Jun', Instituição_A: 23, Instituição_B: 25 },
-];
-
-// Sample list of institutions
-const institutions = [
-  { id: 1, name: "Instituição A" },
-  { id: 2, name: "Instituição B" },
-  { id: 3, name: "Instituição C" },
-  { id: 4, name: "Instituição D" },
-  { id: 5, name: "CRAS Central" },
-  { id: 6, name: "CRAS Norte" },
-  { id: 7, name: "CRAS Sul" },
-  { id: 8, name: "Igreja São Francisco" },
-  { id: 9, name: "Associação Comunitária" },
-  { id: 10, name: "Centro de Apoio" },
-  // Additional institutions to show there are many
-  { id: 11, name: "Fundação Esperança" },
-  { id: 12, name: "Centro Assistencial Luz" },
-  { id: 13, name: "Instituto Apoio Familiar" },
-  { id: 14, name: "Núcleo de Amparo" },
-  { id: 15, name: "Casa de Acolhida" },
-];
+import { useDeliveriesByInstitution } from "@/hooks/useDeliveriesByInstitution";
+import { useAuth } from "@/hooks/useAuth";
 
 const DeliveriesChart = () => {
+  const { profile } = useAuth();
+  const { data: deliveriesData, isLoading } = useDeliveriesByInstitution();
   const [showChart, setShowChart] = useState<boolean>(true);
   const [selectedInstitution, setSelectedInstitution] = useState<string>("all");
 
-  // Filter data based on selected institution
+  // Cores para as instituições
+  const institutionColors = [
+    "#004E64", "#007F5F", "#2D6A4F", "#40916C", "#52B788", 
+    "#74C69D", "#95D5B2", "#B7E4C7", "#D8F3DC", "#F1F8E9"
+  ];
+
   const getFilteredData = () => {
+    if (!deliveriesData?.chartData) return [];
+    
     if (selectedInstitution === "all") {
-      return data;
+      return deliveriesData.chartData;
     }
     
-    // For simplicity in this example, we'll just return a subset of data
-    // In a real app, you would filter based on the actual data
-    return data.map(item => ({
+    // Filtrar por instituição específica
+    return deliveriesData.chartData.map(item => ({
       name: item.name,
-      [selectedInstitution]: item[selectedInstitution === "Instituição_A" ? "Instituição_A" : "Instituição_B"]
+      [selectedInstitution]: item[selectedInstitution] || 0
     }));
   };
+
+  const getVisibleInstitutions = () => {
+    if (!deliveriesData?.institutions) return [];
+    return selectedInstitution === "all" 
+      ? deliveriesData.institutions.map(inst => inst.name)
+      : [selectedInstitution];
+  };
+
+  if (profile?.role !== 'admin') {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="p-6 shadow-md">
+        <Skeleton className="h-6 w-48 mb-6" />
+        <Skeleton className="h-[300px] w-full" />
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6 shadow-md">
@@ -86,8 +87,8 @@ const DeliveriesChart = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas Instituições</SelectItem>
-                {institutions.map((institution) => (
-                  <SelectItem key={institution.id} value={institution.id === 1 ? "Instituição_A" : "Instituição_B"}>
+                {deliveriesData?.institutions.map((institution) => (
+                  <SelectItem key={institution.name} value={institution.name}>
                     {institution.name}
                   </SelectItem>
                 ))}
@@ -132,14 +133,13 @@ const DeliveriesChart = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              {selectedInstitution === "all" ? (
-                <>
-                  <Bar dataKey="Instituição_A" fill="#004E64" />
-                  <Bar dataKey="Instituição_B" fill="#007F5F" />
-                </>
-              ) : (
-                <Bar dataKey={selectedInstitution} fill={selectedInstitution === "Instituição_A" ? "#004E64" : "#007F5F"} />
-              )}
+              {getVisibleInstitutions().map((institutionName, index) => (
+                <Bar 
+                  key={institutionName}
+                  dataKey={institutionName} 
+                  fill={institutionColors[index % institutionColors.length]} 
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>

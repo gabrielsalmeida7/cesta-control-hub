@@ -7,11 +7,14 @@ import DashboardCard from '@/components/DashboardCard';
 import DeliveriesChart from '@/components/DeliveriesChart';
 import RecentDeliveriesTable from '@/components/RecentDeliveriesTable';
 import { useAuth } from '@/hooks/useAuth';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
 
 const Index = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
   useEffect(() => {
     // Only redirect institution users, don't redirect admin users automatically
@@ -47,33 +50,44 @@ const Index = () => {
 
           {/* Cards de estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <DashboardCard
-              title="Total de Famílias"
-              value="0"
-              description="Famílias cadastradas"
-              icon={<Users className="h-6 w-6" />}
-            />
-            
-            <DashboardCard
-              title="Instituições Ativas"
-              value="0"
-              description="Instituições cadastradas"
-              icon={<Building2 className="h-6 w-6" />}
-            />
-            
-            <DashboardCard
-              title="Entregas Este Mês"
-              value="0"
-              description="Cestas entregues"
-              icon={<Package className="h-6 w-6" />}
-            />
-            
-            <DashboardCard
-              title="Famílias Bloqueadas"
-              value="0"
-              description="Aguardando liberação"
-              icon={<AlertTriangle className="h-6 w-6" />}
-            />
+            {statsLoading ? (
+              <>
+                <Skeleton className="h-[120px] w-full" />
+                <Skeleton className="h-[120px] w-full" />
+                <Skeleton className="h-[120px] w-full" />
+                <Skeleton className="h-[120px] w-full" />
+              </>
+            ) : (
+              <>
+                <DashboardCard
+                  title="Total de Famílias"
+                  value={stats?.totalFamilies || 0}
+                  description="Famílias cadastradas"
+                  icon={<Users className="h-6 w-6" />}
+                />
+                
+                <DashboardCard
+                  title="Instituições Ativas"
+                  value={stats?.totalInstitutions || 0}
+                  description="Instituições cadastradas"
+                  icon={<Building2 className="h-6 w-6" />}
+                />
+                
+                <DashboardCard
+                  title="Entregas Este Mês"
+                  value={stats?.totalDeliveries || 0}
+                  description="Cestas entregues"
+                  icon={<Package className="h-6 w-6" />}
+                />
+                
+                <DashboardCard
+                  title="Famílias Bloqueadas"
+                  value={stats?.blockedFamilies || 0}
+                  description="Aguardando liberação"
+                  icon={<AlertTriangle className="h-6 w-6" />}
+                />
+              </>
+            )}
           </div>
 
           {/* Gráfico de entregas */}

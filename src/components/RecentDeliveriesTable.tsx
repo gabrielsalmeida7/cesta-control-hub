@@ -1,20 +1,33 @@
 
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-// Sample data for the table
-const deliveries = [
-  { id: 1, family: 'Silva, Maria', date: '02/05/2023', institution: 'APAE', quantity: 2 },
-  { id: 2, family: 'Santos, João', date: '30/04/2023', institution: 'Casa de Apoio', quantity: 1 },
-  { id: 3, family: 'Oliveira, Ana', date: '28/04/2023', institution: 'Lar dos Idosos', quantity: 3 },
-  { id: 4, family: 'Souza, Pedro', date: '25/04/2023', institution: 'APAE', quantity: 2 },
-  { id: 5, family: 'Ferreira, Luiza', date: '22/04/2023', institution: 'Casa de Apoio', quantity: 1 },
-  { id: 6, family: 'Costa, Carlos', date: '20/04/2023', institution: 'Lar dos Idosos', quantity: 2 },
-  { id: 7, family: 'Pereira, Mariana', date: '18/04/2023', institution: 'APAE', quantity: 1 },
-  { id: 8, family: 'Alves, Roberto', date: '15/04/2023', institution: 'Casa de Apoio', quantity: 3 },
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAdminRecentDeliveries } from "@/hooks/useAdminRecentDeliveries";
+import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
 
 const RecentDeliveriesTable = () => {
+  const { profile } = useAuth();
+  const { data: deliveries, isLoading } = useAdminRecentDeliveries();
+
+  if (profile?.role !== 'admin') {
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-md overflow-hidden">
+        <div className="bg-primary text-white p-4">
+          <h2 className="text-xl font-bold">Entregas Recentes</h2>
+        </div>
+        <div className="p-4 space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </Card>
+    );
+  }
   return (
     <Card className="shadow-md overflow-hidden">
       <div className="bg-primary text-white p-4">
@@ -31,14 +44,29 @@ const RecentDeliveriesTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {deliveries.map((delivery) => (
-              <TableRow key={delivery.id}>
-                <TableCell className="font-medium">{delivery.family}</TableCell>
-                <TableCell>{delivery.date}</TableCell>
-                <TableCell>{delivery.institution}</TableCell>
-                <TableCell className="text-right">{delivery.quantity}</TableCell>
+            {deliveries && deliveries.length > 0 ? (
+              deliveries.map((delivery) => (
+                <TableRow key={delivery.id}>
+                  <TableCell className="font-medium">
+                    {delivery.family?.name || 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    {delivery.delivery_date 
+                      ? format(new Date(delivery.delivery_date), 'dd/MM/yyyy')
+                      : 'N/A'
+                    }
+                  </TableCell>
+                  <TableCell>{delivery.institution?.name || 'N/A'}</TableCell>
+                  <TableCell className="text-right">1</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  Nenhuma entrega encontrada
+                </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
