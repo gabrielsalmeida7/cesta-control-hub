@@ -7,100 +7,34 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useFamilies, useUpdateFamily } from "@/hooks/useFamilies";
+import type { Tables } from "@/integrations/supabase/types";
 
-// Updated interface for families with blocking information
-interface Family {
-  id: number;
-  name: string;
-  cpf: string;
-  address: string;
-  members: number;
-  lastDelivery: string;
-  status: "active" | "blocked";
-  blockedBy?: {
-    id: number;
-    name: string;
-  };
-  blockedUntil?: string;
-  blockReason?: string;
-}
+type Family = Tables<'families'> & {
+  blocked_by_institution?: { name: string } | null;
+};
 
 const Families = () => {
-  // Mock data
-  const isAdmin = true; // Simulating admin privileges
+  const { data: families, isLoading } = useFamilies();
+  const updateFamily = useUpdateFamily();
 
   // Dialog states
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isUnblockDialogOpen, setIsUnblockDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Mock family data with block status
-  const [families, setFamilies] = useState<Family[]>([
-    { 
-      id: 1, 
-      name: "Silva", 
-      cpf: "123.456.789-00", 
-      address: "Rua A, 123", 
-      members: 4, 
-      lastDelivery: "10/04/2025",
-      status: "active"
-    },
-    { 
-      id: 2, 
-      name: "Santos", 
-      cpf: "987.654.321-00", 
-      address: "Rua B, 456", 
-      members: 3, 
-      lastDelivery: "05/04/2025",
-      status: "blocked",
-      blockedBy: {
-        id: 1,
-        name: "Centro Comunitário São José"
-      },
-      blockedUntil: "10/05/2025",
-      blockReason: "Recebeu cesta básica"
-    },
-    { 
-      id: 3, 
-      name: "Oliveira", 
-      cpf: "456.789.123-00", 
-      address: "Rua C, 789", 
-      members: 5, 
-      lastDelivery: "01/04/2025",
-      status: "active"
-    },
-    { 
-      id: 4, 
-      name: "Pereira", 
-      cpf: "789.123.456-00", 
-      address: "Rua D, 101", 
-      members: 2, 
-      lastDelivery: "28/03/2025",
-      status: "blocked",
-      blockedBy: {
-        id: 2,
-        name: "Associação Bem-Estar"
-      },
-      blockedUntil: "28/04/2025",
-      blockReason: "Recebeu cesta básica"
-    },
-    { 
-      id: 5, 
-      name: "Costa", 
-      cpf: "321.654.987-00", 
-      address: "Rua E, 202", 
-      members: 6, 
-      lastDelivery: "25/03/2025",
-      status: "active"
-    },
-  ]);
+  // Filter families based on search term
+  const filteredFamilies = families?.filter(family =>
+    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   // Function to unblock a family
   const handleUnblock = (family: Family) => {
-    if (!isAdmin) return;
-    
     setSelectedFamily(family);
     setIsUnblockDialogOpen(true);
   };
@@ -109,25 +43,27 @@ const Families = () => {
   const confirmUnblock = () => {
     if (!selectedFamily) return;
     
-    const updatedFamilies = families.map(f => {
-      if (f.id === selectedFamily.id) {
-        return {
-          ...f,
-          status: "active" as const,
-          blockedBy: undefined,
-          blockedUntil: undefined,
-          blockReason: undefined
-        };
+    updateFamily.mutate(
+      { 
+        id: selectedFamily.id, 
+        updates: { 
+          is_blocked: false, 
+          blocked_until: null,
+          blocked_by_institution_id: null,
+          block_reason: null
+        } 
+      },
+      {
+        onSuccess: () => {
+          setIsUnblockDialogOpen(false);
+          setSelectedFamily(null);
+          toast({
+            title: "Família desbloqueada",
+            description: `A família ${selectedFamily.name} foi desbloqueada com sucesso.`
+          });
+        }
       }
-      return f;
-    });
-    
-    setFamilies(updatedFamilies);
-    setIsUnblockDialogOpen(false);
-    toast({
-      title: "Família desbloqueada",
-      description: `A família ${selectedFamily.name} foi desbloqueada com sucesso.`
-    });
+    );
   };
 
   // Function to view family details
@@ -151,6 +87,8 @@ const Families = () => {
                 <Input
                   placeholder="Buscar família..."
                   className="pl-9 w-full sm:w-64"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Button className="bg-primary hover:bg-primary/90">
@@ -161,62 +99,77 @@ const Families = () => {
           
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>CPF</TableHead>
-                    <TableHead>Endereço</TableHead>
-                    <TableHead>Pessoas</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Última Entrega</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {families.map((family) => (
-                    <TableRow key={family.id}>
-                      <TableCell className="font-medium">{family.name}</TableCell>
-                      <TableCell>{family.cpf}</TableCell>
-                      <TableCell>{family.address}</TableCell>
-                      <TableCell>{family.members}</TableCell>
-                      <TableCell>
-                        {family.status === "active" ? (
-                          <Badge className="bg-green-500">Ativa</Badge>
-                        ) : (
-                          <Badge className="bg-red-500">
-                            <Lock className="h-3 w-3 mr-1" /> 
-                            Bloqueada
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{family.lastDelivery}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Editar</Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleViewDetails(family)}
-                          >
-                            Detalhes
-                          </Button>
-                          {isAdmin && family.status === "blocked" && (
+              {isLoading ? (
+                <div className="p-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 py-4">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-8 w-24" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Membros</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFamilies.map((family) => (
+                      <TableRow key={family.id}>
+                        <TableCell className="font-medium">{family.name}</TableCell>
+                        <TableCell>{family.contact_person}</TableCell>
+                        <TableCell>{family.phone || "Não informado"}</TableCell>
+                        <TableCell>{family.members_count || 1}</TableCell>
+                        <TableCell>
+                          {!family.is_blocked ? (
+                            <Badge className="bg-green-500">Ativa</Badge>
+                          ) : (
+                            <Badge className="bg-red-500">
+                              <Lock className="h-3 w-3 mr-1" /> 
+                              Bloqueada
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => handleUnblock(family)}
-                              className="border-red-500 text-red-500 hover:bg-red-50"
+                              onClick={() => handleViewDetails(family)}
                             >
-                              <Unlock className="h-3 w-3 mr-1" /> Desbloquear
+                              Detalhes
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {family.is_blocked && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleUnblock(family)}
+                                className="border-red-500 text-red-500 hover:bg-red-50"
+                                disabled={updateFamily.isPending}
+                              >
+                                <Unlock className="h-3 w-3 mr-1" /> 
+                                {updateFamily.isPending ? "..." : "Desbloquear"}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </div>
         </div>
@@ -233,35 +186,30 @@ const Families = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-gray-500">Nome</p>
+                  <p className="text-sm font-semibold text-gray-500">Nome da Família</p>
                   <p>{selectedFamily.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-500">CPF</p>
-                  <p>{selectedFamily.cpf}</p>
+                  <p className="text-sm font-semibold text-gray-500">Pessoa de Contato</p>
+                  <p>{selectedFamily.contact_person}</p>
                 </div>
-              </div>
-              
-              <div>
-                <p className="text-sm font-semibold text-gray-500">Endereço</p>
-                <p>{selectedFamily.address}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-gray-500">Membros</p>
-                  <p>{selectedFamily.members} pessoas</p>
+                  <p className="text-sm font-semibold text-gray-500">Telefone</p>
+                  <p>{selectedFamily.phone || "Não informado"}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-500">Última Entrega</p>
-                  <p>{selectedFamily.lastDelivery}</p>
+                  <p className="text-sm font-semibold text-gray-500">Membros</p>
+                  <p>{selectedFamily.members_count || 1} pessoas</p>
                 </div>
               </div>
               
               <div>
                 <p className="text-sm font-semibold text-gray-500">Status</p>
                 <div className="mt-1">
-                  {selectedFamily.status === "active" ? (
+                  {!selectedFamily.is_blocked ? (
                     <Badge className="bg-green-500">Ativa</Badge>
                   ) : (
                     <Badge className="bg-red-500">Bloqueada</Badge>
@@ -269,21 +217,21 @@ const Families = () => {
                 </div>
               </div>
               
-              {selectedFamily.status === "blocked" && (
+              {selectedFamily.is_blocked && (
                 <>
                   <div>
                     <p className="text-sm font-semibold text-gray-500">Bloqueada por</p>
-                    <p>{selectedFamily.blockedBy?.name}</p>
+                    <p>{selectedFamily.blocked_by_institution?.name || "Sistema"}</p>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-semibold text-gray-500">Bloqueada até</p>
-                      <p>{selectedFamily.blockedUntil}</p>
+                      <p>{selectedFamily.blocked_until ? new Date(selectedFamily.blocked_until).toLocaleDateString('pt-BR') : "N/A"}</p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-500">Motivo</p>
-                      <p>{selectedFamily.blockReason}</p>
+                      <p>{selectedFamily.block_reason || "Não especificado"}</p>
                     </div>
                   </div>
                 </>
