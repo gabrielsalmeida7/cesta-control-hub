@@ -2,77 +2,64 @@
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Calendar, Download, Package, Users, BarChart3 } from 'lucide-react';
+import { Calendar, Download, Package, Users, BarChart3, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
+import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
 
-interface DeliveryReport {
-  id: string;
-  delivery_date: string;
-  family_name: string;
-  family_cpf: string;
-  items_delivered: string[];
-  blocking_period: number;
-  notes?: string;
-}
 
 const InstitutionReports = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
 
-  // Mock data - entregas feitas pela instituição
-  const deliveries: DeliveryReport[] = [
-    {
-      id: '1',
-      delivery_date: '2024-06-15',
-      family_name: 'Família Silva',
-      family_cpf: '123.456.789-10',
-      items_delivered: ['Cesta Básica', 'Leite (2L)', 'Óleo (1L)'],
-      blocking_period: 30,
-      notes: 'Entrega realizada normalmente'
-    },
-    {
-      id: '2',
-      delivery_date: '2024-06-10',
-      family_name: 'Família Oliveira',
-      family_cpf: '456.789.123-45',
-      items_delivered: ['Cesta Básica', 'Arroz (5kg)'],
-      blocking_period: 30
-    },
-    {
-      id: '3',
-      delivery_date: '2024-06-05',
-      family_name: 'Família Costa',
-      family_cpf: '321.654.987-88',
-      items_delivered: ['Cesta Básica'],
-      blocking_period: 15,
-      notes: 'Família com urgência'
-    }
-  ];
+  const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(startDate, endDate);
 
-  const filteredDeliveries = deliveries.filter(delivery => {
-    if (!startDate && !endDate) return true;
-    
-    const deliveryDate = new Date(delivery.delivery_date);
-    const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-    const end = endDate ? new Date(endDate) : new Date('2100-12-31');
-    
-    return deliveryDate >= start && deliveryDate <= end;
-  });
+  const filteredDeliveries = deliveries;
 
   const totalDeliveries = filteredDeliveries.length;
-  const totalFamilies = new Set(filteredDeliveries.map(d => d.family_cpf)).size;
-  const totalItems = filteredDeliveries.reduce((acc, d) => acc + d.items_delivered.length, 0);
+  const totalFamilies = new Set(filteredDeliveries.map(d => d.family?.id)).size;
+  const totalItems = filteredDeliveries.length; // Assumindo 1 item por entrega (cesta básica)
 
   const exportReport = () => {
     // Aqui seria implementada a exportação do relatório
     console.log('Exportando relatório...', filteredDeliveries);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-red-600">Erro ao carregar relatórios: {error.message}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -158,7 +145,7 @@ const InstitutionReports = () => {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Família</TableHead>
-                    <TableHead>CPF</TableHead>
+                    <TableHead>Contato</TableHead>
                     <TableHead>Itens Entregues</TableHead>
                     <TableHead>Período Bloqueio</TableHead>
                     <TableHead>Observações</TableHead>
@@ -171,21 +158,19 @@ const InstitutionReports = () => {
                         {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {delivery.family_name}
+                        {delivery.family?.name || 'N/A'}
                       </TableCell>
-                      <TableCell>{delivery.family_cpf}</TableCell>
+                      <TableCell>{delivery.family?.contact_person || 'N/A'}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {delivery.items_delivered.map((item, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {item}
-                            </Badge>
-                          ))}
+                          <Badge variant="secondary" className="text-xs">
+                            Cesta Básica
+                          </Badge>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {delivery.blocking_period} dias
+                          {delivery.blocking_period_days} dias
                         </Badge>
                       </TableCell>
                       <TableCell>

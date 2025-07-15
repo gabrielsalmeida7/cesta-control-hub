@@ -16,7 +16,9 @@ export const useFamilies = () => {
         .from('families')
         .select(`
           *,
-          blocked_by_institution:blocked_by_institution_id(name)
+          blocked_by_institution:blocked_by_institution_id(name),
+          institution_families(institution_id),
+          deliveries(delivery_date, blocking_period_days, notes)
         `)
         .order('name');
       
@@ -37,7 +39,8 @@ export const useInstitutionFamilies = (institutionId?: string) => {
         .select(`
           *,
           blocked_by_institution:blocked_by_institution_id(name),
-          institution_families!inner(institution_id)
+          institution_families!inner(institution_id),
+          deliveries(delivery_date, blocking_period_days, notes)
         `)
         .eq('institution_families.institution_id', institutionId)
         .order('name');

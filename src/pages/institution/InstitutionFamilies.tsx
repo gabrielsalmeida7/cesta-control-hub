@@ -2,79 +2,39 @@
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useFamilies } from '@/hooks/useFamilies';
+import { useAuth } from '@/hooks/useAuth';
 
-interface Family {
-  id: string;
-  family_name: string;
-  main_cpf: string;
-  address: string;
-  members_count: number;
-  is_blocked: boolean;
-  blocked_until?: string;
-  block_reason?: string;
-  blocked_by_institution?: string;
-  last_delivery_date?: string;
-  last_delivery_institution?: string;
-}
 
 const InstitutionFamilies = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const { profile } = useAuth();
+  
+  const { data: families = [], isLoading, error } = useFamilies();
 
-  // Mock data - Em uma implementação real, viria do Supabase
-  const families: Family[] = [
-    {
-      id: '1',
-      family_name: 'Família Silva',
-      main_cpf: '123.456.789-10',
-      address: 'Rua das Flores, 123',
-      members_count: 4,
-      is_blocked: true,
-      blocked_until: '2024-07-15',
-      block_reason: 'Recebeu cesta básica',
-      blocked_by_institution: 'Centro Comunitário São José',
-      last_delivery_date: '2024-06-15',
-      last_delivery_institution: 'Centro Comunitário São José'
-    },
-    {
-      id: '2', 
-      family_name: 'Família Santos',
-      main_cpf: '987.654.321-00',
-      address: 'Av. Principal, 456',
-      members_count: 3,
-      is_blocked: false,
-      last_delivery_date: '2024-05-10',
-      last_delivery_institution: 'Associação Bem-Estar'
-    },
-    {
-      id: '3',
-      family_name: 'Família Oliveira', 
-      main_cpf: '456.789.123-45',
-      address: 'Rua do Campo, 789',
-      members_count: 5,
-      is_blocked: true,
-      blocked_until: '2024-07-20',
-      block_reason: 'Recebeu cesta básica',
-      blocked_by_institution: 'Igreja Nossa Senhora',
-      last_delivery_date: '2024-06-20',
-      last_delivery_institution: 'Igreja Nossa Senhora'
-    }
-  ];
+  // Filtrar apenas famílias da instituição
+  const institutionFamilies = families.filter(family => {
+    // Verificar se a família está associada à instituição através da tabela institution_families
+    return family.institution_families?.some((if_relation: any) => 
+      if_relation.institution_id === profile?.institution_id
+    );
+  });
 
-  const filteredFamilies = families.filter(family =>
-    family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.main_cpf.includes(searchTerm)
+  const filteredFamilies = institutionFamilies.filter(family =>
+    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusBadge = (family: Family) => {
+  const getStatusBadge = (family: any) => {
     if (family.is_blocked) {
       const daysRemaining = family.blocked_until ? 
         Math.ceil((new Date(family.blocked_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
@@ -95,10 +55,42 @@ const InstitutionFamilies = () => {
     );
   };
 
-  const handleViewDetails = (family: Family) => {
+  const handleViewDetails = (family: any) => {
     setSelectedFamily(family);
     setIsDetailsOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-red-600">Erro ao carregar famílias: {error.message}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -134,13 +126,13 @@ const InstitutionFamilies = () => {
           </Card>
 
           {/* Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Total de Famílias</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{families.length}</p>
+                <p className="text-3xl font-bold">{institutionFamilies.length}</p>
               </CardContent>
             </Card>
             
@@ -150,7 +142,7 @@ const InstitutionFamilies = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-green-600">
-                  {families.filter(f => !f.is_blocked).length}
+                  {institutionFamilies.filter(f => !f.is_blocked).length}
                 </p>
               </CardContent>
             </Card>
@@ -161,7 +153,7 @@ const InstitutionFamilies = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-red-600">
-                  {families.filter(f => f.is_blocked).length}
+                  {institutionFamilies.filter(f => f.is_blocked).length}
                 </p>
               </CardContent>
             </Card>
@@ -187,15 +179,15 @@ const InstitutionFamilies = () => {
                 <TableBody>
                   {filteredFamilies.map((family) => (
                     <TableRow key={family.id}>
-                      <TableCell className="font-medium">{family.family_name}</TableCell>
-                      <TableCell>{family.main_cpf}</TableCell>
-                      <TableCell>{family.members_count}</TableCell>
+                      <TableCell className="font-medium">{family.name}</TableCell>
+                      <TableCell>{family.contact_person}</TableCell>
+                      <TableCell>{family.members_count || 'N/A'}</TableCell>
                       <TableCell>{getStatusBadge(family)}</TableCell>
                       <TableCell>
-                        {family.last_delivery_date ? (
+                        {family.deliveries && family.deliveries.length > 0 ? (
                           <div>
-                            <p className="text-sm">{new Date(family.last_delivery_date).toLocaleDateString('pt-BR')}</p>
-                            <p className="text-xs text-gray-500">{family.last_delivery_institution}</p>
+                            <p className="text-sm">{new Date(family.deliveries[0].delivery_date).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-xs text-gray-500">Esta instituição</p>
                           </div>
                         ) : (
                           <span className="text-gray-500">Nunca</span>
@@ -224,7 +216,7 @@ const InstitutionFamilies = () => {
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Detalhes da Família: {selectedFamily?.family_name}</DialogTitle>
+            <DialogTitle>Detalhes da Família: {selectedFamily?.name}</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
@@ -232,19 +224,19 @@ const InstitutionFamilies = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Nome da Família</p>
-                  <p className="font-medium">{selectedFamily.family_name}</p>
+                  <p className="font-medium">{selectedFamily.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">CPF Principal</p>
-                  <p className="font-medium">{selectedFamily.main_cpf}</p>
+                  <p className="text-sm text-gray-600">Pessoa de Contato</p>
+                  <p className="font-medium">{selectedFamily.contact_person}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Endereço</p>
-                  <p className="font-medium">{selectedFamily.address}</p>
+                  <p className="text-sm text-gray-600">Telefone</p>
+                  <p className="font-medium">{selectedFamily.phone || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Número de Membros</p>
-                  <p className="font-medium">{selectedFamily.members_count}</p>
+                  <p className="font-medium">{selectedFamily.members_count || 'N/A'}</p>
                 </div>
               </div>
               
@@ -257,19 +249,21 @@ const InstitutionFamilies = () => {
                 <div className="p-4 bg-red-50 rounded-lg">
                   <h4 className="font-medium text-red-800 mb-2">Informações do Bloqueio</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Motivo:</strong> {selectedFamily.block_reason}</p>
-                    <p><strong>Bloqueada por:</strong> {selectedFamily.blocked_by_institution}</p>
+                    <p><strong>Motivo:</strong> {selectedFamily.block_reason || 'N/A'}</p>
                     <p><strong>Bloqueada até:</strong> {selectedFamily.blocked_until ? new Date(selectedFamily.blocked_until).toLocaleDateString('pt-BR') : 'N/A'}</p>
                   </div>
                 </div>
               )}
               
-              {selectedFamily.last_delivery_date && (
+              {selectedFamily.deliveries && selectedFamily.deliveries.length > 0 && (
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Data:</strong> {new Date(selectedFamily.last_delivery_date).toLocaleDateString('pt-BR')}</p>
-                    <p><strong>Instituição:</strong> {selectedFamily.last_delivery_institution}</p>
+                    <p><strong>Data:</strong> {new Date(selectedFamily.deliveries[0].delivery_date).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Período de Bloqueio:</strong> {selectedFamily.deliveries[0].blocking_period_days} dias</p>
+                    {selectedFamily.deliveries[0].notes && (
+                      <p><strong>Observações:</strong> {selectedFamily.deliveries[0].notes}</p>
+                    )}
                   </div>
                 </div>
               )}

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Package, AlertTriangle, Plus, Minus } from 'lucide-react';
+import { Search, Package, AlertTriangle, Plus, Minus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useFamilies } from '@/hooks/useFamilies';
+import { useCreateDelivery } from '@/hooks/useInstitutionDeliveries';
+import { useAuth } from '@/hooks/useAuth';
 
 interface DeliveryItem {
   item_name: string;
@@ -17,49 +20,31 @@ interface DeliveryItem {
   unit: string;
 }
 
-interface Family {
-  id: string;
-  family_name: string;
-  main_cpf: string;
-  address: string;
-  members_count: number;
-  is_blocked: boolean;
-  blocked_until?: string;
-}
-
 const InstitutionDelivery = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<any>(null);
   const [blockingPeriod, setBlockingPeriod] = useState('30');
   const [notes, setNotes] = useState('');
   const [deliveryItems, setDeliveryItems] = useState<DeliveryItem[]>([
     { item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }
   ]);
   const { toast } = useToast();
+  const { profile } = useAuth();
+  
+  const { data: families = [], isLoading } = useFamilies();
+  const createDeliveryMutation = useCreateDelivery();
 
-  // Mock data - famílias liberadas para entrega
-  const availableFamilies: Family[] = [
-    {
-      id: '2',
-      family_name: 'Família Santos',
-      main_cpf: '987.654.321-00',
-      address: 'Av. Principal, 456',
-      members_count: 3,
-      is_blocked: false
-    },
-    {
-      id: '4',
-      family_name: 'Família Costa',
-      main_cpf: '321.654.987-88',
-      address: 'Rua Nova, 321',
-      members_count: 2,
-      is_blocked: false
-    }
-  ];
+  // Filtrar famílias liberadas para entrega (da própria instituição)
+  const availableFamilies = families.filter(family => {
+    return !family.is_blocked && 
+           family.institution_families?.some((if_relation: any) => 
+             if_relation.institution_id === profile?.institution_id
+           );
+  });
 
   const filteredFamilies = availableFamilies.filter(family =>
-    family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.main_cpf.includes(searchTerm)
+    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const addDeliveryItem = () => {
@@ -78,7 +63,7 @@ const InstitutionDelivery = () => {
     setDeliveryItems(updated);
   };
 
-  const handleDeliverySubmit = () => {
+  const handleDeliverySubmit = async () => {
     if (!selectedFamily) {
       toast({
         title: "Erro",
@@ -97,24 +82,30 @@ const InstitutionDelivery = () => {
       return;
     }
 
-    // Aqui seria feita a chamada para o Supabase para registrar a entrega
-    console.log('Registrando entrega:', {
-      family: selectedFamily,
-      items: deliveryItems,
-      blockingPeriod,
-      notes
-    });
+    try {
+      await createDeliveryMutation.mutateAsync({
+        family_id: selectedFamily.id,
+        blocking_period_days: parseInt(blockingPeriod),
+        notes: notes || undefined,
+      });
 
-    toast({
-      title: "Entrega Registrada",
-      description: `Entrega registrada para ${selectedFamily.family_name}. Família bloqueada por ${blockingPeriod} dias.`
-    });
+      toast({
+        title: "Entrega Registrada",
+        description: `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingPeriod} dias.`
+      });
 
-    // Resetar formulário
-    setSelectedFamily(null);
-    setDeliveryItems([{ item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }]);
-    setNotes('');
-    setSearchTerm('');
+      // Resetar formulário
+      setSelectedFamily(null);
+      setDeliveryItems([{ item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }]);
+      setNotes('');
+      setSearchTerm('');
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao registrar entrega. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -150,46 +141,52 @@ const InstitutionDelivery = () => {
                   />
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {filteredFamilies.map((family) => (
-                    <div
-                      key={family.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedFamily?.id === family.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedFamily(family)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">{family.family_name}</p>
-                          <p className="text-sm text-gray-600">{family.main_cpf}</p>
-                          <p className="text-sm text-gray-500">{family.address}</p>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {filteredFamilies.map((family) => (
+                      <div
+                        key={family.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedFamily?.id === family.id 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setSelectedFamily(family)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{family.name}</p>
+                            <p className="text-sm text-gray-600">{family.contact_person}</p>
+                            <p className="text-sm text-gray-500">{family.phone || 'Sem telefone'}</p>
+                          </div>
+                          <Badge variant="default" className="bg-green-500">
+                            Liberada
+                          </Badge>
                         </div>
-                        <Badge variant="default" className="bg-green-500">
-                          Liberada
-                        </Badge>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {family.members_count || 'N/A'} membros
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {family.members_count} membros
-                      </p>
-                    </div>
-                  ))}
-                  
-                  {filteredFamilies.length === 0 && searchTerm && (
-                    <p className="text-center text-gray-500 py-4">
-                      Nenhuma família encontrada
-                    </p>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
+                
+                {filteredFamilies.length === 0 && searchTerm && (
+                  <p className="text-center text-gray-500 py-4">
+                    Nenhuma família encontrada
+                  </p>
+                )}
 
                 {selectedFamily && (
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <h4 className="font-medium text-blue-800 mb-2">Família Selecionada</h4>
-                    <p className="text-sm"><strong>Nome:</strong> {selectedFamily.family_name}</p>
-                    <p className="text-sm"><strong>CPF:</strong> {selectedFamily.main_cpf}</p>
-                    <p className="text-sm"><strong>Membros:</strong> {selectedFamily.members_count}</p>
+                    <p className="text-sm"><strong>Nome:</strong> {selectedFamily.name}</p>
+                    <p className="text-sm"><strong>Contato:</strong> {selectedFamily.contact_person}</p>
+                    <p className="text-sm"><strong>Membros:</strong> {selectedFamily.members_count || 'N/A'}</p>
                   </div>
                 )}
               </CardContent>
@@ -299,10 +296,14 @@ const InstitutionDelivery = () => {
                 <Button 
                   onClick={handleDeliverySubmit}
                   className="w-full"
-                  disabled={!selectedFamily}
+                  disabled={!selectedFamily || createDeliveryMutation.isPending}
                 >
-                  <Package className="h-4 w-4 mr-2" />
-                  Registrar Entrega
+                  {createDeliveryMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Package className="h-4 w-4 mr-2" />
+                  )}
+                  {createDeliveryMutation.isPending ? 'Registrando...' : 'Registrar Entrega'}
                 </Button>
               </CardContent>
             </Card>
