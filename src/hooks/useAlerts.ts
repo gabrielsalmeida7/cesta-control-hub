@@ -21,17 +21,21 @@ export const useAlerts = () => {
       const alerts: Alert[] = [];
 
       // Check for families receiving multiple deliveries
-      const { data: recentDeliveries } = await supabase
+      const { data: recentDeliveries, error: deliveriesError } = await supabase
         .from('deliveries')
         .select(`
           *,
-          families!inner(name),
-          institutions!inner(name)
+          families(name),
+          institutions(name)
         `)
         .gte('delivery_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .order('delivery_date', { ascending: false });
 
-      if (recentDeliveries) {
+      if (deliveriesError) {
+        console.error('Error fetching deliveries:', deliveriesError);
+      }
+
+      if (recentDeliveries && recentDeliveries.length > 0) {
         // Group deliveries by family
         const deliveriesByFamily: { [key: string]: any[] } = {};
         recentDeliveries.forEach(delivery => {
@@ -44,14 +48,14 @@ export const useAlerts = () => {
         // Check for potential fraud (multiple deliveries in short period)
         Object.entries(deliveriesByFamily).forEach(([familyId, deliveries]) => {
           if (deliveries.length > 1) {
-            const institutions = [...new Set(deliveries.map(d => d.institutions.name))];
+            const institutions = [...new Set(deliveries.map(d => d.institutions?.name).filter(Boolean))];
             if (institutions.length > 1) {
               alerts.push({
                 id: `fraud-${familyId}`,
                 type: 'fraude',
                 severity: 'alta',
                 title: 'Possível tentativa de fraude detectada',
-                description: `A família ${deliveries[0].families.name} recebeu cestas de ${institutions.length} instituições diferentes no último mês.`,
+                description: `A família ${deliveries[0].families?.name || 'Desconhecida'} recebeu cestas de ${institutions.length} instituições diferentes no último mês: ${institutions.join(', ')}.`,
                 familyId: familyId,
                 institutionId: deliveries[0].institution_id,
                 createdAt: new Date().toISOString(),
@@ -63,11 +67,15 @@ export const useAlerts = () => {
       }
 
       // Check for blocked families that should be unblocked
-      const { data: blockedFamilies } = await supabase
+      const { data: blockedFamilies, error: familiesError } = await supabase
         .from('families')
         .select('*')
         .eq('is_blocked', true)
         .lt('blocked_until', new Date().toISOString());
+
+      if (familiesError) {
+        console.error('Error fetching blocked families:', familiesError);
+      }
 
       if (blockedFamilies && blockedFamilies.length > 0) {
         blockedFamilies.forEach(family => {
@@ -84,16 +92,47 @@ export const useAlerts = () => {
         });
       }
 
-      // Check for high activity institutions
-      const { data: institutionStats } = await supabase
+      // Check for high activity institutions (optional - simplified for now)
+      const { data: highActivityDeliveries } = await supabase
         .from('deliveries')
         .select(`
           institution_id,
-          institutions!inner(name),
-          count(*)
+          institutions(name)
         `)
         .gte('delivery_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
+      if (highActivityDeliveries && highActivityDeliveries.length > 0) {
+        // Count deliveries per institution
+        const institutionCounts: { [key: string]: { count: number, name: string } } = {};
+        highActivityDeliveries.forEach(delivery => {
+          const institutionId = delivery.institution_id;
+          if (!institutionCounts[institutionId]) {
+            institutionCounts[institutionId] = { 
+              count: 0, 
+              name: delivery.institutions?.name || 'Instituição Desconhecida' 
+            };
+          }
+          institutionCounts[institutionId].count++;
+        });
+
+        // Generate alerts for institutions with high activity (>10 deliveries in a week)
+        Object.entries(institutionCounts).forEach(([institutionId, data]) => {
+          if (data.count > 10) {
+            alerts.push({
+              id: `high-activity-${institutionId}`,
+              type: 'outro',
+              severity: 'média',
+              title: 'Alta atividade detectada',
+              description: `A instituição ${data.name} realizou ${data.count} entregas nos últimos 7 dias.`,
+              institutionId: institutionId,
+              createdAt: new Date().toISOString(),
+              resolved: false
+            });
+          }
+        });
+      }
+
+      console.log('Generated alerts:', alerts);
       return alerts;
     },
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
