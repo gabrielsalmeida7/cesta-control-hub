@@ -12,14 +12,23 @@ export const useInstitutions = () => {
   return useQuery({
     queryKey: ['institutions'],
     queryFn: async () => {
+      console.log('🏢 Fetching institutions...');
+      
       const { data, error } = await supabase
         .from('institutions')
         .select('*')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching institutions:', error);
+        throw error;
+      }
+      
+      console.log('✅ Institutions fetched:', data?.length || 0, 'records');
       return data as Institution[];
     },
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 };
 

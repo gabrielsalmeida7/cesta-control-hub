@@ -8,6 +8,8 @@ export const useAdminRecentDeliveries = () => {
   return useQuery({
     queryKey: ['admin-recent-deliveries'],
     queryFn: async () => {
+      console.log('🚚 Fetching recent deliveries for admin...');
+      
       const { data, error } = await supabase
         .from('deliveries')
         .select(`
@@ -18,9 +20,16 @@ export const useAdminRecentDeliveries = () => {
         .order('delivery_date', { ascending: false })
         .limit(10);
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching recent deliveries:', error);
+        throw error;
+      }
+      
+      console.log('✅ Recent deliveries fetched:', data?.length || 0, 'records');
       return data;
     },
     enabled: !!profile && profile.role === 'admin',
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 };

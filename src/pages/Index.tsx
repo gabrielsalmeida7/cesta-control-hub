@@ -7,7 +7,7 @@ import DashboardCard from '@/components/DashboardCard';
 import DeliveriesChart from '@/components/DeliveriesChart';
 import RecentDeliveriesTable from '@/components/RecentDeliveriesTable';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useDashboardStats, type AdminStats } from '@/hooks/useDashboardStats';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
 
@@ -61,28 +61,28 @@ const Index = () => {
               <>
                 <DashboardCard
                   title="Total de Famílias"
-                  value={stats?.totalFamilies || 0}
+                  value={(stats as AdminStats)?.totalFamilies || 0}
                   description="Famílias cadastradas"
                   icon={<Users className="h-6 w-6" />}
                 />
                 
                 <DashboardCard
                   title="Instituições Ativas"
-                  value={stats?.totalInstitutions || 0}
+                  value={(stats as AdminStats)?.totalInstitutions || 0}
                   description="Instituições cadastradas"
                   icon={<Building2 className="h-6 w-6" />}
                 />
                 
                 <DashboardCard
                   title="Entregas Este Mês"
-                  value={stats?.totalDeliveries || 0}
+                  value={(stats as AdminStats)?.totalDeliveries || 0}
                   description="Cestas entregues"
                   icon={<Package className="h-6 w-6" />}
                 />
                 
                 <DashboardCard
                   title="Famílias Bloqueadas"
-                  value={stats?.blockedFamilies || 0}
+                  value={(stats as AdminStats)?.blockedFamilies || 0}
                   description="Aguardando liberação"
                   icon={<AlertTriangle className="h-6 w-6" />}
                 />

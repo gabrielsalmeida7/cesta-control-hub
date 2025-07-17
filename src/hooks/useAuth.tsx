@@ -49,31 +49,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Create a mock session for bypass users
+  const createBypassSession = (bypassProfile: UserProfile) => {
+    const mockUser = {
+      id: bypassProfile.id,
+      email: bypassProfile.email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user_metadata: { full_name: bypassProfile.full_name },
+      app_metadata: {},
+      aud: 'authenticated',
+      role: 'authenticated',
+      confirmation_sent_at: null,
+      recovery_sent_at: null,
+      email_change_sent_at: null,
+      new_email: null,
+      invited_at: null,
+      action_link: null,
+      email_confirmed_at: new Date().toISOString(),
+      phone_confirmed_at: null,
+      confirmed_at: new Date().toISOString(),
+      email_change: null,
+      phone_change: null,
+      phone: null,
+      factors: null,
+      identities: []
+    } as User;
+
+    const mockSession = {
+      access_token: 'mock-access-token',
+      refresh_token: 'mock-refresh-token',
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: 'bearer',
+      user: mockUser
+    } as Session;
+
+    return { user: mockUser, session: mockSession };
+  };
+
   useEffect(() => {
+    console.log('🔐 Auth hook initializing...');
+    
     // Check for bypass user first
     const bypassUser = localStorage.getItem('bypass_user');
     if (bypassUser) {
       try {
         const parsedUser = JSON.parse(bypassUser);
+        console.log('🚀 Using bypass user:', parsedUser);
+        
+        // Create mock session for bypass user
+        const { user: mockUser, session: mockSession } = createBypassSession(parsedUser);
+        
         setProfile(parsedUser);
-        // Create a mock user object for bypass
-        setUser({
-          id: parsedUser.id,
-          email: parsedUser.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: { full_name: parsedUser.full_name },
-          aud: 'authenticated',
-          role: 'authenticated'
-        } as User);
+        setUser(mockUser);
+        setSession(mockSession);
         setLoading(false);
         
         // Redirect bypass user based on role
         redirectUserBasedOnRole(parsedUser.role);
         return;
       } catch (error) {
-        console.error('Error parsing bypass user:', error);
+        console.error('❌ Error parsing bypass user:', error);
         localStorage.removeItem('bypass_user');
       }
     }
@@ -158,6 +195,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      console.log('🚪 Signing out...');
+      
       // Clear bypass user if exists
       localStorage.removeItem('bypass_user');
       
@@ -180,7 +219,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(null);
       setProfile(null);
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
     }
   };
 

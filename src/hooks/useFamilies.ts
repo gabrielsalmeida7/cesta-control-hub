@@ -12,6 +12,8 @@ export const useFamilies = () => {
   return useQuery({
     queryKey: ['families'],
     queryFn: async () => {
+      console.log('👨‍👩‍👧‍👦 Fetching families...');
+      
       const { data, error } = await supabase
         .from('families')
         .select(`
@@ -22,9 +24,16 @@ export const useFamilies = () => {
         `)
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching families:', error);
+        throw error;
+      }
+      
+      console.log('✅ Families fetched:', data?.length || 0, 'records');
       return data;
     },
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 };
 
