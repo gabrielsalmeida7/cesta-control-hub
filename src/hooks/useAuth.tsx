@@ -51,6 +51,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Create a mock session for bypass users
   const createBypassSession = (bypassProfile: UserProfile) => {
+    console.log('🔧 Creating bypass session for:', bypassProfile.role, bypassProfile.id);
+    
     const mockUser = {
       id: bypassProfile.id,
       email: bypassProfile.email,

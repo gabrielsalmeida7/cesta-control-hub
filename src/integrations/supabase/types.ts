@@ -223,6 +223,10 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      is_bypass_user: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       blocking_period: "7" | "15" | "20" | "30" | "45"

@@ -38,7 +38,7 @@ const Login = () => {
   // Bypass functions for testing
   const handleBypassAdmin = () => {
     const adminProfile = {
-      id: '11111111-2222-4333-8444-555555555555',
+      id: 'd1e6f7a2-b3c4-5d6e-7f8a-9b0c1d2e3f40',
       email: 'admin@araguari.mg.gov.br',
       full_name: 'Administrador Sistema',
       role: 'admin'
@@ -51,11 +51,11 @@ const Login = () => {
 
   const handleBypassInstitution = () => {
     const institutionProfile = {
-      id: '22222222-3333-4444-8555-666666666666',
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       email: 'instituicao@casesperanca.org.br',
       full_name: 'Responsável Instituição',
       role: 'institution',
-      institution_id: 'b9e546e9-6443-460c-a6e1-d8d86efb0971'
+      institution_id: '12345678-1234-1234-1234-123456789012'
     };
     localStorage.setItem('bypass_user', JSON.stringify(institutionProfile));
     
