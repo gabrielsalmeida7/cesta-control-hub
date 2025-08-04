@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface Alert {
   id: string;
@@ -14,127 +15,199 @@ export interface Alert {
 }
 
 export const useAlerts = () => {
+  const { profile } = useAuth();
+
   return useQuery({
     queryKey: ['alerts'],
     queryFn: async (): Promise<Alert[]> => {
-      // Generate alerts based on real data
-      const alerts: Alert[] = [];
-
-      // Check for families receiving multiple deliveries
-      const { data: recentDeliveries, error: deliveriesError } = await supabase
-        .from('deliveries')
-        .select(`
-          *,
-          families(name),
-          institutions(name)
-        `)
-        .gte('delivery_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .order('delivery_date', { ascending: false });
-
-      if (deliveriesError) {
-        console.error('Error fetching deliveries:', deliveriesError);
+      console.log('🚨 Fetching alerts...');
+      
+      if (!profile) {
+        console.log('❌ No profile available for alerts');
+        return [];
       }
 
-      if (recentDeliveries && recentDeliveries.length > 0) {
-        // Group deliveries by family
-        const deliveriesByFamily: { [key: string]: any[] } = {};
-        recentDeliveries.forEach(delivery => {
-          if (!deliveriesByFamily[delivery.family_id]) {
-            deliveriesByFamily[delivery.family_id] = [];
-          }
-          deliveriesByFamily[delivery.family_id].push(delivery);
-        });
+      try {
+        const alerts: Alert[] = [];
+        
+        // 1. Verificar possíveis fraudes (múltiplas entregas para a mesma família)
+        const { data: deliveries, error: deliveriesError } = await supabase
+          .from('deliveries')
+          .select(`
+            *,
+            family:families(name),
+            institution:institutions(name)
+          `)
+          .gte('delivery_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-        // Check for potential fraud (multiple deliveries in short period)
-        Object.entries(deliveriesByFamily).forEach(([familyId, deliveries]) => {
-          if (deliveries.length > 1) {
-            const institutions = [...new Set(deliveries.map(d => d.institutions?.name).filter(Boolean))];
-            if (institutions.length > 1) {
+        if (deliveriesError) {
+          console.error('❌ Error fetching deliveries for alerts:', deliveriesError);
+        } else if (deliveries) {
+          // Agrupar por família e verificar múltiplas entregas
+          const familyDeliveries = deliveries.reduce((acc, delivery) => {
+            const familyId = delivery.family_id;
+            if (!acc[familyId]) acc[familyId] = [];
+            acc[familyId].push(delivery);
+            return acc;
+          }, {} as Record<string, any[]>);
+
+          Object.entries(familyDeliveries).forEach(([familyId, familyDeliveries]) => {
+            if (familyDeliveries.length > 1) {
               alerts.push({
                 id: `fraud-${familyId}`,
                 type: 'fraude',
                 severity: 'alta',
-                title: 'Possível tentativa de fraude detectada',
-                description: `A família ${deliveries[0].families?.name || 'Desconhecida'} recebeu cestas de ${institutions.length} instituições diferentes no último mês: ${institutions.join(', ')}.`,
-                familyId: familyId,
-                institutionId: deliveries[0].institution_id,
+                title: 'Possível Fraude Detectada',
+                description: `A família ${familyDeliveries[0].family?.name} recebeu ${familyDeliveries.length} entregas nos últimos 7 dias de diferentes instituições.`,
+                familyId,
                 createdAt: new Date().toISOString(),
                 resolved: false
               });
             }
-          }
-        });
-      }
-
-      // Check for blocked families that should be unblocked
-      const { data: blockedFamilies, error: familiesError } = await supabase
-        .from('families')
-        .select('*')
-        .eq('is_blocked', true)
-        .lt('blocked_until', new Date().toISOString());
-
-      if (familiesError) {
-        console.error('Error fetching blocked families:', familiesError);
-      }
-
-      if (blockedFamilies && blockedFamilies.length > 0) {
-        blockedFamilies.forEach(family => {
-          alerts.push({
-            id: `expired-block-${family.id}`,
-            type: 'expirado',
-            severity: 'baixa',
-            title: 'Bloqueio de família expirado',
-            description: `A família ${family.name} está bloqueada mas o período de bloqueio já expirou.`,
-            familyId: family.id,
-            createdAt: new Date().toISOString(),
-            resolved: false
           });
-        });
-      }
+        }
 
-      // Check for high activity institutions (optional - simplified for now)
-      const { data: highActivityDeliveries } = await supabase
-        .from('deliveries')
-        .select(`
-          institution_id,
-          institutions(name)
-        `)
-        .gte('delivery_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        // 2. Verificar famílias com bloqueio expirado que ainda estão marcadas como bloqueadas
+        const { data: expiredFamilies, error: expiredError } = await supabase
+          .from('families')
+          .select('*')
+          .eq('is_blocked', true)
+          .lt('blocked_until', new Date().toISOString());
 
-      if (highActivityDeliveries && highActivityDeliveries.length > 0) {
-        // Count deliveries per institution
-        const institutionCounts: { [key: string]: { count: number, name: string } } = {};
-        highActivityDeliveries.forEach(delivery => {
-          const institutionId = delivery.institution_id;
-          if (!institutionCounts[institutionId]) {
-            institutionCounts[institutionId] = { 
-              count: 0, 
-              name: delivery.institutions?.name || 'Instituição Desconhecida' 
-            };
-          }
-          institutionCounts[institutionId].count++;
-        });
-
-        // Generate alerts for institutions with high activity (>10 deliveries in a week)
-        Object.entries(institutionCounts).forEach(([institutionId, data]) => {
-          if (data.count > 10) {
+        if (expiredError) {
+          console.error('❌ Error fetching expired families:', expiredError);
+        } else if (expiredFamilies) {
+          expiredFamilies.forEach(family => {
             alerts.push({
-              id: `high-activity-${institutionId}`,
-              type: 'outro',
+              id: `expired-${family.id}`,
+              type: 'expirado',
               severity: 'média',
-              title: 'Alta atividade detectada',
-              description: `A instituição ${data.name} realizou ${data.count} entregas nos últimos 7 dias.`,
-              institutionId: institutionId,
+              title: 'Bloqueio Expirado',
+              description: `A família ${family.name} tem bloqueio expirado desde ${new Date(family.blocked_until).toLocaleDateString('pt-BR')} e deve ser liberada.`,
+              familyId: family.id,
               createdAt: new Date().toISOString(),
               resolved: false
             });
-          }
-        });
-      }
+          });
+        }
 
-      console.log('Generated alerts:', alerts);
-      return alerts;
+        // 3. Verificar entregas duplicadas no mesmo dia (possível duplicação)
+        if (deliveries) {
+          const dailyDeliveries = deliveries.reduce((acc, delivery) => {
+            const date = new Date(delivery.delivery_date).toDateString();
+            const familyId = delivery.family_id;
+            const key = `${date}-${familyId}`;
+            
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(delivery);
+            return acc;
+          }, {} as Record<string, any[]>);
+
+          Object.entries(dailyDeliveries).forEach(([key, dayDeliveries]) => {
+            if (dayDeliveries.length > 1) {
+              alerts.push({
+                id: `duplicate-${key}`,
+                type: 'duplicado',
+                severity: 'alta',
+                title: 'Entrega Duplicada Detectada',
+                description: `A família ${dayDeliveries[0].family?.name} recebeu ${dayDeliveries.length} entregas no mesmo dia de diferentes instituições.`,
+                familyId: dayDeliveries[0].family_id,
+                createdAt: new Date().toISOString(),
+                resolved: false
+              });
+            }
+          });
+        }
+
+        // 4. Verificar instituições com alta atividade (mais de 15 entregas nos últimos 7 dias)
+        if (profile.role === 'admin') {
+          const { data: institutionStats, error: statsError } = await supabase
+            .from('deliveries')
+            .select('institution_id, institutions(name)')
+            .gte('delivery_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+          if (statsError) {
+            console.error('❌ Error fetching institution stats:', statsError);
+          } else if (institutionStats) {
+            const institutionCounts = institutionStats.reduce((acc, delivery) => {
+              const institutionId = delivery.institution_id;
+              if (!acc[institutionId]) {
+                acc[institutionId] = {
+                  count: 0,
+                  name: delivery.institutions?.name || 'Instituição desconhecida'
+                };
+              }
+              acc[institutionId].count++;
+              return acc;
+            }, {} as Record<string, { count: number; name: string }>);
+
+            Object.entries(institutionCounts).forEach(([institutionId, data]) => {
+              if (data.count > 15) {
+                alerts.push({
+                  id: `high-activity-${institutionId}`,
+                  type: 'outro',
+                  severity: 'baixa',
+                  title: 'Alta Atividade Detectada',
+                  description: `A instituição ${data.name} realizou ${data.count} entregas nos últimos 7 dias. Verificar se é atividade normal.`,
+                  institutionId,
+                  createdAt: new Date().toISOString(),
+                  resolved: false
+                });
+              }
+            });
+          }
+        }
+
+        // 5. Verificar famílias sem entregas há muito tempo (mais de 6 meses)
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const { data: familiesWithoutDeliveries, error: noDeliveryError } = await supabase
+          .from('families')
+          .select(`
+            *,
+            deliveries!left(delivery_date)
+          `)
+          .eq('is_blocked', false);
+
+        if (noDeliveryError) {
+          console.error('❌ Error fetching families without deliveries:', noDeliveryError);
+        } else if (familiesWithoutDeliveries) {
+          familiesWithoutDeliveries.forEach(family => {
+            const hasRecentDelivery = family.deliveries?.some((delivery: any) => 
+              new Date(delivery.delivery_date) > sixMonthsAgo
+            );
+            
+            if (!hasRecentDelivery && family.deliveries?.length === 0) {
+              alerts.push({
+                id: `no-delivery-${family.id}`,
+                type: 'outro',
+                severity: 'baixa',
+                title: 'Família Sem Entregas',
+                description: `A família ${family.name} está cadastrada mas nunca recebeu entregas. Verificar se ainda precisa de assistência.`,
+                familyId: family.id,
+                createdAt: new Date().toISOString(),
+                resolved: false
+              });
+            }
+          });
+        }
+
+        console.log('✅ Alerts generated:', alerts.length);
+        return alerts.sort((a, b) => {
+          // Ordenar por severidade e depois por data
+          const severityOrder = { 'alta': 3, 'média': 2, 'baixa': 1 };
+          const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
+          if (severityDiff !== 0) return severityDiff;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      } catch (error) {
+        console.error('💥 Error generating alerts:', error);
+        throw error;
+      }
     },
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    enabled: !!profile,
+    refetchInterval: 5 * 60 * 1000, // Refresh alerts every 5 minutes
+    retry: 1
   });
 };

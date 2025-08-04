@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
 import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
+import { useReportExport } from '@/hooks/useReportExport';
 
 
 const InstitutionReports = () => {
@@ -17,6 +18,7 @@ const InstitutionReports = () => {
   const [endDate, setEndDate] = useState('');
 
   const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(startDate, endDate);
+  const { exportDeliveriesReport } = useReportExport();
 
   const filteredDeliveries = deliveries;
 
@@ -25,8 +27,7 @@ const InstitutionReports = () => {
   const totalItems = filteredDeliveries.length; // Assumindo 1 item por entrega (cesta básica)
 
   const exportReport = () => {
-    // Aqui seria implementada a exportação do relatório
-    console.log('Exportando relatório...', filteredDeliveries);
+    exportDeliveriesReport(startDate, endDate);
   };
 
   if (isLoading) {
