@@ -23,7 +23,12 @@ export const useDashboardStats = () => {
   return useQuery({
     queryKey: ['dashboard-stats', profile?.role, profile?.institution_id],
     queryFn: async (): Promise<AdminStats | InstitutionStats | null> => {
-      console.log('📊 Fetching dashboard stats for profile:', profile);
+      console.log('📊 Fetching dashboard stats for profile:', {
+        role: profile?.role,
+        institution_id: profile?.institution_id,
+        user_id: profile?.id,
+        email: profile?.email
+      });
       
       if (!profile) {
         console.log('❌ No profile available');
