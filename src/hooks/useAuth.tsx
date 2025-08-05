@@ -49,16 +49,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Create a mock session for bypass users
+  // Create a mock session for bypass users with proper JWT simulation
   const createBypassSession = (bypassProfile: UserProfile) => {
     console.log('🔧 Creating bypass session for:', bypassProfile.role, bypassProfile.id);
+    
+    // Create a proper JWT-like token for Supabase
+    const tokenPayload = {
+      sub: bypassProfile.id,
+      email: bypassProfile.email,
+      role: 'authenticated',
+      user_metadata: { 
+        full_name: bypassProfile.full_name,
+        role: bypassProfile.role 
+      },
+      app_metadata: {},
+      aud: 'authenticated',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600
+    };
+
+    // Create base64 encoded "JWT" (não criptografado, apenas para simulação)
+    const mockJWT = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify(tokenPayload))}.mock-signature`;
     
     const mockUser = {
       id: bypassProfile.id,
       email: bypassProfile.email,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      user_metadata: { full_name: bypassProfile.full_name },
+      user_metadata: { 
+        full_name: bypassProfile.full_name,
+        role: bypassProfile.role 
+      },
       app_metadata: {},
       aud: 'authenticated',
       role: 'authenticated',
@@ -79,13 +100,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } as User;
 
     const mockSession = {
-      access_token: 'mock-access-token',
+      access_token: mockJWT,
       refresh_token: 'mock-refresh-token',
       expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600,
       token_type: 'bearer',
       user: mockUser
     } as Session;
+
+    // Inject the session into Supabase client internal state
+    try {
+      // @ts-ignore - Acesso interno ao estado do Supabase
+      if (supabase.auth._currentSession !== mockSession) {
+        // @ts-ignore
+        supabase.auth._currentSession = mockSession;
+        // @ts-ignore
+        supabase.auth._currentUser = mockUser;
+        
+        console.log('✅ Injected session into Supabase client');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not inject session into Supabase client:', error);
+    }
 
     return { user: mockUser, session: mockSession };
   };
