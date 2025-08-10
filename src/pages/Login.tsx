@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +10,9 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const { signIn, signUp, user } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -25,42 +25,15 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    const action = isSignup ? signUp : signIn;
+    const { error } = await action(email, password);
     
-    if (!error) {
+    // For signup, the hook will show a toast to verify email
+    if (!error && !isSignup) {
       // Let the auth state change handle the redirect
-      // No need to navigate manually here
     }
     
     setLoading(false);
-  };
-
-  // Bypass functions for testing
-  const handleBypassAdmin = () => {
-    const adminProfile = {
-      id: 'd1e6f7a2-b3c4-5d6e-7f8a-9b0c1d2e3f40',
-      email: 'admin@araguari.mg.gov.br',
-      full_name: 'Administrador Sistema',
-      role: 'admin'
-    };
-    localStorage.setItem('bypass_user', JSON.stringify(adminProfile));
-    
-    // Force page reload to trigger auth state change
-    window.location.href = '/';
-  };
-
-  const handleBypassInstitution = () => {
-    const institutionProfile = {
-      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      email: 'instituicao@casesperanca.org.br',
-      full_name: 'Responsável Instituição',
-      role: 'institution',
-      institution_id: '12345678-1234-1234-1234-123456789012'
-    };
-    localStorage.setItem('bypass_user', JSON.stringify(institutionProfile));
-    
-    // Force page reload to trigger auth state change
-    window.location.href = '/institution/dashboard';
   };
 
   return (
@@ -84,7 +57,7 @@ const Login = () => {
               alt="Logo" 
               className="w-[330px] h-[130px] mx-auto mb-0"
             />
-             <CardTitle className="text-2xl font-bold tracking-tight">
+            <CardTitle className="text-2xl font-bold tracking-tight">
               Sistema de Controle de Alimentos
             </CardTitle>
           </CardHeader>
@@ -133,8 +106,26 @@ const Login = () => {
                 className="w-full bg-primary hover:bg-primary/90" 
                 disabled={loading}
               >
-                {loading ? "Entrando..." : "Entrar"}
+                {loading ? (isSignup ? "Cadastrando..." : "Entrando...") : (isSignup ? "Cadastrar" : "Entrar")}
               </Button>
+
+              <p className="text-center text-sm text-gray-600 mt-2">
+                {isSignup ? (
+                  <>
+                    Já tem uma conta?{' '}
+                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(false); }}>
+                      Entrar
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    Não tem conta?{' '}
+                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(true); }}>
+                      Cadastre-se
+                    </a>
+                  </>
+                )}
+              </p>
             </form>
 
             {/* Seção de Bypass para Testes */}

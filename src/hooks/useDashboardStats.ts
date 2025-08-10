@@ -23,27 +23,6 @@ export const useDashboardStats = () => {
   return useQuery({
     queryKey: ['dashboard-stats', profile?.role, profile?.institution_id],
     queryFn: async (): Promise<AdminStats | InstitutionStats | null> => {
-      console.log('📊 DETAILED AUTH STATE CHECK:', {
-        hasProfile: !!profile,
-        hasUser: !!user,
-        hasSession: !!session,
-        userId: user?.id,
-        sessionAccessToken: session?.access_token?.substring(0, 50) + '...',
-        profile: profile
-      });
-
-      // Test auth.uid() function directly
-      const { data: authTest, error: authError } = await supabase.rpc('get_user_role', { 
-        user_id: user?.id 
-      });
-      console.log('🧪 Auth test result:', { authTest, authError });
-
-      // Test direct query without RLS
-      const { data: testQuery, error: testError } = await supabase
-        .from('institutions')
-        .select('count(*)')
-        .maybeSingle();
-      console.log('🧪 Direct test query result:', { testQuery, testError });
       
       if (!profile) {
         console.log('❌ No profile available, returning null');
