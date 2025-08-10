@@ -128,31 +128,6 @@ const Login = () => {
               </p>
             </form>
 
-            {/* Seção de Bypass para Testes */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-center text-sm text-gray-600 mb-4">
-                🧪 Acesso de Teste (Bypass)
-              </p>
-              <div className="space-y-2">
-                <Button 
-                  onClick={handleBypassAdmin}
-                  variant="outline" 
-                  className="w-full text-sm"
-                >
-                  🔧 Entrar como Administrador
-                </Button>
-                <Button 
-                  onClick={handleBypassInstitution}
-                  variant="outline" 
-                  className="w-full text-sm"
-                >
-                  🏢 Entrar como Instituição
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-2">
-                Para testes e desenvolvimento
-              </p>
-            </div>
           </CardContent>
           
           <CardFooter className="flex justify-center">
