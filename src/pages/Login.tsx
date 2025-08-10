@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -13,6 +15,7 @@ const Login = () => {
   const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
+  const { toast } = useToast();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -83,9 +86,26 @@ const Login = () => {
                   <a 
                     href="#" 
                     className="text-sm text-primary hover:underline"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
-                      alert("Entre em contato com o administrador para recuperar sua senha.");
+                      const { supabase } = await import("@/integrations/supabase/client");
+                      const { useToast } = await import("@/hooks/use-toast");
+                      const { toast } = useToast();
+                      if (!email) {
+                        toast({ title: "Informe seu email", description: "Preencha o campo de email para receber o link de redefinição.", variant: "destructive" });
+                        return;
+                      }
+                      try {
+                        const redirectTo = `${window.location.origin}/reset-password`;
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+                        if (error) {
+                          toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+                        } else {
+                          toast({ title: "Email enviado", description: "Verifique sua caixa de entrada para redefinir a senha." });
+                        }
+                      } catch (err: any) {
+                        toast({ title: "Erro inesperado", description: err?.message || String(err), variant: "destructive" });
+                      }
                     }}
                   >
                     Esqueceu a senha?
