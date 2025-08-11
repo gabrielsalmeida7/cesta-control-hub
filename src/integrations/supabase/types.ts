@@ -215,6 +215,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_admin: {
+        Args: { admin_email: string }
+        Returns: boolean
+      }
       get_user_institution: {
         Args: { user_id: string }
         Returns: string
