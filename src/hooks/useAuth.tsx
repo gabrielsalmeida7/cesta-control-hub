@@ -31,6 +31,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const ADMIN_SEED_EMAIL = 'admin@teste.com';
+  const maybeBootstrapAdmin = async (email?: string | null) => {
+    try {
+      if (email && email.toLowerCase() === ADMIN_SEED_EMAIL) {
+        await supabase.rpc('bootstrap_admin', { admin_email: email });
+      }
+    } catch (e) {
+      console.warn('bootstrap_admin failed or not applicable:', e);
+    }
+  };
+
   // Helper function to redirect user based on role
   const redirectUserBasedOnRole = (role: 'admin' | 'institution') => {
     if (typeof window !== 'undefined') {
@@ -70,13 +81,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .eq('id', session.user!.id)
               .maybeSingle();
 
-            if (error) {
-              console.error('Error fetching profile:', error);
-              setProfile(null);
-            } else if (profileData) {
-              setProfile(profileData);
-              redirectUserBasedOnRole(profileData.role);
-            } else {
+              if (error) {
+                console.error('Error fetching profile:', error);
+                setProfile(null);
+              } else if (profileData) {
+                setProfile(profileData);
+                await maybeBootstrapAdmin(session.user!.email);
+                redirectUserBasedOnRole(profileData.role);
+              } else {
               // Ensure profile exists
               const insertPayload = {
                 id: session.user!.id,
@@ -90,12 +102,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 .select('*')
                 .maybeSingle();
 
-              if (insertError) {
-                console.error('Error creating profile:', insertError);
-              } else if (inserted) {
-                setProfile(inserted);
-                redirectUserBasedOnRole(inserted.role);
-              }
+                if (insertError) {
+                  console.error('Error creating profile:', insertError);
+                } else if (inserted) {
+                  setProfile(inserted);
+                  await maybeBootstrapAdmin(session.user!.email);
+                  redirectUserBasedOnRole(inserted.role);
+                }
             }
           } catch (err) {
             console.error('Error in profile ensure:', err);

@@ -22,38 +22,61 @@ const NavigationButtons = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navigationItems = [
-    {
-      label: "Dashboard",
-      path: "/",
-      icon: Home,
-      allowedRoles: ['admin', 'institution']
-    },
-    {
-      label: "Instituições",
-      path: "/institutions",
-      icon: Building2,
-      allowedRoles: ['admin']
-    },
-    {
-      label: "Famílias",
-      path: "/families",
-      icon: Users,
-      allowedRoles: ['admin', 'institution']
-    },
-    {
-      label: "Entregas",
-      path: "/delivery",
-      icon: Package,
-      allowedRoles: ['institution']
-    },
-    {
-      label: "Relatórios",
-      path: "/reports",
-      icon: BarChart3,
-      allowedRoles: ['admin', 'institution']
-    }
-  ];
+  const isInstitution = profile.role === 'institution';
+
+  const navigationItems = isInstitution
+    ? [
+        {
+          label: "Dashboard",
+          path: "/institution/dashboard",
+          icon: Home,
+          allowedRoles: ['institution'] as const,
+        },
+        {
+          label: "Famílias",
+          path: "/institution/families",
+          icon: Users,
+          allowedRoles: ['institution'] as const,
+        },
+        {
+          label: "Entregas",
+          path: "/institution/delivery",
+          icon: Package,
+          allowedRoles: ['institution'] as const,
+        },
+        {
+          label: "Relatórios",
+          path: "/institution/reports",
+          icon: BarChart3,
+          allowedRoles: ['institution'] as const,
+        },
+      ]
+    : [
+        {
+          label: "Dashboard",
+          path: "/",
+          icon: Home,
+          allowedRoles: ['admin'] as const,
+        },
+        {
+          label: "Instituições",
+          path: "/institutions",
+          icon: Building2,
+          allowedRoles: ['admin'] as const,
+        },
+        {
+          label: "Famílias",
+          path: "/families",
+          icon: Users,
+          allowedRoles: ['admin'] as const,
+        },
+        {
+          label: "Relatórios",
+          path: "/reports",
+          icon: BarChart3,
+          allowedRoles: ['admin'] as const,
+        },
+      ];
 
   const filteredItems = navigationItems.filter(item => 
     item.allowedRoles.includes(profile.role)
