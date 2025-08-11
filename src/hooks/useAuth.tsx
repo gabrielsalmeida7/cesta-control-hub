@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const maybeBootstrapAdmin = async (email?: string | null) => {
     try {
       if (email && email.toLowerCase() === ADMIN_SEED_EMAIL) {
-        await supabase.rpc('bootstrap_admin', { admin_email: email });
+        await (supabase as any).rpc('bootstrap_admin', { admin_email: email });
       }
     } catch (e) {
       console.warn('bootstrap_admin failed or not applicable:', e);
