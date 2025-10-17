@@ -11,12 +11,14 @@ Este documento detalha as estratégias para migrar o banco de dados do Supabase 
 ### 1.1 Opção A: Manter Supabase Database (apenas DB)
 
 **Vantagens:**
+
 - ✅ Database já configurado e populado
 - ✅ Backups automáticos
 - ✅ Menos trabalho de migração
 - ✅ Interface web para administração
 
 **Desvantagens:**
+
 - ⚠️ Ainda depende do Supabase (só para DB)
 - ⚠️ Limitações de customização
 - ⚠️ Possível vendor lock-in futuro
@@ -24,24 +26,27 @@ Este documento detalha as estratégias para migrar o banco de dados do Supabase 
 **Custo:** Free tier até 500MB
 
 **Configuração:**
+
 ```typescript
 // .env
-DB_HOST=db.eslfcjhnaojghzuswpgz.supabase.co
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=sua_senha_supabase
-DB_NAME=postgres
+DB_HOST = db.eslfcjhnaojghzuswpgz.supabase.co;
+DB_PORT = 5432;
+DB_USERNAME = postgres;
+DB_PASSWORD = sua_senha_supabase;
+DB_NAME = postgres;
 ```
 
 ### 1.2 Opção B: PostgreSQL Próprio (Recomendado)
 
 **Vantagens:**
+
 - ✅ Controle total
 - ✅ Sem dependências externas
 - ✅ Customização completa
 - ✅ Deploy flexível
 
 **Desvantagens:**
+
 - ❌ Precisa configurar backups
 - ❌ Responsabilidade de manutenção
 - ❌ Setup inicial mais complexo
@@ -51,24 +56,28 @@ DB_NAME=postgres
 **Opções de Hospedagem:**
 
 #### Railway
+
 - **Custo:** $5/mês (Starter) + $5/mês (PostgreSQL)
 - **Setup:** Automático via GitHub
 - **Backup:** Automático
 - **URL:** `postgresql://postgres:password@containers-us-west-xxx.railway.app:5432/railway`
 
 #### Render
+
 - **Custo:** $7/mês (Starter) + $7/mês (PostgreSQL)
 - **Setup:** Via dashboard
 - **Backup:** Manual
 - **URL:** `postgresql://user:password@dpg-xxx.oregon-postgres.render.com:5432/database`
 
 #### DigitalOcean Managed Database
+
 - **Custo:** $15/mês (Basic)
 - **Setup:** Via dashboard
 - **Backup:** Automático + Point-in-time recovery
 - **URL:** `postgresql://doadmin:password@db-postgresql-xxx-do-user-xxx.db.ondigitalocean.com:25060/defaultdb`
 
 #### Supabase (apenas DB)
+
 - **Custo:** Free tier
 - **Setup:** Já configurado
 - **Backup:** Automático
@@ -132,13 +141,13 @@ echo "🎉 Migração concluída!"
 **Criar**: `scripts/migrate-data.ts`
 
 ```typescript
-import { createClient } from '@supabase/supabase-js';
-import { Client } from 'pg';
+import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 
 // Configurações
-const SUPABASE_URL = 'https://eslfcjhnaojghzuswpgz.supabase.co';
-const SUPABASE_KEY = 'sua_anon_key';
-const NEW_DB_URL = 'postgresql://user:password@host:port/database';
+const SUPABASE_URL = "https://eslfcjhnaojghzuswpgz.supabase.co";
+const SUPABASE_KEY = "sua_anon_key";
+const NEW_DB_URL = "postgresql://user:password@host:port/database";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const newDb = new Client({ connectionString: NEW_DB_URL });
@@ -146,62 +155,101 @@ const newDb = new Client({ connectionString: NEW_DB_URL });
 async function migrateData() {
   try {
     await newDb.connect();
-    console.log('✅ Conectado ao novo banco');
+    console.log("✅ Conectado ao novo banco");
 
     // 1. Migrar instituições
-    console.log('📤 Migrando instituições...');
-    const { data: institutions } = await supabase.from('institutions').select('*');
+    console.log("📤 Migrando instituições...");
+    const { data: institutions } = await supabase
+      .from("institutions")
+      .select("*");
     for (const inst of institutions || []) {
       await newDb.query(
-        'INSERT INTO institutions (id, name, address, phone, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
-        [inst.id, inst.name, inst.address, inst.phone, inst.created_at, inst.updated_at]
+        "INSERT INTO institutions (id, name, address, phone, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
+        [
+          inst.id,
+          inst.name,
+          inst.address,
+          inst.phone,
+          inst.created_at,
+          inst.updated_at
+        ]
       );
     }
 
     // 2. Migrar famílias
-    console.log('📤 Migrando famílias...');
-    const { data: families } = await supabase.from('families').select('*');
+    console.log("📤 Migrando famílias...");
+    const { data: families } = await supabase.from("families").select("*");
     for (const family of families || []) {
       await newDb.query(
-        'INSERT INTO families (id, name, contact_person, phone, members_count, is_blocked, blocked_until, blocked_by_institution_id, block_reason, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING',
-        [family.id, family.name, family.contact_person, family.phone, family.members_count, family.is_blocked, family.blocked_until, family.blocked_by_institution_id, family.block_reason, family.created_at, family.updated_at]
+        "INSERT INTO families (id, name, contact_person, phone, members_count, is_blocked, blocked_until, blocked_by_institution_id, block_reason, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING",
+        [
+          family.id,
+          family.name,
+          family.contact_person,
+          family.phone,
+          family.members_count,
+          family.is_blocked,
+          family.blocked_until,
+          family.blocked_by_institution_id,
+          family.block_reason,
+          family.created_at,
+          family.updated_at
+        ]
       );
     }
 
     // 3. Migrar usuários
-    console.log('📤 Migrando usuários...');
-    const { data: profiles } = await supabase.from('profiles').select('*');
+    console.log("📤 Migrando usuários...");
+    const { data: profiles } = await supabase.from("profiles").select("*");
     for (const profile of profiles || []) {
       await newDb.query(
-        'INSERT INTO users (id, email, full_name, role, institution_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING',
-        [profile.id, profile.email, profile.full_name, profile.role, profile.institution_id, profile.created_at, profile.updated_at]
+        "INSERT INTO users (id, email, full_name, role, institution_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING",
+        [
+          profile.id,
+          profile.email,
+          profile.full_name,
+          profile.role,
+          profile.institution_id,
+          profile.created_at,
+          profile.updated_at
+        ]
       );
     }
 
     // 4. Migrar entregas
-    console.log('📤 Migrando entregas...');
-    const { data: deliveries } = await supabase.from('deliveries').select('*');
+    console.log("📤 Migrando entregas...");
+    const { data: deliveries } = await supabase.from("deliveries").select("*");
     for (const delivery of deliveries || []) {
       await newDb.query(
-        'INSERT INTO deliveries (id, family_id, institution_id, blocking_period_days, notes, delivered_by_user_id, delivery_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING',
-        [delivery.id, delivery.family_id, delivery.institution_id, delivery.blocking_period_days, delivery.notes, delivery.delivered_by_user_id, delivery.delivery_date, delivery.created_at]
+        "INSERT INTO deliveries (id, family_id, institution_id, blocking_period_days, notes, delivered_by_user_id, delivery_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
+        [
+          delivery.id,
+          delivery.family_id,
+          delivery.institution_id,
+          delivery.blocking_period_days,
+          delivery.notes,
+          delivery.delivered_by_user_id,
+          delivery.delivery_date,
+          delivery.created_at
+        ]
       );
     }
 
     // 5. Migrar associações
-    console.log('📤 Migrando associações...');
-    const { data: associations } = await supabase.from('institution_families').select('*');
+    console.log("📤 Migrando associações...");
+    const { data: associations } = await supabase
+      .from("institution_families")
+      .select("*");
     for (const assoc of associations || []) {
       await newDb.query(
-        'INSERT INTO institution_families (institution_id, family_id, created_at) VALUES ($1, $2, $3) ON CONFLICT (institution_id, family_id) DO NOTHING',
+        "INSERT INTO institution_families (institution_id, family_id, created_at) VALUES ($1, $2, $3) ON CONFLICT (institution_id, family_id) DO NOTHING",
         [assoc.institution_id, assoc.family_id, assoc.created_at]
       );
     }
 
-    console.log('🎉 Migração concluída com sucesso!');
-
+    console.log("🎉 Migração concluída com sucesso!");
   } catch (error) {
-    console.error('❌ Erro na migração:', error);
+    console.error("❌ Erro na migração:", error);
   } finally {
     await newDb.end();
   }
@@ -342,7 +390,7 @@ BEGIN
         block_reason = 'Recebeu cesta básica',
         updated_at = now()
     WHERE id = NEW.family_id;
-    
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -375,7 +423,7 @@ INSERT INTO users (email, password, full_name, role) VALUES
 
 -- Criar usuário instituição (senha: inst123)
 INSERT INTO users (email, password, full_name, role, institution_id) VALUES
-('instituicao@test.com', '$2b$10$hash...', 'Instituição Teste', 'institution', 
+('instituicao@test.com', '$2b$10$hash...', 'Instituição Teste', 'institution',
  (SELECT id FROM institutions WHERE name = 'Centro Comunitário São José' LIMIT 1));
 
 -- Vincular famílias a instituições
@@ -399,11 +447,17 @@ WHERE i.name = 'Associação Bem-Estar' AND f.name = 'Oliveira';
 **Criar**: `src/database/entities/institution.entity.ts`
 
 ```typescript
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn
+} from "typeorm";
 
-@Entity('institutions')
+@Entity("institutions")
 export class Institution {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -428,13 +482,15 @@ export class Institution {
 **Criar**: `src/database/migrations/001-initial-schema.ts`
 
 ```typescript
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class InitialSchema1700000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Criar enum
-    await queryRunner.query(`CREATE TYPE user_role AS ENUM ('admin', 'institution')`);
-    
+    await queryRunner.query(
+      `CREATE TYPE user_role AS ENUM ('admin', 'institution')`
+    );
+
     // Criar tabelas
     await queryRunner.query(`
       CREATE TABLE institutions (
@@ -446,7 +502,7 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         phone TEXT
       )
     `);
-    
+
     // ... outras tabelas
   }
 
@@ -506,21 +562,25 @@ gunzip -c backup_20250115_143000.sql.gz | psql "$DATABASE_URL"
 **Criar**: `src/health/health.controller.ts`
 
 ```typescript
-import { Controller, Get } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Controller, Get } from "@nestjs/common";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 
-@Controller('health')
+@Controller("health")
 export class HealthController {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   @Get()
   async check() {
     try {
-      await this.dataSource.query('SELECT 1');
-      return { status: 'ok', database: 'connected' };
+      await this.dataSource.query("SELECT 1");
+      return { status: "ok", database: "connected" };
     } catch (error) {
-      return { status: 'error', database: 'disconnected', error: error.message };
+      return {
+        status: "error",
+        database: "disconnected",
+        error: error.message
+      };
     }
   }
 }
@@ -553,12 +613,14 @@ async getMetrics() {
 ## 7. CHECKLIST DE MIGRAÇÃO
 
 ### Preparação
+
 - [ ] Escolher provedor de PostgreSQL
 - [ ] Configurar instância do banco
 - [ ] Testar conectividade
 - [ ] Configurar backups
 
 ### Migração
+
 - [ ] Exportar dados do Supabase
 - [ ] Aplicar schema no novo banco
 - [ ] Migrar dados (SQL ou script)
@@ -566,18 +628,21 @@ async getMetrics() {
 - [ ] Testar triggers e funções
 
 ### Configuração
+
 - [ ] Configurar TypeORM entities
 - [ ] Criar migrations
 - [ ] Configurar variáveis de ambiente
 - [ ] Testar conexão da API
 
 ### Validação
+
 - [ ] Testar CRUD operations
 - [ ] Verificar autenticação
 - [ ] Testar regras de negócio
 - [ ] Validar performance
 
 ### Produção
+
 - [ ] Configurar monitoramento
 - [ ] Setup backup automático
 - [ ] Configurar alertas

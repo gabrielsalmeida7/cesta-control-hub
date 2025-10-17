@@ -13,18 +13,18 @@ Este documento detalha todas as refatorações necessárias no frontend para mig
 **Criar**: `src/lib/api-client.ts`
 
 ```typescript
-import axios from 'axios';
+import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
   headers: {
-    'Content-Type': 'application/json',
-  },
+    "Content-Type": "application/json"
+  }
 });
 
 // Interceptor para adicionar JWT token
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -36,9 +36,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
@@ -70,7 +70,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'institution';
+  role: "admin" | "institution";
   institution_id?: string;
 }
 
@@ -165,9 +165,15 @@ export interface CreateDeliveryDto {
 **Modificar**: `src/hooks/useAuth.tsx`
 
 ```typescript
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import apiClient from '@/lib/api-client';
-import type { User, LoginResponse } from '@/types/api';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode
+} from "react";
+import apiClient from "@/lib/api-client";
+import type { User, LoginResponse } from "@/types/api";
 
 interface AuthContextType {
   user: User | null;
@@ -186,49 +192,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Verificar se há token salvo
-    const token = localStorage.getItem('access_token');
-    const savedUser = localStorage.getItem('user');
-    
+    const token = localStorage.getItem("access_token");
+    const savedUser = localStorage.getItem("user");
+
     if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
         setProfile(userData);
       } catch (error) {
-        console.error('Error parsing saved user:', error);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
+        console.error("Error parsing saved user:", error);
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
       }
     }
-    
+
     setLoading(false);
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      const response = await apiClient.post<LoginResponse>('/auth/login', {
+      const response = await apiClient.post<LoginResponse>("/auth/login", {
         email,
-        password,
+        password
       });
 
       const { access_token, user: userData } = response.data;
-      
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
+
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("user", JSON.stringify(userData));
+
       setUser(userData);
       setProfile(userData);
-      
+
       return { error: null };
     } catch (error: any) {
-      console.error('Login error:', error);
-      return { error: error.response?.data?.message || 'Erro ao fazer login' };
+      console.error("Login error:", error);
+      return { error: error.response?.data?.message || "Erro ao fazer login" };
     }
   };
 
   const signOut = async () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     setUser(null);
     setProfile(null);
   };
@@ -243,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
@@ -258,18 +264,22 @@ export function useAuth() {
 **Modificar**: `src/hooks/useInstitutions.ts`
 
 ```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api-client';
-import { useToast } from '@/hooks/use-toast';
-import type { Institution, CreateInstitutionDto, UpdateInstitutionDto } from '@/types/api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import apiClient from "@/lib/api-client";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  Institution,
+  CreateInstitutionDto,
+  UpdateInstitutionDto
+} from "@/types/api";
 
 export const useInstitutions = () => {
   return useQuery({
-    queryKey: ['institutions'],
+    queryKey: ["institutions"],
     queryFn: async () => {
-      const { data } = await apiClient.get<Institution[]>('/institutions');
+      const { data } = await apiClient.get<Institution[]>("/institutions");
       return data;
-    },
+    }
   });
 };
 
@@ -279,23 +289,28 @@ export const useCreateInstitution = () => {
 
   return useMutation({
     mutationFn: async (institution: CreateInstitutionDto) => {
-      const { data } = await apiClient.post<Institution>('/institutions', institution);
+      const { data } = await apiClient.post<Institution>(
+        "/institutions",
+        institution
+      );
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['institutions'] });
+      queryClient.invalidateQueries({ queryKey: ["institutions"] });
       toast({
         title: "Sucesso",
-        description: "Instituição criada com sucesso!",
+        description: "Instituição criada com sucesso!"
       });
     },
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao criar instituição: " + (error.response?.data?.message || error.message),
-        variant: "destructive",
+        description:
+          "Erro ao criar instituição: " +
+          (error.response?.data?.message || error.message),
+        variant: "destructive"
       });
-    },
+    }
   });
 };
 
@@ -304,24 +319,35 @@ export const useUpdateInstitution = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: UpdateInstitutionDto }) => {
-      const { data } = await apiClient.patch<Institution>(`/institutions/${id}`, updates);
+    mutationFn: async ({
+      id,
+      updates
+    }: {
+      id: string;
+      updates: UpdateInstitutionDto;
+    }) => {
+      const { data } = await apiClient.patch<Institution>(
+        `/institutions/${id}`,
+        updates
+      );
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['institutions'] });
+      queryClient.invalidateQueries({ queryKey: ["institutions"] });
       toast({
         title: "Sucesso",
-        description: "Instituição atualizada com sucesso!",
+        description: "Instituição atualizada com sucesso!"
       });
     },
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao atualizar instituição: " + (error.response?.data?.message || error.message),
-        variant: "destructive",
+        description:
+          "Erro ao atualizar instituição: " +
+          (error.response?.data?.message || error.message),
+        variant: "destructive"
       });
-    },
+    }
   });
 };
 
@@ -334,19 +360,21 @@ export const useDeleteInstitution = () => {
       await apiClient.delete(`/institutions/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['institutions'] });
+      queryClient.invalidateQueries({ queryKey: ["institutions"] });
       toast({
         title: "Sucesso",
-        description: "Instituição excluída com sucesso!",
+        description: "Instituição excluída com sucesso!"
       });
     },
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao excluir instituição: " + (error.response?.data?.message || error.message),
-        variant: "destructive",
+        description:
+          "Erro ao excluir instituição: " +
+          (error.response?.data?.message || error.message),
+        variant: "destructive"
       });
-    },
+    }
   });
 };
 ```
@@ -357,7 +385,7 @@ export const useDeleteInstitution = () => {
 
 ```typescript
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import apiClient from '@/lib/api-client';
+import apiClient from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import type { Family, CreateFamilyDto, UpdateFamilyDto } from "@/types/api";
 
@@ -365,7 +393,7 @@ export const useFamilies = () => {
   return useQuery({
     queryKey: ["families"],
     queryFn: async () => {
-      const { data } = await apiClient.get<Family[]>('/families');
+      const { data } = await apiClient.get<Family[]>("/families");
       return data;
     }
   });
@@ -376,7 +404,9 @@ export const useInstitutionFamilies = (institutionId?: string) => {
     queryKey: ["institution-families", institutionId],
     queryFn: async () => {
       if (!institutionId) return [];
-      const { data } = await apiClient.get<Family[]>(`/families?institution_id=${institutionId}`);
+      const { data } = await apiClient.get<Family[]>(
+        `/families?institution_id=${institutionId}`
+      );
       return data;
     },
     enabled: !!institutionId
@@ -389,7 +419,7 @@ export const useCreateFamily = () => {
 
   return useMutation({
     mutationFn: async (family: CreateFamilyDto) => {
-      const { data } = await apiClient.post<Family>('/families', family);
+      const { data } = await apiClient.post<Family>("/families", family);
       return data;
     },
     onSuccess: () => {
@@ -402,7 +432,9 @@ export const useCreateFamily = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao criar família: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao criar família: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -414,8 +446,17 @@ export const useUpdateFamily = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: UpdateFamilyDto }) => {
-      const { data } = await apiClient.patch<Family>(`/families/${id}`, updates);
+    mutationFn: async ({
+      id,
+      updates
+    }: {
+      id: string;
+      updates: UpdateFamilyDto;
+    }) => {
+      const { data } = await apiClient.patch<Family>(
+        `/families/${id}`,
+        updates
+      );
       return data;
     },
     onSuccess: () => {
@@ -429,7 +470,9 @@ export const useUpdateFamily = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao atualizar família: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao atualizar família: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -455,7 +498,9 @@ export const useDeleteFamily = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao excluir família: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao excluir família: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -467,8 +512,17 @@ export const useAssociateFamilyWithInstitution = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ familyId, institutionId }: { familyId: string; institutionId: string }) => {
-      const { data } = await apiClient.post(`/families/${familyId}/institutions`, { institution_id: institutionId });
+    mutationFn: async ({
+      familyId,
+      institutionId
+    }: {
+      familyId: string;
+      institutionId: string;
+    }) => {
+      const { data } = await apiClient.post(
+        `/families/${familyId}/institutions`,
+        { institution_id: institutionId }
+      );
       return data;
     },
     onSuccess: () => {
@@ -483,7 +537,9 @@ export const useAssociateFamilyWithInstitution = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao associar família: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao associar família: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -495,8 +551,16 @@ export const useDisassociateFamilyFromInstitution = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ familyId, institutionId }: { familyId: string; institutionId: string }) => {
-      await apiClient.delete(`/families/${familyId}/institutions/${institutionId}`);
+    mutationFn: async ({
+      familyId,
+      institutionId
+    }: {
+      familyId: string;
+      institutionId: string;
+    }) => {
+      await apiClient.delete(
+        `/families/${familyId}/institutions/${institutionId}`
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["families"] });
@@ -510,7 +574,9 @@ export const useDisassociateFamilyFromInstitution = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao desassociar família: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao desassociar família: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -524,7 +590,7 @@ export const useDisassociateFamilyFromInstitution = () => {
 
 ```typescript
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import apiClient from '@/lib/api-client';
+import apiClient from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import type { Delivery, CreateDeliveryDto } from "@/types/api";
 
@@ -532,7 +598,9 @@ export const useDeliveries = (institutionId?: string) => {
   return useQuery({
     queryKey: ["deliveries", institutionId],
     queryFn: async () => {
-      const url = institutionId ? `/deliveries?institution_id=${institutionId}` : '/deliveries';
+      const url = institutionId
+        ? `/deliveries?institution_id=${institutionId}`
+        : "/deliveries";
       const { data } = await apiClient.get<Delivery[]>(url);
       return data;
     },
@@ -546,7 +614,7 @@ export const useCreateDelivery = () => {
 
   return useMutation({
     mutationFn: async (delivery: CreateDeliveryDto) => {
-      const { data } = await apiClient.post<Delivery>('/deliveries', delivery);
+      const { data } = await apiClient.post<Delivery>("/deliveries", delivery);
       return data;
     },
     onSuccess: () => {
@@ -561,7 +629,9 @@ export const useCreateDelivery = () => {
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Erro ao registrar entrega: " + (error.response?.data?.message || error.message),
+        description:
+          "Erro ao registrar entrega: " +
+          (error.response?.data?.message || error.message),
         variant: "destructive"
       });
     }
@@ -570,8 +640,17 @@ export const useCreateDelivery = () => {
 
 export const useCanDeliverToFamily = () => {
   return useMutation({
-    mutationFn: async ({ familyId, institutionId }: { familyId: string; institutionId: string }) => {
-      const { data } = await apiClient.post(`/deliveries/validate`, { family_id: familyId, institution_id: institutionId });
+    mutationFn: async ({
+      familyId,
+      institutionId
+    }: {
+      familyId: string;
+      institutionId: string;
+    }) => {
+      const { data } = await apiClient.post(`/deliveries/validate`, {
+        family_id: familyId,
+        institution_id: institutionId
+      });
       return data;
     }
   });
@@ -583,8 +662,8 @@ export const useCanDeliverToFamily = () => {
 **Modificar**: `src/hooks/useDashboardStats.ts`
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api-client';
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "@/lib/api-client";
 
 interface DashboardStats {
   totalInstitutions?: number;
@@ -599,11 +678,11 @@ interface DashboardStats {
 
 export const useDashboardStats = () => {
   return useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const { data } = await apiClient.get<DashboardStats>('/dashboard/stats');
+      const { data } = await apiClient.get<DashboardStats>("/dashboard/stats");
       return data;
-    },
+    }
   });
 };
 ```
@@ -634,19 +713,19 @@ VITE_API_URL=http://localhost:3000/api
 **Modificar**: `src/App.tsx`
 
 ```typescript
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/hooks/useAuth';
-import { Toaster } from '@/components/ui/toaster';
-import { AppRoutes } from './AppRoutes';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/hooks/useAuth";
+import { Toaster } from "@/components/ui/toaster";
+import { AppRoutes } from "./AppRoutes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutos
       cacheTime: 10 * 60 * 1000, // 10 minutos
-      retry: 3,
-    },
-  },
+      retry: 3
+    }
+  }
 });
 
 function App() {
@@ -672,21 +751,21 @@ export default App;
 // import { supabase } from '@/integrations/supabase/client';
 
 // Adicionar
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from "@/hooks/useAuth";
 
 // No handleSubmit, substituir:
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
-  
+
   const { error } = await signIn(email, password);
-  
+
   if (error) {
     setError(error);
   } else {
     // Redirecionamento automático via useAuth
   }
-  
+
   setLoading(false);
 };
 ```
@@ -715,6 +794,7 @@ npm uninstall @supabase/supabase-js
 ## 8. CHECKLIST DE REFATORAÇÃO
 
 ### Autenticação
+
 - [ ] Remover imports do Supabase
 - [ ] Implementar apiClient
 - [ ] Refatorar useAuth
@@ -722,6 +802,7 @@ npm uninstall @supabase/supabase-js
 - [ ] Testar login/logout
 
 ### Hooks
+
 - [ ] Refatorar useInstitutions
 - [ ] Refatorar useFamilies
 - [ ] Criar useDeliveries
@@ -729,12 +810,14 @@ npm uninstall @supabase/supabase-js
 - [ ] Testar todos os hooks
 
 ### Tipos
+
 - [ ] Remover types.ts do Supabase
 - [ ] Criar types/api.ts
 - [ ] Atualizar imports nos componentes
 - [ ] Verificar TypeScript
 
 ### Configuração
+
 - [ ] Atualizar .env.local
 - [ ] Remover dependências Supabase
 - [ ] Atualizar App.tsx
@@ -749,10 +832,10 @@ npm uninstall @supabase/supabase-js
 ```typescript
 // Teste manual no console
 const testAuth = async () => {
-  const response = await fetch('http://localhost:3000/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@test.com', password: 'senha123' })
+  const response = await fetch("http://localhost:3000/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "admin@test.com", password: "senha123" })
   });
   const data = await response.json();
   console.log(data);
@@ -764,9 +847,9 @@ const testAuth = async () => {
 ```typescript
 // Teste de instituições
 const testInstitutions = async () => {
-  const token = localStorage.getItem('access_token');
-  const response = await fetch('http://localhost:3000/api/institutions', {
-    headers: { 'Authorization': `Bearer ${token}` }
+  const token = localStorage.getItem("access_token");
+  const response = await fetch("http://localhost:3000/api/institutions", {
+    headers: { "Authorization": `Bearer ${token}` }
   });
   const data = await response.json();
   console.log(data);

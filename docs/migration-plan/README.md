@@ -20,45 +20,51 @@ docs/migration-plan/
 ## 🎯 Visão Geral da Migração
 
 ### Situação Atual
+
 - **Backend**: Supabase (BaaS) com PostgreSQL, Auth, RLS
 - **Frontend**: React + TypeScript + React Query
 - **Status**: ~40% completo, funcionalidades básicas implementadas
 - **Problemas**: Dependência de terceiros, limitações de customização
 
 ### Proposta
+
 - **Backend**: API REST customizada com NestJS + TypeScript
 - **Database**: PostgreSQL (mantido, mas próprio)
 - **Auth**: JWT + bcrypt (controle total)
 - **Deploy**: Railway/Render/DigitalOcean
 
 ### Benefícios
+
 ✅ **Controle total** sobre regras de negócio  
 ✅ **Sem vendor lock-in**  
 ✅ **Custos previsíveis**  
 ✅ **Performance otimizada**  
-✅ **Deploy flexível**  
+✅ **Deploy flexível**
 
 ## 📊 Estimativas
 
-| Aspecto | Tempo | Custo |
-|---------|-------|-------|
+| Aspecto             | Tempo              | Custo                  |
+| ------------------- | ------------------ | ---------------------- |
 | **Desenvolvimento** | 70-80h (2 semanas) | (seu custo/hora × 80h) |
-| **Infraestrutura** | - | $15-30/mês |
-| **Setup inicial** | 1-2 dias | - |
+| **Infraestrutura**  | -                  | $15-30/mês             |
+| **Setup inicial**   | 1-2 dias           | -                      |
 
 ## 🚀 Opções de Implementação
 
 ### Opção A: Migração Imediata
+
 - **Tempo**: 10-12 dias até MVP
 - **Prós**: Base sólida desde o início
 - **Contras**: Mais tempo até MVP funcional
 
 ### Opção B: Concluir MVP com Supabase
+
 - **Tempo**: 4-6 dias até MVP
 - **Prós**: MVP funcional mais rápido
 - **Contras**: Mantém dependência do Supabase
 
 ### Opção C: Abordagem Híbrida (Recomendada)
+
 1. **Fase 1**: Concluir MVP com Supabase (1 semana)
 2. **Fase 2**: Testar com usuários reais (1-2 semanas)
 3. **Fase 3**: Migrar para API customizada (2 semanas)

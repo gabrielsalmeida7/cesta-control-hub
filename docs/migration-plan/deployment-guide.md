@@ -11,6 +11,7 @@ Este documento detalha as opções de deploy e hospedagem para a API customizada
 ### 1.1 Railway (Recomendado para MVP)
 
 **Vantagens:**
+
 - ✅ Deploy automático do GitHub
 - ✅ PostgreSQL incluso
 - ✅ SSL automático
@@ -19,10 +20,12 @@ Este documento detalha as opções de deploy e hospedagem para a API customizada
 - ✅ Escalabilidade automática
 
 **Desvantagens:**
+
 - ❌ Custo pode aumentar com uso
 - ❌ Menos controle sobre infraestrutura
 
 **Custo:**
+
 - Free tier: $5 crédito/mês
 - Starter: $5/mês + uso
 - Pro: $20/mês + uso
@@ -31,22 +34,25 @@ Este documento detalha as opções de deploy e hospedagem para a API customizada
 **Setup:**
 
 1. **Criar conta no Railway**
+
    - Acesse: https://railway.app
    - Conecte com GitHub
 
 2. **Deploy da API**
+
    ```bash
    # Instalar Railway CLI
    npm install -g @railway/cli
-   
+
    # Login
    railway login
-   
+
    # Deploy
    railway up
    ```
 
 3. **Configurar PostgreSQL**
+
    - Adicionar serviço PostgreSQL
    - Copiar variáveis de ambiente
 
@@ -57,6 +63,7 @@ Este documento detalha as opções de deploy e hospedagem para a API customizada
    ```
 
 **Dockerfile para Railway:**
+
 ```dockerfile
 FROM node:18-alpine
 
@@ -76,6 +83,7 @@ CMD ["node", "dist/main"]
 ### 1.2 Render
 
 **Vantagens:**
+
 - ✅ Free tier disponível
 - ✅ Deploy automático
 - ✅ SSL automático
@@ -83,11 +91,13 @@ CMD ["node", "dist/main"]
 - ✅ Interface simples
 
 **Desvantagens:**
+
 - ❌ Free tier com limitações
 - ❌ Cold starts no free tier
 - ❌ Menos flexibilidade
 
 **Custo:**
+
 - Free tier: Limitado
 - Starter: $7/mês
 - PostgreSQL: $7/mês
@@ -95,16 +105,19 @@ CMD ["node", "dist/main"]
 **Setup:**
 
 1. **Criar conta no Render**
+
    - Acesse: https://render.com
    - Conecte com GitHub
 
 2. **Deploy da API**
+
    - New → Web Service
    - Conectar repositório
    - Build Command: `npm run build`
    - Start Command: `npm run start:prod`
 
 3. **Configurar PostgreSQL**
+
    - New → PostgreSQL
    - Copiar connection string
 
@@ -118,17 +131,20 @@ CMD ["node", "dist/main"]
 ### 1.3 DigitalOcean App Platform
 
 **Vantagens:**
+
 - ✅ Controle total
 - ✅ Docker nativo
 - ✅ Escalabilidade
 - ✅ Integração com outros serviços DO
 
 **Desvantagens:**
+
 - ❌ Mais complexo
 - ❌ Custo mais alto
 - ❌ Precisa configurar mais coisas
 
 **Custo:**
+
 - Basic: $5/mês
 - Professional: $12/mês
 - Managed Database: $15/mês
@@ -136,6 +152,7 @@ CMD ["node", "dist/main"]
 **Setup:**
 
 1. **Criar App**
+
    - Acesse: https://cloud.digitalocean.com/apps
    - Create App → GitHub
 
@@ -144,47 +161,51 @@ CMD ["node", "dist/main"]
    # .do/app.yaml
    name: cesta-control-hub-api
    services:
-   - name: api
-     source_dir: /
-     github:
-       repo: seu-usuario/cesta-control-hub
-       branch: main
-     run_command: npm run start:prod
-     build_command: npm run build
-     environment_slug: node-js
-     instance_count: 1
-     instance_size_slug: basic-xxs
-     envs:
-     - key: JWT_SECRET
-       value: your-secret-key
-     - key: DATABASE_URL
-       value: ${db.DATABASE_URL}
+     - name: api
+       source_dir: /
+       github:
+         repo: seu-usuario/cesta-control-hub
+         branch: main
+       run_command: npm run start:prod
+       build_command: npm run build
+       environment_slug: node-js
+       instance_count: 1
+       instance_size_slug: basic-xxs
+       envs:
+         - key: JWT_SECRET
+           value: your-secret-key
+         - key: DATABASE_URL
+           value: ${db.DATABASE_URL}
    databases:
-   - name: db
-     engine: PG
-     version: "13"
+     - name: db
+       engine: PG
+       version: "13"
    ```
 
 ### 1.4 VPS Manual (AWS EC2, Linode, Vultr)
 
 **Vantagens:**
+
 - ✅ Controle total
 - ✅ Custo previsível
 - ✅ Flexibilidade máxima
 - ✅ Aprendizado
 
 **Desvantagens:**
+
 - ❌ Mais trabalho de setup
 - ❌ Responsabilidade de manutenção
 - ❌ Precisa configurar tudo
 
 **Custo:**
+
 - VPS: $5-10/mês
 - Managed DB: $15/mês (opcional)
 
 **Setup:**
 
 1. **Criar VPS**
+
    ```bash
    # Ubuntu 22.04
    sudo apt update
@@ -192,15 +213,16 @@ CMD ["node", "dist/main"]
    ```
 
 2. **Configurar Docker**
+
    ```bash
    # Clonar repositório
    git clone https://github.com/seu-usuario/cesta-control-hub.git
    cd cesta-control-hub
-   
+
    # Configurar .env
    cp .env.example .env
    # Editar variáveis
-   
+
    # Deploy
    docker-compose up -d
    ```
@@ -211,7 +233,7 @@ CMD ["node", "dist/main"]
    server {
        listen 80;
        server_name api.seudominio.com;
-       
+
        location / {
            proxy_pass http://localhost:3000;
            proxy_http_version 1.1;
@@ -243,22 +265,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-      
+          node-version: "18"
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Deploy to Railway
         uses: railway-app/railway-deploy@v1
         with:
@@ -281,22 +303,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-      
+          node-version: "18"
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
-      
+
       - name: Build
         run: npm run build
-      
+
       - name: Deploy to Render
         uses: johnbeynon/render-deploy-action@v0.0.8
         with:
@@ -320,7 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Deploy to DigitalOcean
         uses: digitalocean/app_action@v1
         with:
@@ -397,7 +419,7 @@ CMD ["node", "dist/main"]
 **Criar**: `docker-compose.prod.yml`
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -433,42 +455,42 @@ services:
 **Criar**: `src/health/health.controller.ts`
 
 ```typescript
-import { Controller, Get } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Controller, Get } from "@nestjs/common";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 
-@Controller('health')
+@Controller("health")
 export class HealthController {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   @Get()
   async check() {
     const checks = {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      database: 'unknown',
-      memory: process.memoryUsage(),
+      database: "unknown",
+      memory: process.memoryUsage()
     };
 
     try {
-      await this.dataSource.query('SELECT 1');
-      checks.database = 'connected';
+      await this.dataSource.query("SELECT 1");
+      checks.database = "connected";
     } catch (error) {
-      checks.database = 'disconnected';
-      checks.status = 'error';
+      checks.database = "disconnected";
+      checks.status = "error";
     }
 
     return checks;
   }
 
-  @Get('ready')
+  @Get("ready")
   async ready() {
     try {
-      await this.dataSource.query('SELECT 1');
-      return { status: 'ready' };
+      await this.dataSource.query("SELECT 1");
+      return { status: "ready" };
     } catch (error) {
-      return { status: 'not ready', error: error.message };
+      return { status: "not ready", error: error.message };
     }
   }
 }
@@ -479,26 +501,34 @@ export class HealthController {
 **Criar**: `src/common/logger.service.ts`
 
 ```typescript
-import { Injectable, LoggerService } from '@nestjs/common';
+import { Injectable, LoggerService } from "@nestjs/common";
 
 @Injectable()
 export class AppLoggerService implements LoggerService {
   log(message: string, context?: string) {
-    console.log(`[${new Date().toISOString()}] [${context || 'App'}] ${message}`);
+    console.log(
+      `[${new Date().toISOString()}] [${context || "App"}] ${message}`
+    );
   }
 
   error(message: string, trace?: string, context?: string) {
-    console.error(`[${new Date().toISOString()}] [${context || 'App'}] ERROR: ${message}`);
+    console.error(
+      `[${new Date().toISOString()}] [${context || "App"}] ERROR: ${message}`
+    );
     if (trace) console.error(trace);
   }
 
   warn(message: string, context?: string) {
-    console.warn(`[${new Date().toISOString()}] [${context || 'App'}] WARN: ${message}`);
+    console.warn(
+      `[${new Date().toISOString()}] [${context || "App"}] WARN: ${message}`
+    );
   }
 
   debug(message: string, context?: string) {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`[${new Date().toISOString()}] [${context || 'App'}] DEBUG: ${message}`);
+    if (process.env.NODE_ENV === "development") {
+      console.debug(
+        `[${new Date().toISOString()}] [${context || "App"}] DEBUG: ${message}`
+      );
     }
   }
 }
@@ -509,21 +539,21 @@ export class AppLoggerService implements LoggerService {
 **Criar**: `src/metrics/metrics.controller.ts`
 
 ```typescript
-import { Controller, Get } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Controller, Get } from "@nestjs/common";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 
-@Controller('metrics')
+@Controller("metrics")
 export class MetricsController {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   @Get()
   async getMetrics() {
     const [institutions, families, deliveries, users] = await Promise.all([
-      this.dataSource.query('SELECT COUNT(*) as count FROM institutions'),
-      this.dataSource.query('SELECT COUNT(*) as count FROM families'),
-      this.dataSource.query('SELECT COUNT(*) as count FROM deliveries'),
-      this.dataSource.query('SELECT COUNT(*) as count FROM users'),
+      this.dataSource.query("SELECT COUNT(*) as count FROM institutions"),
+      this.dataSource.query("SELECT COUNT(*) as count FROM families"),
+      this.dataSource.query("SELECT COUNT(*) as count FROM deliveries"),
+      this.dataSource.query("SELECT COUNT(*) as count FROM users")
     ]);
 
     return {
@@ -532,13 +562,13 @@ export class MetricsController {
         institutions: parseInt(institutions[0].count),
         families: parseInt(families[0].count),
         deliveries: parseInt(deliveries[0].count),
-        users: parseInt(users[0].count),
+        users: parseInt(users[0].count)
       },
       system: {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        version: process.version,
-      },
+        version: process.version
+      }
     };
   }
 }
@@ -553,35 +583,37 @@ export class MetricsController {
 **Configurar**: `src/main.ts`
 
 ```typescript
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
-import { AppModule } from './app.module';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { ThrottlerGuard } from "@nestjs/throttler";
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Rate limiting
   app.useGlobalGuards(new ThrottlerGuard());
-  
+
   // Validation
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true
+    })
+  );
 
   // CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true,
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true
   });
 
   // Security headers
   app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("X-XSS-Protection", "1; mode=block");
     next();
   });
 
@@ -652,7 +684,7 @@ name: Database Backup
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM
+    - cron: "0 2 * * *" # Daily at 2 AM
   workflow_dispatch:
 
 jobs:
@@ -664,14 +696,14 @@ jobs:
           DATE=$(date +%Y%m%d_%H%M%S)
           pg_dump "${{ secrets.DATABASE_URL }}" > "backup_${DATE}.sql"
           gzip "backup_${DATE}.sql"
-          
+
       - name: Upload to S3
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-          
+
       - name: Upload Backup
         run: |
           aws s3 cp "backup_${DATE}.sql.gz" s3://seu-bucket/backups/
@@ -682,36 +714,42 @@ jobs:
 ## 7. CHECKLIST DE DEPLOY
 
 ### Preparação
+
 - [ ] Escolher provedor de hospedagem
 - [ ] Configurar repositório GitHub
 - [ ] Configurar variáveis de ambiente
 - [ ] Testar build local
 
 ### Deploy
+
 - [ ] Configurar CI/CD
 - [ ] Deploy inicial
 - [ ] Configurar domínio
 - [ ] Configurar SSL
 
 ### Configuração
+
 - [ ] Configurar banco de dados
 - [ ] Migrar dados
 - [ ] Configurar monitoramento
 - [ ] Configurar logs
 
 ### Segurança
+
 - [ ] Configurar rate limiting
 - [ ] Configurar CORS
 - [ ] Configurar headers de segurança
 - [ ] Configurar SSL/HTTPS
 
 ### Monitoramento
+
 - [ ] Configurar health checks
 - [ ] Configurar métricas
 - [ ] Configurar alertas
 - [ ] Configurar backup automático
 
 ### Validação
+
 - [ ] Testar endpoints
 - [ ] Testar autenticação
 - [ ] Testar performance
@@ -721,13 +759,13 @@ jobs:
 
 ## 8. CUSTOS COMPARATIVOS
 
-| Provedor | API | Database | Total/Mês | Observações |
-|----------|-----|----------|-----------|-------------|
-| **Railway** | $5 | $5 | $10 | Recomendado para MVP |
-| **Render** | $7 | $7 | $14 | Free tier limitado |
-| **DigitalOcean** | $5 | $15 | $20 | Mais controle |
-| **VPS Manual** | $5 | $15 | $20 | Máximo controle |
-| **Supabase** | $0 | $0 | $0 | Apenas DB, limitado |
+| Provedor         | API | Database | Total/Mês | Observações          |
+| ---------------- | --- | -------- | --------- | -------------------- |
+| **Railway**      | $5  | $5       | $10       | Recomendado para MVP |
+| **Render**       | $7  | $7       | $14       | Free tier limitado   |
+| **DigitalOcean** | $5  | $15      | $20       | Mais controle        |
+| **VPS Manual**   | $5  | $15      | $20       | Máximo controle      |
+| **Supabase**     | $0  | $0       | $0        | Apenas DB, limitado  |
 
 ---
 
