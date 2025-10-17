@@ -6,56 +6,80 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { signIn, user } = useAuth();
+  const { signIn, user, profile } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    if (user && profile) {
+      if (import.meta.env.DEV) {
+        console.log("[LOGIN]", "User already authenticated, redirecting to home", {
+          email: user.email,
+          role: profile.role,
+          timestamp: new Date().toISOString()
+        });
+      }
       navigate("/");
     }
-  }, [user, navigate]);
+  }, [user, profile, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (import.meta.env.DEV) {
+      console.log("[LOGIN]", "Form submission initiated:", {
+        email,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Clear previous errors
+    setError(null);
     setLoading(true);
 
-    const { error } = await signIn(email, password);
-    
-    if (!error) {
-      navigate("/");
+    if (!email || !password) {
+      setError("Por favor, preencha todos os campos.");
+      setLoading(false);
+      if (import.meta.env.DEV) {
+        console.warn("[LOGIN]", "Form submission failed: missing fields", {
+          emailEmpty: !email,
+          passwordEmpty: !password,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return;
     }
+
+    const { error: signInError } = await signIn(email, password);
     
-    setLoading(false);
-  };
-
-  // Bypass functions for testing
-  const handleBypassAdmin = () => {
-    // Simulate admin login by navigating directly
-    localStorage.setItem('bypass_user', JSON.stringify({
-      id: '11111111-2222-4333-8444-555555555555',
-      email: 'admin@araguari.mg.gov.br',
-      full_name: 'Administrador Sistema',
-      role: 'admin'
-    }));
-    navigate("/");
-  };
-
-  const handleBypassInstitution = () => {
-    // Simulate institution login by navigating directly
-    localStorage.setItem('bypass_user', JSON.stringify({
-      id: '22222222-3333-4444-8555-666666666666',
-      email: 'instituicao@casesperanca.org.br',
-      full_name: 'Responsável Instituição',
-      role: 'institution',
-      institution_id: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890'
-    }));
-    navigate("/");
+    if (signInError) {
+      if (import.meta.env.DEV) {
+        console.error("[LOGIN]", "Form submission error:", {
+          error: signInError.message,
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+      setError(signInError.message || "Erro ao fazer login. Tente novamente.");
+      setLoading(false);
+    } else {
+      if (import.meta.env.DEV) {
+        console.log("[LOGIN]", "Form submission successful, waiting for profile fetch", {
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+      // Don't navigate here - let useEffect handle it when profile is ready
+      // Just show that form was successful
+    }
   };
 
   return (
@@ -123,6 +147,13 @@ const Login = () => {
                 />
               </div>
               
+              {error && (
+                <Alert variant="destructive" className="w-full">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90" 
@@ -131,32 +162,6 @@ const Login = () => {
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
-
-            {/* Seção de Bypass para Testes */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-center text-sm text-gray-600 mb-4">
-                🧪 Acesso de Teste (Bypass)
-              </p>
-              <div className="space-y-2">
-                <Button 
-                  onClick={handleBypassAdmin}
-                  variant="outline" 
-                  className="w-full text-sm"
-                >
-                  🔧 Entrar como Administrador
-                </Button>
-                <Button 
-                  onClick={handleBypassInstitution}
-                  variant="outline" 
-                  className="w-full text-sm"
-                >
-                  🏢 Entrar como Instituição
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-2">
-                Para testes e desenvolvimento
-              </p>
-            </div>
           </CardContent>
           
           <CardFooter className="flex justify-center">

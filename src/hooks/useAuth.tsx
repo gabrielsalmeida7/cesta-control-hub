@@ -17,7 +17,7 @@ interface AuthContextType {
   session: Session | null;
   profile: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -31,58 +31,74 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for bypass user first
-    const bypassUser = localStorage.getItem('bypass_user');
-    if (bypassUser) {
-      try {
-        const parsedUser = JSON.parse(bypassUser);
-        setProfile(parsedUser);
-        // Create a mock user object for bypass
-        setUser({
-          id: parsedUser.id,
-          email: parsedUser.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: { full_name: parsedUser.full_name },
-          aud: 'authenticated',
-          role: 'authenticated'
-        } as User);
-        setLoading(false);
-        return;
-      } catch (error) {
-        console.error('Error parsing bypass user:', error);
-        localStorage.removeItem('bypass_user');
-      }
-    }
-
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (event, authSession) => {
+        if (import.meta.env.DEV) {
+          console.log("[SESSION]", "Auth state changed:", {
+            event,
+            userEmail: authSession?.user?.email,
+            timestamp: new Date().toISOString()
+          });
+        }
+        setSession(authSession);
+        setUser(authSession?.user ?? null);
         
-        if (session?.user) {
+        if (authSession?.user) {
           // Fetch user profile data
-          setTimeout(async () => {
-            try {
-              const { data: profileData, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-              if (error) {
-                console.error('Error fetching profile:', error);
-                return;
-              }
-
-              setProfile(profileData);
-            } catch (error) {
-              console.error('Error in profile fetch:', error);
+          try {
+            if (import.meta.env.DEV) {
+              console.log("[PROFILE]", "Profile fetch attempt:", {
+                userId: authSession.user.id,
+                timestamp: new Date().toISOString()
+              });
             }
-          }, 0);
+
+            const { data: profileData, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authSession.user.id)
+              .single();
+
+            if (error) {
+              if (import.meta.env.DEV) {
+                console.error("[PROFILE]", "Profile fetch error:", {
+                  error: error.message,
+                  code: error.code,
+                  details: error.details,
+                  userId: authSession.user.id,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              // Don't return - continue anyway
+            } else if (profileData) {
+              if (import.meta.env.DEV) {
+                console.log("[PROFILE]", "Profile fetch response:", {
+                  profileId: profileData?.id,
+                  email: profileData?.email,
+                  role: profileData?.role,
+                  hasInstitutionId: !!profileData?.institution_id,
+                  timestamp: new Date().toISOString()
+                });
+              }
+              setProfile(profileData);
+            } else {
+              if (import.meta.env.DEV) {
+                console.warn("[PROFILE]", "Profile data is null:", {
+                  userId: authSession.user.id,
+                  timestamp: new Date().toISOString()
+                });
+              }
+            }
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.error("[PROFILE]", "Unexpected error in profile fetch:", {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                timestamp: new Date().toISOString()
+              });
+            }
+          }
         } else {
           setProfile(null);
         }
@@ -92,10 +108,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
+    supabase.auth.getSession().then(({ data: { session: authSession } }) => {
+      if (import.meta.env.DEV) {
+        console.log("[SESSION]", "Initial session check:", {
+          hasSession: !!authSession,
+          userEmail: authSession?.user?.email,
+          timestamp: new Date().toISOString()
+        });
+      }
+      setSession(authSession);
+      setUser(authSession?.user ?? null);
+      if (!authSession) {
         setLoading(false);
       }
     });
@@ -105,21 +128,85 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Login attempt started:", {
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        if (import.meta.env.DEV) {
+          console.error("[AUTH]", "Supabase auth error:", {
+            error: error.message,
+            status: error.status,
+            code: error.code,
+            email,
+            timestamp: new Date().toISOString()
+          });
+        }
+
         toast({
           title: "Erro no login",
           description: error.message,
           variant: "destructive",
         });
+      } else {
+        if (import.meta.env.DEV) {
+          console.log("[AUTH]", "Supabase auth response: success", {
+            email,
+            user_id: data?.user?.id,
+            session_id: data?.session?.access_token ? "exists" : "null",
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        // Wait for onAuthStateChange listener to process and profile to be fetched
+        // This ensures the user, session, and profile states are all set before returning
+        let waitTime = 0;
+        const maxWait = 5000; // 5 second max wait
+        const checkInterval = 100;
+        
+        while ((!user || !profile) && waitTime < maxWait) {
+          if (import.meta.env.DEV && waitTime % 500 === 0) {
+            console.log("[AUTH]", "Waiting for profile...", {
+              has_user: !!user,
+              has_profile: !!profile,
+              wait_time: waitTime,
+              timestamp: new Date().toISOString()
+            });
+          }
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          waitTime += checkInterval;
+        }
+
+        if (import.meta.env.DEV) {
+          console.log("[AUTH]", "Sign in complete:", {
+            has_user: !!user,
+            has_profile: !!profile,
+            user_email: user?.email,
+            profile_role: profile?.role,
+            wait_time: waitTime,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
 
       return { error };
     } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("[AUTH]", "Unexpected error during sign in:", {
+          error: error instanceof Error ? error.message : String(error),
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: "Erro no login",
@@ -132,29 +219,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      // Clear bypass user if exists
-      localStorage.removeItem('bypass_user');
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Sign out initiated:", {
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Clear Supabase auth token from localStorage
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.includes('sb-') && key.includes('auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
       
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
+        if (import.meta.env.DEV) {
+          console.error("[AUTH]", "Supabase signOut error:", {
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
+        }
         toast({
           title: "Erro ao sair",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        if (import.meta.env.DEV) {
+          console.log("[AUTH]", "Sign out successful:", {
+            timestamp: new Date().toISOString()
+          });
+        }
         toast({
           title: "Logout realizado",
           description: "Você foi desconectado com sucesso.",
         });
       }
       
-      // Reset states
+      // Reset all states
       setUser(null);
       setSession(null);
       setProfile(null);
     } catch (error) {
-      console.error('Error signing out:', error);
+      if (import.meta.env.DEV) {
+        console.error("[AUTH]", "Error during sign out:", {
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        });
+      }
+      // Reset states anyway
+      setUser(null);
+      setSession(null);
+      setProfile(null);
     }
   };
 

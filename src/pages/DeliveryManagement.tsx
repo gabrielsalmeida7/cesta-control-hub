@@ -1,7 +1,7 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Package, Calendar, Search, Users, Check, Building } from "lucide-react";
+import { Package, Calendar, Search, Users, Check, Building, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,61 +10,58 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { useDeliveries, useCreateDelivery } from "@/hooks/useDeliveries";
+import { useInstitutions } from "@/hooks/useInstitutions";
+import { useInstitutionFamilies } from "@/hooks/useFamilies";
+import { useAuth } from "@/hooks/useAuth";
+import type { Tables } from "@/integrations/supabase/types";
 
-// Interfaces
-interface Family {
-  id: number;
-  name: string;
-  cpf: string;
-  address: string;
-  members: number;
-  lastDelivery: string | null;
-  status: "active" | "blocked";
-  blockedBy?: {
-    id: number;
+// Types from Supabase
+type Family = Tables<'families'> & {
+  blocked_by_institution?: {
     name: string;
-  };
-  blockedUntil?: string;
-  blockReason?: string;
-  institutionIds: number[]; // List of institutions this family is registered with
-}
+  } | null;
+};
 
-interface Institution {
-  id: number;
-  name: string;
-  address: string;
-  phone: string;
-  availableBaskets: number; // Changed from deliveries to availableBaskets
-}
+type Institution = Tables<'institutions'>;
 
-interface Delivery {
-  id: number;
-  familyId: number;
-  familyName: string;
-  institutionId: number;
-  institutionName: string;
-  deliveryDate: string;
-  blockPeriod: number; // Days
-  blockUntil: string;
-  items: {
-    baskets: number;
-    others: string[];
+type Delivery = Tables<'deliveries'> & {
+  family: {
+    id: string;
+    name: string;
+    contact_person: string;
+    members_count: number | null;
+    is_blocked: boolean | null;
+    blocked_until: string | null;
+    block_reason: string | null;
+    blocked_by_institution?: {
+      name: string;
+    } | null;
   };
-}
+  institution: {
+    id: string;
+    name: string;
+    address: string | null;
+    phone: string | null;
+  };
+};
 
 interface DeliveryFormValues {
-  familyId: number;
+  familyId: string;
   blockPeriod: string; // Days as string to be used in select
   basketCount: number;
   otherItems: string;
 }
 
 const DeliveryManagement = () => {
-  // Mock data
-  const username = "Gabriel Admin";
-  const isAdmin = true; // Mock admin status
+  // Auth and user data
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const userInstitutionId = profile?.institution_id;
   
   // States
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
@@ -72,175 +69,59 @@ const DeliveryManagement = () => {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("active");
-  const [selectedInstitutionId, setSelectedInstitutionId] = useState<number>(1); // Default to first institution
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
   
-  // Mock data for institutions
-  const institutions: Institution[] = [
-    { id: 1, name: "Centro Comunitário São José", address: "Rua das Flores, 123", phone: "(11) 9999-8888", availableBaskets: 42 },
-    { id: 2, name: "Associação Bem-Estar", address: "Av. Principal, 456", phone: "(11) 7777-6666", availableBaskets: 37 },
-    { id: 3, name: "Igreja Nossa Senhora", address: "Praça Central, 789", phone: "(11) 5555-4444", availableBaskets: 25 },
-    { id: 4, name: "Instituto Esperança", address: "Rua dos Sonhos, 101", phone: "(11) 3333-2222", availableBaskets: 31 },
-  ];
+  // Data hooks
+  const institutions = useInstitutions();
+  const families = useInstitutionFamilies(selectedInstitutionId || undefined);
+  const deliveries = useDeliveries(selectedInstitutionId || undefined);
+  const createDelivery = useCreateDelivery();
   
-  // Mock data for families with different statuses and institution associations
-  const [families, setFamilies] = useState<Family[]>([
-    { 
-      id: 1, 
-      name: "Silva", 
-      cpf: "123.456.789-00", 
-      address: "Rua A, 123", 
-      members: 4, 
-      lastDelivery: "10/04/2025",
-      status: "active",
-      institutionIds: [1, 3] // Registered with institutions 1 and 3
-    },
-    { 
-      id: 2, 
-      name: "Santos", 
-      cpf: "987.654.321-00", 
-      address: "Rua B, 456", 
-      members: 3, 
-      lastDelivery: "05/04/2025",
-      status: "blocked",
-      blockedBy: {
-        id: 1,
-        name: "Centro Comunitário São José"
-      },
-      blockedUntil: "10/05/2025",
-      blockReason: "Recebeu cesta básica",
-      institutionIds: [1, 2] // Registered with institutions 1 and 2
-    },
-    { 
-      id: 3, 
-      name: "Oliveira", 
-      cpf: "456.789.123-00", 
-      address: "Rua C, 789", 
-      members: 5, 
-      lastDelivery: "01/04/2025",
-      status: "active",
-      institutionIds: [1, 2, 4] // Registered with institutions 1, 2 and 4
-    },
-    { 
-      id: 4, 
-      name: "Pereira", 
-      cpf: "789.123.456-00", 
-      address: "Rua D, 101", 
-      members: 2, 
-      lastDelivery: "28/03/2025",
-      status: "blocked",
-      blockedBy: {
-        id: 2,
-        name: "Associação Bem-Estar"
-      },
-      blockedUntil: "28/04/2025",
-      blockReason: "Recebeu cesta básica",
-      institutionIds: [2, 3] // Registered with institutions 2 and 3
-    },
-    { 
-      id: 5, 
-      name: "Costa", 
-      cpf: "321.654.987-00", 
-      address: "Rua E, 202", 
-      members: 6, 
-      lastDelivery: null,
-      status: "active",
-      institutionIds: [1, 3, 4] // Registered with institutions 1, 3 and 4
-    },
-  ]);
-  
-  // Mock data for past deliveries
-  const [deliveries, setDeliveries] = useState<Delivery[]>([
-    {
-      id: 1,
-      familyId: 1,
-      familyName: "Silva",
-      institutionId: 1,
-      institutionName: "Centro Comunitário São José",
-      deliveryDate: "10/04/2025",
-      blockPeriod: 30,
-      blockUntil: "10/05/2025",
-      items: {
-        baskets: 1,
-        others: ["Leite (2L)", "Arroz (5kg)"]
-      }
-    },
-    {
-      id: 2,
-      familyId: 3,
-      familyName: "Oliveira",
-      institutionId: 1,
-      institutionName: "Centro Comunitário São José",
-      deliveryDate: "01/04/2025",
-      blockPeriod: 30,
-      blockUntil: "01/05/2025",
-      items: {
-        baskets: 2,
-        others: ["Feijão (2kg)", "Óleo (1L)"]
-      }
-    },
-    {
-      id: 3,
-      familyId: 2,
-      familyName: "Santos",
-      institutionId: 1,
-      institutionName: "Centro Comunitário São José",
-      deliveryDate: "05/04/2025",
-      blockPeriod: 30,
-      blockUntil: "05/05/2025",
-      items: {
-        baskets: 1,
-        others: ["Macarrão (500g)", "Café (500g)"]
-      }
-    },
-    {
-      id: 4,
-      familyId: 4,
-      familyName: "Pereira",
-      institutionId: 2,
-      institutionName: "Associação Bem-Estar",
-      deliveryDate: "28/03/2025",
-      blockPeriod: 30,
-      blockUntil: "28/04/2025",
-      items: {
-        baskets: 1,
-        others: ["Açúcar (1kg)", "Farinha (2kg)"]
-      }
-    },
-    {
-      id: 5,
-      familyId: 5,
-      familyName: "Costa",
-      institutionId: 3,
-      institutionName: "Igreja Nossa Senhora",
-      deliveryDate: "25/03/2025",
-      blockPeriod: 30,
-      blockUntil: "25/04/2025",
-      items: {
-        baskets: 2,
-        others: ["Sabonete (3un)", "Detergente (500ml)"]
-      }
+  // Initialize selectedInstitutionId based on user role
+  useEffect(() => {
+    if (isAdmin && institutions.data && institutions.data.length > 0) {
+      setSelectedInstitutionId(institutions.data[0].id);
+    } else if (!isAdmin && userInstitutionId) {
+      setSelectedInstitutionId(userInstitutionId);
     }
-  ]);
-
-  // Filter families based on status and selected institution
-  const filteredFamilies = filterStatus === "all" 
-    ? families.filter(f => f.institutionIds.includes(selectedInstitutionId))
-    : families.filter(f => f.status === filterStatus && f.institutionIds.includes(selectedInstitutionId));
+  }, [isAdmin, institutions.data, userInstitutionId]);
   
-  // Only show deliveries from selected institution
-  const filteredDeliveries = deliveries
-    .filter(d => d.institutionId === selectedInstitutionId)
-    .sort((a, b) => {
-      // Sort by date descending
-      const dateA = new Date(a.deliveryDate.split('/').reverse().join('-'));
-      const dateB = new Date(b.deliveryDate.split('/').reverse().join('-'));
-      return dateB.getTime() - dateA.getTime();
-    });
+  // Loading states
+  const isLoading = institutions.isLoading || families.isLoading || deliveries.isLoading;
+  const hasError = institutions.isError || families.isError || deliveries.isError;
+  
+  // Helper functions
+  const formatDate = (dateString: string | null): string => {
+    if (!dateString) return "Não há registros";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  
+  const calculateBlockUntilDate = (blockPeriod: number): string => {
+    const today = new Date();
+    const blockUntil = new Date(today);
+    blockUntil.setDate(today.getDate() + blockPeriod);
+    return blockUntil.toISOString().split('T')[0];
+  };
+  
+  // Filter families based on status
+  const filteredFamilies = families.data?.filter(family => {
+    if (filterStatus === "all") return true;
+    if (filterStatus === "active") return !family.is_blocked;
+    if (filterStatus === "blocked") return family.is_blocked;
+    return true;
+  }) || [];
+  
+  // Get deliveries data
+  const deliveriesData = deliveries.data || [];
   
   // Setup form
   const form = useForm<DeliveryFormValues>({
     defaultValues: {
-      familyId: 0,
+      familyId: "",
       blockPeriod: "30",
       basketCount: 1,
       otherItems: ""
@@ -261,7 +142,7 @@ const DeliveryManagement = () => {
   
   // Handle institution change (admin only)
   const handleInstitutionChange = (value: string) => {
-    setSelectedInstitutionId(parseInt(value));
+    setSelectedInstitutionId(value);
   };
   
   // Handle delivery details view
@@ -270,88 +151,107 @@ const DeliveryManagement = () => {
     setIsDetailsDialogOpen(true);
   };
   
-  // Function to format date as DD/MM/YYYY
-  const formatDate = (date: Date): string => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-  
-  // Calculate block until date based on current date and period in days
-  const calculateBlockUntilDate = (blockPeriod: number): string => {
+  // Get current institution
+  const currentInstitution = institutions.data?.find(i => i.id === selectedInstitutionId);
+
+  // Validation functions
+  const isFamilyBlocked = (family: Family) => {
+    if (!family.is_blocked) return false;
+    if (!family.blocked_until) return false;
+    const blockedUntil = new Date(family.blocked_until);
     const today = new Date();
-    const blockUntil = new Date(today);
-    blockUntil.setDate(today.getDate() + blockPeriod);
-    return formatDate(blockUntil);
+    return blockedUntil > today;
   };
 
-  // Get current institution
-  const currentInstitution = institutions.find(i => i.id === selectedInstitutionId);
+  const isFamilyAssociatedWithInstitution = (family: Family, institutionId: string) => {
+    // This would need to be checked against the institution_families table
+    // For now, we'll assume all families in the filtered list are associated
+    return true;
+  };
 
   // Process delivery submission
   const onSubmit = (data: DeliveryFormValues) => {
-    if (!selectedFamily || !currentInstitution) return;
+    if (!selectedFamily || !currentInstitution || !selectedInstitutionId) return;
+    
+    // Validation checks
+    if (isFamilyBlocked(selectedFamily)) {
+      toast({
+        title: "Erro",
+        description: "Esta família está bloqueada e não pode receber entregas no momento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isFamilyAssociatedWithInstitution(selectedFamily, selectedInstitutionId)) {
+      toast({
+        title: "Erro",
+        description: "Esta família não está associada à instituição selecionada.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     const blockPeriod = parseInt(data.blockPeriod);
     const blockUntilDate = calculateBlockUntilDate(blockPeriod);
     
-    // Create new delivery record
-    const newDelivery: Delivery = {
-      id: deliveries.length + 1,
-      familyId: selectedFamily.id,
-      familyName: selectedFamily.name,
-      institutionId: selectedInstitutionId,
-      institutionName: currentInstitution.name,
-      deliveryDate: formatDate(new Date()),
-      blockPeriod,
-      blockUntil: blockUntilDate,
-      items: {
-        baskets: data.basketCount,
-        others: data.otherItems ? data.otherItems.split(',').map(item => item.trim()) : []
-      }
+    // Create delivery data for Supabase
+    const deliveryData = {
+      family_id: selectedFamily.id,
+      institution_id: selectedInstitutionId,
+      delivery_date: new Date().toISOString().split('T')[0],
+      blocking_period_days: blockPeriod,
+      notes: data.otherItems || null,
+      delivered_by_user_id: user?.id || null
     };
     
-    // Add delivery to records
-    setDeliveries([...deliveries, newDelivery]);
-    
-    // Update available baskets count
-    const updatedInstitutions = institutions.map(inst => {
-      if (inst.id === selectedInstitutionId) {
-        return {
-          ...inst,
-          availableBaskets: Math.max(0, inst.availableBaskets - data.basketCount)
-        };
+    createDelivery.mutate(deliveryData, {
+      onSuccess: () => {
+        setIsDeliveryDialogOpen(false);
+        form.reset();
       }
-      return inst;
-    });
-    
-    // Update family's status to blocked
-    const updatedFamilies = families.map(f => {
-      if (f.id === selectedFamily.id) {
-        return {
-          ...f,
-          status: "blocked" as const,
-          lastDelivery: formatDate(new Date()),
-          blockedBy: {
-            id: selectedInstitutionId,
-            name: currentInstitution.name
-          },
-          blockedUntil: blockUntilDate,
-          blockReason: "Recebeu cesta básica"
-        };
-      }
-      return f;
-    });
-    
-    setFamilies(updatedFamilies);
-    setIsDeliveryDialogOpen(false);
-    
-    toast({
-      title: "Entrega realizada",
-      description: `Cesta básica entregue para a família ${selectedFamily.name}`,
     });
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
+        <Header />
+        <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Gerenciamento de Entregas</h2>
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
+        <Header />
+        <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Gerenciamento de Entregas</h2>
+            <Alert variant="destructive">
+              <AlertDescription>
+                Erro ao carregar dados. Tente novamente mais tarde.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
@@ -368,17 +268,17 @@ const DeliveryManagement = () => {
                 Selecionar Instituição
               </label>
               <Select
-                value={selectedInstitutionId.toString()}
+                value={selectedInstitutionId || ""}
                 onValueChange={handleInstitutionChange}
               >
                 <SelectTrigger className="w-full md:w-[300px]">
                   <SelectValue placeholder="Selecione uma instituição" />
                 </SelectTrigger>
                 <SelectContent>
-                  {institutions.map((institution) => (
+                  {institutions.data?.map((institution) => (
                     <SelectItem
                       key={institution.id}
-                      value={institution.id.toString()}
+                      value={institution.id}
                     >
                       {institution.name}
                     </SelectItem>
@@ -401,7 +301,7 @@ const DeliveryManagement = () => {
                 <div className="mt-2 flex items-center gap-2">
                   <Badge className="bg-green-500">
                     <Package className="h-3 w-3 mr-1" />
-                    Cestas Disponíveis: {currentInstitution.availableBaskets}
+                    Instituição Ativa
                   </Badge>
                 </div>
               </CardContent>
@@ -443,7 +343,7 @@ const DeliveryManagement = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>CPF</TableHead>
+                      <TableHead>Contato</TableHead>
                       <TableHead>Membros</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Última Entrega</TableHead>
@@ -455,23 +355,23 @@ const DeliveryManagement = () => {
                       filteredFamilies.map((family) => (
                         <TableRow key={family.id}>
                           <TableCell className="font-medium">{family.name}</TableCell>
-                          <TableCell>{family.cpf}</TableCell>
-                          <TableCell>{family.members}</TableCell>
+                          <TableCell>{family.contact_person}</TableCell>
+                          <TableCell>{family.members_count || 0}</TableCell>
                           <TableCell>
-                            {family.status === "active" ? (
+                            {!family.is_blocked ? (
                               <Badge className="bg-green-500">Ativa</Badge>
                             ) : (
                               <Badge className="bg-red-500">Bloqueada</Badge>
                             )}
                           </TableCell>
-                          <TableCell>{family.lastDelivery || "Não há registros"}</TableCell>
+                          <TableCell>{formatDate(family.blocked_until)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              {family.status === "active" ? (
+                              {!isFamilyBlocked(family) ? (
                                 <Button 
                                   size="sm" 
                                   onClick={() => handleDelivery(family)}
-                                  disabled={currentInstitution?.availableBaskets === 0}
+                                  disabled={createDelivery.isPending}
                                 >
                                   <Package className="h-4 w-4 mr-1" /> Entregar Cesta
                                 </Button>
@@ -480,7 +380,7 @@ const DeliveryManagement = () => {
                                   size="sm" 
                                   variant="outline" 
                                   disabled
-                                  title={`Bloqueada até ${family.blockedUntil}`}
+                                  title={`Bloqueada até ${formatDate(family.blocked_until)}`}
                                 >
                                   Bloqueada
                                 </Button>
@@ -520,14 +420,14 @@ const DeliveryManagement = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDeliveries.length > 0 ? (
-                      filteredDeliveries.map((delivery) => (
+                    {deliveriesData.length > 0 ? (
+                      deliveriesData.map((delivery) => (
                         <TableRow key={delivery.id}>
-                          <TableCell className="font-medium">{delivery.familyName}</TableCell>
-                          <TableCell>{delivery.deliveryDate}</TableCell>
-                          <TableCell>{delivery.blockPeriod} dias</TableCell>
-                          <TableCell>{delivery.blockUntil}</TableCell>
-                          <TableCell>{delivery.items.baskets}</TableCell>
+                          <TableCell className="font-medium">{delivery.family.name}</TableCell>
+                          <TableCell>{formatDate(delivery.delivery_date)}</TableCell>
+                          <TableCell>{delivery.blocking_period_days} dias</TableCell>
+                          <TableCell>{formatDate(delivery.family.blocked_until)}</TableCell>
+                          <TableCell>1</TableCell>
                           <TableCell>
                             <Button 
                               variant="outline" 
@@ -566,8 +466,8 @@ const DeliveryManagement = () => {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="bg-gray-50 p-3 rounded-md mb-2">
                   <p className="font-semibold">Família: {selectedFamily.name}</p>
-                  <p className="text-sm text-gray-600">Membros: {selectedFamily.members} pessoas</p>
-                  <p className="text-sm text-gray-600">CPF: {selectedFamily.cpf}</p>
+                  <p className="text-sm text-gray-600">Membros: {selectedFamily.members_count || 0} pessoas</p>
+                  <p className="text-sm text-gray-600">Contato: {selectedFamily.contact_person}</p>
                 </div>
                 
                 <FormField
@@ -580,7 +480,7 @@ const DeliveryManagement = () => {
                         <Input
                           type="number"
                           min={1}
-                          max={currentInstitution?.availableBaskets || 1}
+                          max={10}
                           {...field}
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                         />
@@ -652,8 +552,14 @@ const DeliveryManagement = () => {
                   <Button 
                     type="submit"
                     className="bg-primary hover:bg-primary/90"
+                    disabled={createDelivery.isPending}
                   >
-                    <Check className="h-4 w-4 mr-1" /> Confirmar Entrega
+                    {createDelivery.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-1" />
+                    )}
+                    {createDelivery.isPending ? "Registrando..." : "Confirmar Entrega"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -674,38 +580,34 @@ const DeliveryManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Família</p>
-                  <p>{selectedDelivery.familyName}</p>
+                  <p>{selectedDelivery.family.name}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Data da Entrega</p>
-                  <p>{selectedDelivery.deliveryDate}</p>
+                  <p>{formatDate(selectedDelivery.delivery_date)}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Período de Bloqueio</p>
-                  <p>{selectedDelivery.blockPeriod} dias</p>
+                  <p>{selectedDelivery.blocking_period_days} dias</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Bloqueada até</p>
-                  <p>{selectedDelivery.blockUntil}</p>
+                  <p>{formatDate(selectedDelivery.family.blocked_until)}</p>
                 </div>
               </div>
               
               <div>
                 <p className="text-sm font-semibold text-gray-500">Itens Entregues</p>
                 <div className="bg-gray-50 p-3 rounded-md mt-2">
-                  <p><strong>Cestas básicas:</strong> {selectedDelivery.items.baskets}</p>
+                  <p><strong>Cestas básicas:</strong> 1</p>
                   
-                  {selectedDelivery.items.others.length > 0 && (
+                  {selectedDelivery.notes && (
                     <>
-                      <p className="mt-2"><strong>Outros itens:</strong></p>
-                      <ul className="list-disc pl-5 mt-1">
-                        {selectedDelivery.items.others.map((item, index) => (
-                          <li key={index}>{item}</li>
-                        ))}
-                      </ul>
+                      <p className="mt-2"><strong>Observações:</strong></p>
+                      <p className="text-sm">{selectedDelivery.notes}</p>
                     </>
                   )}
                 </div>

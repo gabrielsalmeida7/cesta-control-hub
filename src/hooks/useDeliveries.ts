@@ -1,94 +1,109 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  Tables,
+  TablesInsert,
+  TablesUpdate
+} from "@/integrations/supabase/types";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+type Delivery = Tables<"deliveries">;
+type DeliveryInsert = TablesInsert<"deliveries">;
+type DeliveryUpdate = TablesUpdate<"deliveries">;
 
-type Delivery = Tables<'deliveries'>;
-type DeliveryInsert = TablesInsert<'deliveries'>;
-type DeliveryUpdate = TablesUpdate<'deliveries'>;
-
-export const useDeliveries = () => {
+export const useDeliveries = (institutionId?: string) => {
   return useQuery({
-    queryKey: ['deliveries'],
+    queryKey: ["deliveries", institutionId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deliveries')
-        .select(`
+      let query = supabase
+        .from("deliveries")
+        .select(
+          `
           *,
-          family:families(name, contact_person),
-          institution:institutions(name),
-          delivered_by:delivered_by_user_id(profiles(full_name))
-        `)
-        .order('delivery_date', { ascending: false });
-      
+          family:family_id(
+            id,
+            name,
+            contact_person,
+            members_count,
+            is_blocked,
+            blocked_until,
+            block_reason,
+            blocked_by_institution:blocked_by_institution_id(name)
+          ),
+          institution:institution_id(
+            id,
+            name,
+            address,
+            phone
+          )
+        `
+        )
+        .order("delivery_date", { ascending: false });
+
+      if (institutionId) {
+        query = query.eq("institution_id", institutionId);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       return data;
     },
-  });
-};
-
-export const useInstitutionDeliveries = (institutionId?: string) => {
-  return useQuery({
-    queryKey: ['institution-deliveries', institutionId],
-    queryFn: async () => {
-      if (!institutionId) return [];
-      
-      const { data, error } = await supabase
-        .from('deliveries')
-        .select(`
-          *,
-          family:families(name, contact_person),
-          institution:institutions(name),
-          delivered_by:delivered_by_user_id(profiles(full_name))
-        `)
-        .eq('institution_id', institutionId)
-        .order('delivery_date', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!institutionId,
+    enabled: true
   });
 };
 
 export const useCreateDelivery = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (delivery: Omit<DeliveryInsert, 'delivered_by_user_id'>) => {
+    mutationFn: async (delivery: DeliveryInsert) => {
       const { data, error } = await supabase
-        .from('deliveries')
-        .insert({
-          ...delivery,
-          delivered_by_user_id: user?.id || null,
-        })
-        .select()
+        .from("deliveries")
+        .insert(delivery)
+        .select(
+          `
+          *,
+          family:family_id(
+            id,
+            name,
+            contact_person,
+            members_count,
+            is_blocked,
+            blocked_until,
+            block_reason,
+            blocked_by_institution:blocked_by_institution_id(name)
+          ),
+          institution:institution_id(
+            id,
+            name,
+            address,
+            phone
+          )
+        `
+        )
         .single();
-      
+
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
-      queryClient.invalidateQueries({ queryKey: ['families'] });
-      queryClient.invalidateQueries({ queryKey: ['institution-families'] });
+      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["institution-families"] });
       toast({
         title: "Sucesso",
-        description: "Entrega registrada com sucesso! A família foi automaticamente bloqueada.",
+        description: "Entrega registrada com sucesso!"
       });
     },
     onError: (error) => {
       toast({
         title: "Erro",
         description: "Erro ao registrar entrega: " + error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
-    },
+    }
   });
 };
 
@@ -97,32 +112,58 @@ export const useUpdateDelivery = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: DeliveryUpdate }) => {
+    mutationFn: async ({
+      id,
+      updates
+    }: {
+      id: string;
+      updates: DeliveryUpdate;
+    }) => {
       const { data, error } = await supabase
-        .from('deliveries')
+        .from("deliveries")
         .update(updates)
-        .eq('id', id)
-        .select()
+        .eq("id", id)
+        .select(
+          `
+          *,
+          family:family_id(
+            id,
+            name,
+            contact_person,
+            members_count,
+            is_blocked,
+            blocked_until,
+            block_reason,
+            blocked_by_institution:blocked_by_institution_id(name)
+          ),
+          institution:institution_id(
+            id,
+            name,
+            address,
+            phone
+          )
+        `
+        )
         .single();
-      
+
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["families"] });
       toast({
         title: "Sucesso",
-        description: "Entrega atualizada com sucesso!",
+        description: "Entrega atualizada com sucesso!"
       });
     },
     onError: (error) => {
       toast({
         title: "Erro",
         description: "Erro ao atualizar entrega: " + error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
-    },
+    }
   });
 };
 
@@ -132,27 +173,24 @@ export const useDeleteDelivery = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('deliveries')
-        .delete()
-        .eq('id', id);
-      
+      const { error } = await supabase.from("deliveries").delete().eq("id", id);
+
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["families"] });
       toast({
         title: "Sucesso",
-        description: "Entrega excluída com sucesso!",
+        description: "Entrega excluída com sucesso!"
       });
     },
     onError: (error) => {
       toast({
         title: "Erro",
         description: "Erro ao excluir entrega: " + error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
-    },
+    }
   });
 };
