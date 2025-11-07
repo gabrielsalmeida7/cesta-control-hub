@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
 
 const Index = () => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
@@ -21,8 +21,14 @@ const Index = () => {
     if (profile?.role === 'institution') {
       navigate('/institution/dashboard');
     }
-  }, [profile, navigate]);
+  }, [user, profile, navigate]);
 
+  // Se user for null, não renderizar nada (ProtectedRoute vai redirecionar)
+  if (!user) {
+    return null;
+  }
+
+  // Se profile ainda não carregou, mostrar loading ou null
   if (!profile) {
     return null;
   }

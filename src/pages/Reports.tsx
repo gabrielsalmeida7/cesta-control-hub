@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
-import { FileText, Download, Calendar, AlertTriangle, BellRing } from "lucide-react";
+import { FileText, Download, Calendar, AlertTriangle, BellRing, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,9 +58,11 @@ const Reports = () => {
   const [endDate, setEndDate] = useState('');
 
   // Filter alerts based on selected type
-  const filteredAlerts = alertFilter === 'todos' 
-    ? alerts 
-    : alerts.filter(alert => alert.type === alertFilter);
+  const filteredAlerts = useMemo(() => {
+    return alertFilter === 'todos' 
+      ? alerts 
+      : alerts.filter(alert => alert.type === alertFilter);
+  }, [alerts, alertFilter]);
 
   // Get alert count by severity
   const highSeverityCount = alerts.filter(alert => alert.severity === 'alta').length;

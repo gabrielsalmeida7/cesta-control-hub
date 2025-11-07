@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import { Search, Package, AlertTriangle, Plus, Minus, Loader2 } from 'lucide-react';
@@ -71,6 +71,41 @@ const InstitutionDelivery = () => {
         variant: "destructive"
       });
       return;
+    }
+
+    if (!profile?.institution_id) {
+      toast({
+        title: "Erro",
+        description: "Instituição não identificada. Faça login novamente.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verificar se família está vinculada à instituição
+    // As famílias em availableFamilies já são filtradas por useInstitutionFamilies
+    // que só retorna famílias vinculadas à instituição, mas vamos verificar novamente por segurança
+    const familyData = familiesData.find((f: any) => f.id === selectedFamily.id);
+    if (!familyData) {
+      toast({
+        title: "Erro",
+        description: "Esta família não está vinculada à sua instituição. Por favor, vincule a família primeiro.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verificar se família está bloqueada
+    if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
+      const blockedUntil = new Date(selectedFamily.blocked_until);
+      if (blockedUntil > new Date()) {
+        toast({
+          title: "Erro",
+          description: `Esta família está bloqueada até ${blockedUntil.toLocaleDateString('pt-BR')}. Não é possível registrar entrega enquanto a família estiver bloqueada.`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     if (deliveryItems.some(item => !item.item_name || item.quantity <= 0)) {

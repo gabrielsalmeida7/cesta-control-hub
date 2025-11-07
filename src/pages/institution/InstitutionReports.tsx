@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import { Calendar, Download, Package, Users, BarChart3, Loader2 } from 'lucide-react';
@@ -191,6 +191,49 @@ const InstitutionReports = () => {
                     Nenhuma entrega encontrada no período selecionado
                   </p>
                 </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Família</TableHead>
+                      <TableHead>Itens Entregues</TableHead>
+                      <TableHead>Período Bloqueio</TableHead>
+                      <TableHead>Observações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeliveries.map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>
+                          {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {delivery.family_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {delivery.items_delivered.map((item, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {item}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {delivery.blocking_period} dias
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {delivery.notes || '-'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

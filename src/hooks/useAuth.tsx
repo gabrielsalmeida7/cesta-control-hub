@@ -128,36 +128,98 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       if (!session) {
         setLoading(false);
-      }
-    });
 
-    return () => subscription.unsubscribe();
+        if (import.meta.env.DEV) {
+          console.log("[SESSION]", "Initial load complete", {
+            hasSession: !!authSession,
+            hasUser: !!authSession?.user,
+            hasProfile: !!profileData,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("[SESSION]", "Unexpected error during initial load:", {
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString()
+          });
+        }
+        setLoading(false);
+        initialLoadComplete = true;
+        isInitialLoad = false;
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Login attempt started:", {
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        if (import.meta.env.DEV) {
+          console.error("[AUTH]", "Supabase auth error:", {
+            error: error.message,
+            status: error.status,
+            code: error.code,
+            email,
+            timestamp: new Date().toISOString()
+          });
+        }
+
         toast({
           title: "Erro no login",
           description: error.message,
           variant: "destructive",
         });
+        return { error };
       }
 
-      return { error };
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Supabase auth response: success", {
+          email,
+          user_id: data?.user?.id,
+          session_id: data?.session?.access_token ? "exists" : "null",
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // The onAuthStateChange listener will handle updating user, session, and profile
+      // We don't need to wait here - the ProtectedRoute and Login page will handle navigation
+      // based on the auth state changes
+
+      return { error: null };
     } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("[AUTH]", "Unexpected error during sign in:", {
+          error: error instanceof Error ? error.message : String(error),
+          email,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: "Erro no login",
         description: errorMessage,
         variant: "destructive",
       });
-      return { error };
+      return { error: error instanceof Error ? error : new Error(errorMessage) };
     }
   };
 
@@ -202,24 +264,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('🚪 Signing out...');
       
       
-      const { error } = await supabase.auth.signOut();
-      if (error) {
+      // 3. Sign out from Supabase (limpa sessão no servidor e localmente)
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) {
+        const error = signOutError;
+        if (import.meta.env.DEV) {
+          console.error("[AUTH]", "Supabase signOut error:", {
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
+        }
         toast({
           title: "Erro ao sair",
-          description: error.message,
+          description: error?.message || "Erro ao limpar sessão",
           variant: "destructive",
         });
       } else {
+        if (import.meta.env.DEV) {
+          console.log("[AUTH]", "Sign out successful - session and tokens cleared:", {
+            timestamp: new Date().toISOString()
+          });
+        }
         toast({
           title: "Logout realizado",
           description: "Você foi desconectado com sucesso.",
         });
       }
       
-      // Reset states
+      // 5. Resetar todos os states
+      // Os states serão atualizados pelo onAuthStateChange quando o evento SIGNED_OUT for disparado
       setUser(null);
       setSession(null);
       setProfile(null);
+      
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Sign out complete - states reset. Navigation will be handled by ProtectedRoute or Header component");
+      }
     } catch (error) {
       console.error('❌ Error signing out:', error);
     }

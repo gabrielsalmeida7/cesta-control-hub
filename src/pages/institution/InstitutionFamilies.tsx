@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import { Search, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -99,13 +99,21 @@ const InstitutionFamilies = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Famílias Cadastradas
-            </h2>
-            <p className="text-gray-600">
-              Visualize o status das famílias e histórico de entregas
-            </p>
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Famílias Cadastradas
+              </h2>
+              <p className="text-gray-600">
+                Visualize o status das famílias e histórico de entregas
+              </p>
+            </div>
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={handleCreateFamily}
+            >
+              <UserPlus className="mr-2 h-4 w-4" /> Cadastrar Nova Família
+            </Button>
           </div>
 
           {/* Barra de pesquisa */}
@@ -204,9 +212,56 @@ const InstitutionFamilies = () => {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFamilies.map((family) => (
+                      <TableRow key={family.id}>
+                        <TableCell className="font-medium">{family.family_name}</TableCell>
+                        <TableCell>{family.members_count}</TableCell>
+                        <TableCell>{getStatusBadge(family)}</TableCell>
+                        <TableCell>
+                          {family.last_delivery_date ? (
+                            <div>
+                              <p className="text-sm">{new Date(family.last_delivery_date).toLocaleDateString('pt-BR')}</p>
+                              {family.last_delivery_institution && (
+                                <p className="text-xs text-gray-500">{family.last_delivery_institution}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">Nunca</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleViewDetails(family)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Detalhes
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleUnlinkClick(family)}
+                              disabled={disassociateMutation.isPending}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            >
+                              {disassociateMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Unlink className="h-4 w-4 mr-1" />
+                              )}
+                              Desvincular
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -272,6 +327,166 @@ const InstitutionFamilies = () => {
           
           <DialogFooter>
             <Button onClick={() => setIsDetailsOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Family Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Nova Família</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...createForm}>
+            <form onSubmit={createForm.handleSubmit(onSubmitCreate)} className="space-y-4">
+              <FormField
+                control={createForm.control}
+                name="name"
+                rules={{ required: "Nome é obrigatório" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Família</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: Família Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="contact_person"
+                rules={{ required: "Pessoa de contato é obrigatória" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pessoa de Contato</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(11) 99999-9999" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="members_count"
+                rules={{ 
+                  required: "Número de membros é obrigatório",
+                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
+                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Membros</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        value={field.value || 1}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                        min="1"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> A família será automaticamente vinculada à sua instituição após o cadastro.
+                </p>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createFamilyMutation.isPending || !profile?.institution_id}
+                >
+                  {createFamilyMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cadastrando...
+                    </>
+                  ) : (
+                    "Cadastrar Família"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unlink Confirmation Dialog */}
+      <Dialog open={isUnlinkDialogOpen} onOpenChange={setIsUnlinkDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Desvinculação</DialogTitle>
+          </DialogHeader>
+          
+          {familyToUnlink && (
+            <div className="py-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Tem certeza que deseja desvincular a família <strong>{familyToUnlink.family_name}</strong> da sua instituição?
+              </p>
+              <p className="text-sm text-gray-500">
+                Após desvincular, você não poderá mais registrar entregas para esta família até que ela seja vinculada novamente.
+              </p>
+              <p className="text-sm text-red-600 mt-2 font-medium">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsUnlinkDialogOpen(false);
+                setFamilyToUnlink(null);
+              }}
+              disabled={disassociateMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmUnlink}
+              disabled={disassociateMutation.isPending}
+            >
+              {disassociateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Desvinculando...
+                </>
+              ) : (
+                "Confirmar Desvinculação"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

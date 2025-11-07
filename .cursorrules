@@ -1,0 +1,47 @@
+# Multi-Agent Development Rules
+
+## Task Management
+
+- Read assigned task file from docs/tasks/agent-X-\*.md
+- Update task status: TODO → IN_PROGRESS → DONE
+- Add lock before starting: [LOCKED by Agent X at YYYY-MM-DD HH:MM]
+- Remove lock when done
+- Stop when: all tasks DONE + no errors + doc updated
+
+## Code Standards
+
+- Follow existing patterns in codebase
+- Use shadcn/ui components (see src/components/ui/)
+- Use React Query hooks (see src/hooks/)
+- Follow TypeScript strict mode
+- Use existing Supabase types (src/integrations/supabase/types.ts)
+
+## Design Patterns
+
+- DRY: Reuse existing hooks and components
+- SOLID: Single responsibility, dependency injection via hooks
+- Component structure: See src/pages/ for examples
+- Hook structure: See src/hooks/useFamilies.ts for pattern
+
+## Documentation
+
+- Reference business rules: docs/BUSINESS_RULES.md
+- Reference frontend tasks: docs/FRONTEND_TASKS.md
+- Reference API patterns: docs/API_INTEGRATION.md
+- Update task file with progress
+- No duplicate information across docs
+
+## Commands to AVOID
+
+- Do NOT run: npm run dev, npm start, npm install
+- Do NOT commit changes
+- Do NOT modify .cursorrules or task files of other agents
+
+## References
+
+- UI patterns: src/components/ui/
+- Hook patterns: src/hooks/useFamilies.ts, src/hooks/useInstitutions.ts
+- Page structure: src/pages/Institutions.tsx, src/pages/Families.tsx
+- Business rules: docs/BUSINESS_RULES.md
+- Coordination: docs/AGENTS_COORDINATION.md
+- Task files: docs/tasks/agent-X-\*.md

@@ -1,15 +1,44 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 
 const Header = () => {
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
+    if (import.meta.env.DEV) {
+      console.log("[HEADER]", "Logout button clicked", {
+        timestamp: new Date().toISOString()
+      });
+    }
     await signOut();
   };
+
+  // Navegar para login quando user e profile ficarem null após logout
+  // Mas só após loading completar (para evitar redirecionamento durante refresh)
+  useEffect(() => {
+    // Wait for loading to complete before checking auth state
+    if (loading) {
+      return;
+    }
+
+    if (!user && !profile) {
+      // Verificar se não estamos já na página de login para evitar loop
+      if (window.location.pathname !== '/login') {
+        if (import.meta.env.DEV) {
+          console.log("[HEADER]", "User and profile are null after loading, navigating to login", {
+            currentPath: window.location.pathname,
+            timestamp: new Date().toISOString()
+          });
+        }
+        navigate('/login', { replace: true });
+      }
+    }
+  }, [user, profile, loading, navigate]);
 
   if (!profile) {
     return null;

@@ -17,12 +17,22 @@ const Login = () => {
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
 
-  // Redirect if already logged in
+  // Redirect if already logged in (simplified - let ProtectedRoute handle most of the logic)
   useEffect(() => {
-    if (user) {
-      navigate("/");
+    // Only redirect if we're not loading and user is authenticated
+    // The ProtectedRoute will handle redirecting away from /login if user is logged in
+    if (!authLoading && user && profile) {
+      if (import.meta.env.DEV) {
+        console.log("[LOGIN]", "User already authenticated, redirecting to home", {
+          email: user.email,
+          role: profile.role,
+          timestamp: new Date().toISOString()
+        });
+      }
+      setLoading(false);
+      navigate("/", { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, profile, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,9 +45,6 @@ const Login = () => {
     if (!error && !isSignup) {
       // Let the auth state change handle the redirect
     }
-    
-    setLoading(false);
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-blue-600 relative">
@@ -121,10 +128,17 @@ const Login = () => {
                 />
               </div>
               
+              {error && (
+                <Alert variant="destructive" className="w-full">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90" 
-                disabled={loading}
+                disabled={loading || authLoading}
               >
                 {loading ? (isSignup ? "Cadastrando..." : "Entrando...") : (isSignup ? "Cadastrar" : "Entrar")}
               </Button>

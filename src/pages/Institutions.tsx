@@ -26,6 +26,12 @@ const Institutions = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
+  
+  // Hooks for data management
+  const { data: institutions = [], isLoading, error } = useInstitutions();
+  const createInstitution = useCreateInstitution();
+  const updateInstitution = useUpdateInstitution();
+  const deleteInstitution = useDeleteInstitution();
 
   // Setup form
   const form = useForm<TablesInsert<'institutions'>>({
@@ -51,6 +57,18 @@ const Institutions = () => {
       phone: institution.phone || "",
     });
     setIsEditDialogOpen(true);
+  };
+  
+  // Function to handle opening the create dialog
+  const handleCreate = () => {
+    createForm.reset();
+    setIsCreateDialogOpen(true);
+  };
+  
+  // Function to handle opening the delete dialog
+  const handleDelete = (institution: Institution) => {
+    setSelectedInstitution(institution);
+    setIsDeleteDialogOpen(true);
   };
 
   // Function to save institution (create or update)
@@ -81,6 +99,66 @@ const Institutions = () => {
     setSelectedInstitution(institution);
     setIsDetailsDialogOpen(true);
   };
+  
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
+        <Header />
+        <NavigationButtons />
+        <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Instituições</h2>
+              <Skeleton className="h-10 w-32" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardHeader className="bg-primary">
+                    <Skeleton className="h-6 w-3/4" />
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-2/3 mb-4" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 flex-1" />
+                      <Skeleton className="h-8 flex-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
+        <Header />
+        <NavigationButtons />
+        <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Instituições</h2>
+            </div>
+            <Alert variant="destructive">
+              <AlertDescription>
+                Erro ao carregar instituições: {error.message}
+              </AlertDescription>
+            </Alert>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
@@ -163,10 +241,10 @@ const Institutions = () => {
             <DialogTitle>Nova Instituição</DialogTitle>
           </DialogHeader>
           
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
               <FormField
-                control={form.control}
+                control={editForm.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -180,7 +258,7 @@ const Institutions = () => {
               />
               
               <FormField
-                control={form.control}
+                control={editForm.control}
                 name="address"
                 render={({ field }) => (
                   <FormItem>
@@ -194,7 +272,7 @@ const Institutions = () => {
               />
               
               <FormField
-                control={form.control}
+                control={editForm.control}
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
@@ -279,7 +357,7 @@ const Institutions = () => {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsEditDialogOpen(false)}
+                  onClick={() => setIsCreateDialogOpen(false)}
                 >
                   Cancelar
                 </Button>
@@ -291,10 +369,46 @@ const Institutions = () => {
           </Form>
         </DialogContent>
       </Dialog>
-
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+          </DialogHeader>
+          
+          {selectedInstitution && (
+            <div className="py-4">
+              <p>
+                Tem certeza que deseja excluir a instituição <strong>{selectedInstitution.name}</strong>?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={onDeleteConfirm}
+              disabled={deleteInstitution.isPending}
+            >
+              {deleteInstitution.isPending ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Details Institution Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               Detalhes da Instituição: {selectedInstitution?.name}

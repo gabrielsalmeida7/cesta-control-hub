@@ -1,0 +1,104 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                  🔴 FIX LOGIN IN 2 MINUTES - READ THIS                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+PROBLEM: Login timeout after 106 seconds (RLS deadlock)
+
+SOLUTION: Disable RLS for MVP (2 minutes)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+STEP-BY-STEP:
+
+1. Open: https://app.supabase.com/project/eslfcjhnaojghzuswpgz/sql/new
+
+2. Copy this entire SQL (all of it):
+
+BEGIN;
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE families DISABLE ROW LEVEL SECURITY;
+ALTER TABLE deliveries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE institutions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE institution_families DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "profiles_read_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_select" ON profiles;
+DROP POLICY IF EXISTS "profiles_insert" ON profiles;
+DROP POLICY IF EXISTS "profiles_update" ON profiles;
+DROP POLICY IF EXISTS "profiles_delete" ON profiles;
+DROP POLICY IF EXISTS "families_select" ON families;
+DROP POLICY IF EXISTS "families_insert" ON families;
+DROP POLICY IF EXISTS "families_update" ON families;
+DROP POLICY IF EXISTS "families_delete" ON families;
+DROP POLICY IF EXISTS "deliveries_select" ON deliveries;
+DROP POLICY IF EXISTS "deliveries_insert" ON deliveries;
+DROP POLICY IF EXISTS "deliveries_update" ON deliveries;
+DROP POLICY IF EXISTS "deliveries_delete" ON deliveries;
+DROP POLICY IF EXISTS "institutions_select" ON institutions;
+DROP POLICY IF EXISTS "institutions_insert" ON institutions;
+DROP POLICY IF EXISTS "institutions_update" ON institutions;
+DROP POLICY IF EXISTS "institutions_delete" ON institutions;
+DROP POLICY IF EXISTS "inst_fam_select" ON institution_families;
+DROP POLICY IF EXISTS "inst_fam_insert" ON institution_families;
+DROP POLICY IF EXISTS "inst_fam_update" ON institution_families;
+DROP POLICY IF EXISTS "inst_fam_delete" ON institution_families;
+COMMIT;
+
+3. Paste into the SQL editor
+
+4. Click "Run" or press Ctrl+Enter
+
+5. Wait for: "queries executed successfully"
+
+6. Close editor
+
+7. Go back to frontend: http://localhost:5173
+
+8. Press F5 (refresh)
+
+9. Try login:
+   Email: teste@admin.com
+   Password: senha123
+
+10. Should login instantly! ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+
+IF IT WORKS:
+  ✅ Login is instant
+  ✅ Redirect to dashboard
+  ✅ MVP is ready to test
+
+IF IT STILL DOESN'T WORK:
+  1. Check browser console (F12 → Console tab)
+  2. Look for red error messages
+  3. Copy the error
+  4. See docs/QUICK_START_FIX.md for troubleshooting
+
+═══════════════════════════════════════════════════════════════════════════════
+
+AFTER LOGIN WORKS:
+
+Test these (takes ~45 minutes total):
+  [ ] Admin dashboard loads
+  [ ] Create a family
+  [ ] Edit the family
+  [ ] Register a delivery
+  [ ] Family auto-blocks
+  [ ] Can unblock
+  [ ] Institution login works
+  [ ] Logout works
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DOCS:
+  - CURRENT_STATUS.md ................ Full project status
+  - docs/QUICK_START_FIX.md .......... More details
+  - docs/NEXT_STEPS.md .............. Full testing plan
+  - docs/SUPABASE_INTEGRATION_ANALYSIS.md .... Why this fix
+
+═══════════════════════════════════════════════════════════════════════════════
+
+GO DO IT NOW! 🚀
+
+The SQL is ready to copy above. Execute it and come back here.
+MVP will be working in 2 minutes!

@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
-import { Users, UserPlus, Search, Lock, Unlock } from "lucide-react";
+import { Users, UserPlus, Search, Lock, Unlock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -72,6 +72,53 @@ const Families = () => {
     setIsDetailsOpen(true);
   };
 
+  // Function to handle creating a new family
+  const handleCreateFamily = () => {
+    createForm.reset();
+    setIsCreateDialogOpen(true);
+  };
+
+  // Function to submit create family form
+  const onSubmitCreate = (data: TablesInsert<'families'>) => {
+    createFamilyMutation.mutate({
+      family: data,
+      institutionId: undefined // Admin não vincula automaticamente
+    }, {
+      onSuccess: () => {
+        setIsCreateDialogOpen(false);
+        createForm.reset();
+      }
+    });
+  };
+
+  // Function to handle editing a family
+  const handleEditFamily = (family: Family) => {
+    setSelectedFamily(family);
+    editForm.reset({
+      name: family.name,
+      contact_person: family.contact_person,
+      phone: family.phone || "",
+      members_count: family.members_count || 1,
+      is_blocked: family.is_blocked || false,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  // Function to submit edit family form
+  const onSubmitEdit = (data: TablesInsert<'families'>) => {
+    if (!selectedFamily) return;
+    
+    updateFamilyMutation.mutate({
+      id: selectedFamily.id,
+      updates: data
+    }, {
+      onSuccess: () => {
+        setIsEditDialogOpen(false);
+        editForm.reset();
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
       <Header />
@@ -91,7 +138,10 @@ const Families = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button className="bg-primary hover:bg-primary/90">
+              <Button 
+                className="bg-primary hover:bg-primary/90"
+                onClick={handleCreateFamily}
+              >
                 <UserPlus className="mr-2 h-4 w-4" /> Nova Família
               </Button>
             </div>
@@ -213,6 +263,8 @@ const Families = () => {
                     <Badge className="bg-green-500">Ativa</Badge>
                   ) : (
                     <Badge className="bg-red-500">Bloqueada</Badge>
+                  ) : (
+                    <Badge className="bg-green-500">Ativa</Badge>
                   )}
                 </div>
               </div>
@@ -236,6 +288,18 @@ const Families = () => {
                   </div>
                 </>
               )}
+
+              {/* Institution Association */}
+              <div>
+                <p className="text-sm font-semibold text-gray-500 mb-3">Associações com Instituições</p>
+                <FamilyInstitutionAssociation 
+                  family={selectedFamily} 
+                  onAssociationChange={() => {
+                    // Refresh the families data when associations change
+                    // This will be handled by React Query's invalidation
+                  }}
+                />
+              </div>
             </div>
           )}
           
@@ -277,6 +341,227 @@ const Families = () => {
               Desbloquear
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Family Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Nova Família</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...createForm}>
+            <form onSubmit={createForm.handleSubmit(onSubmitCreate)} className="space-y-4">
+              <FormField
+                control={createForm.control}
+                name="name"
+                rules={{ required: "Nome é obrigatório" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Família</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: Família Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="contact_person"
+                rules={{ required: "Pessoa de contato é obrigatória" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pessoa de Contato</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(11) 99999-9999" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="members_count"
+                rules={{ 
+                  required: "Número de membros é obrigatório",
+                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
+                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Membros</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        value={field.value || 1}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                        min="1"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createFamilyMutation.isPending}
+                >
+                  {createFamilyMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    "Criar Família"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Family Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Família</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                rules={{ required: "Nome é obrigatório" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Família</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: Família Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="contact_person"
+                rules={{ required: "Pessoa de contato é obrigatória" }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pessoa de Contato</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(11) 99999-9999" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="members_count"
+                rules={{ 
+                  required: "Número de membros é obrigatório",
+                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
+                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Membros</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        value={field.value || 1}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                        min="1"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Institution Association Section */}
+              {selectedFamily && (
+                <div className="pt-4 border-t">
+                  <FamilyInstitutionLink 
+                    family={selectedFamily}
+                    onAssociationChange={() => {
+                      // Refresh family data after association
+                      // React Query will handle invalidation
+                    }}
+                  />
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={updateFamilyMutation.isPending}
+                >
+                  {updateFamilyMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar Alterações"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
