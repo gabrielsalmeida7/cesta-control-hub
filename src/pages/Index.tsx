@@ -10,16 +10,33 @@ import { useAuth } from '@/hooks/useAuth';
 import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
 
 const Index = () => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Se user for null (durante logout), não fazer nada - ProtectedRoute vai redirecionar
+    if (!user) {
+      if (import.meta.env.DEV) {
+        console.log("[INDEX]", "User is null, waiting for ProtectedRoute to redirect", {
+          hasProfile: !!profile,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return;
+    }
+
     // Redirecionar usuários instituição para seu dashboard específico
     if (profile?.role === 'institution') {
       navigate('/institution/dashboard');
     }
-  }, [profile, navigate]);
+  }, [user, profile, navigate]);
 
+  // Se user for null, não renderizar nada (ProtectedRoute vai redirecionar)
+  if (!user) {
+    return null;
+  }
+
+  // Se profile ainda não carregou, mostrar loading ou null
   if (!profile) {
     return null;
   }

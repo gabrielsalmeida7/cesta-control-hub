@@ -38,8 +38,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.log("[SESSION]", "Auth state changed:", {
             event,
             userEmail: authSession?.user?.email,
+            hasSession: !!authSession,
             timestamp: new Date().toISOString()
           });
+          
+          // Log específico para evento SIGNED_OUT
+          if (event === 'SIGNED_OUT') {
+            console.log("[SESSION]", "SIGNED_OUT event detected - user logged out", {
+              timestamp: new Date().toISOString()
+            });
+          }
         }
         setSession(authSession);
         setUser(authSession?.user ?? null);
@@ -225,17 +233,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
 
-      // Clear Supabase auth token from localStorage
+      // 1. Limpar bypass_user do localStorage (se existir)
+      localStorage.removeItem("bypass_user");
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Bypass user cleared from localStorage");
+      }
+
+      // 2. Limpar todos os tokens do Supabase do localStorage
       const keys = Object.keys(localStorage);
+      let clearedTokens = 0;
       keys.forEach(key => {
-        if (key.includes('sb-') && key.includes('auth-token')) {
+        if (key.includes('sb-') && (key.includes('auth-token') || key.includes('auth'))) {
           localStorage.removeItem(key);
+          clearedTokens++;
         }
       });
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", `Cleared ${clearedTokens} Supabase tokens from localStorage`);
+      }
       
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
+      // 3. Sign out from Supabase (limpa sessão no servidor e localmente)
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) {
+        const error = signOutError;
         if (import.meta.env.DEV) {
           console.error("[AUTH]", "Supabase signOut error:", {
             error: error.message,
@@ -244,12 +265,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         toast({
           title: "Erro ao sair",
-          description: error.message,
+          description: error?.message || "Erro ao limpar sessão",
           variant: "destructive",
         });
       } else {
         if (import.meta.env.DEV) {
-          console.log("[AUTH]", "Sign out successful:", {
+          console.log("[AUTH]", "Sign out successful - session and tokens cleared:", {
             timestamp: new Date().toISOString()
           });
         }
@@ -259,21 +280,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
       
-      // Reset all states
+      // 5. Resetar todos os states
+      // Os states serão atualizados pelo onAuthStateChange quando o evento SIGNED_OUT for disparado
       setUser(null);
       setSession(null);
       setProfile(null);
+      
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Sign out complete - states reset. Navigation will be handled by ProtectedRoute or Header component");
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("[AUTH]", "Error during sign out:", {
           error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString()
         });
       }
-      // Reset states anyway
+      
+      // Reset states anyway, mesmo se houver erro
       setUser(null);
       setSession(null);
       setProfile(null);
+      
+      // Tentar limpar localStorage mesmo com erro
+      try {
+        localStorage.removeItem("bypass_user");
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes('sb-') && (key.includes('auth-token') || key.includes('auth'))) {
+            localStorage.removeItem(key);
+          }
+        });
+      } catch (localStorageError) {
+        if (import.meta.env.DEV) {
+          console.error("[AUTH]", "Error clearing localStorage:", localStorageError);
+        }
+      }
+      
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Sign out error handled - states reset. Navigation will be handled by ProtectedRoute or Header component");
+      }
     }
   };
 
