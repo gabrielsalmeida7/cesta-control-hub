@@ -110,7 +110,10 @@ const Families = () => {
 
   // Function to submit create family form
   const onSubmitCreate = (data: TablesInsert<'families'>) => {
-    createFamilyMutation.mutate(data, {
+    createFamilyMutation.mutate({
+      family: data,
+      institutionId: undefined // Admin não vincula automaticamente
+    }, {
       onSuccess: () => {
         setIsCreateDialogOpen(false);
         createForm.reset();

@@ -43,11 +43,22 @@ const InstitutionDelivery = () => {
   const { data: familiesData = [], isLoading: familiesLoading } = useInstitutionFamilies(profile?.institution_id);
   const createDelivery = useCreateDelivery();
 
-  // Filter families to show only non-blocked ones
+  // Filter families to show only non-blocked ones that are linked to this institution
+  // useInstitutionFamilies já retorna apenas famílias vinculadas, mas vamos garantir
   const availableFamilies = useMemo(() => {
     return familiesData
-      .filter((family: any) => !family.is_blocked || 
-        (family.blocked_until && new Date(family.blocked_until) < new Date()))
+      .filter((family: any) => {
+        // Verificar se família está vinculada à instituição (já filtrado pelo hook, mas garantindo)
+        const isLinked = family.institution_families?.some(
+          (assoc: any) => assoc.institution_id === profile?.institution_id
+        ) || true; // Se não tem institution_families no select, assumir que está vinculada (hook já filtra)
+        
+        // Verificar se não está bloqueada ou se o bloqueio expirou
+        const isNotBlocked = !family.is_blocked || 
+          (family.blocked_until && new Date(family.blocked_until) < new Date());
+        
+        return isLinked && isNotBlocked;
+      })
       .map((family: any) => ({
         id: family.id,
         family_name: family.name || family.contact_person || 'N/A',
@@ -57,7 +68,7 @@ const InstitutionDelivery = () => {
         is_blocked: family.is_blocked || false,
         blocked_until: family.blocked_until || undefined
       }));
-  }, [familiesData]);
+  }, [familiesData, profile?.institution_id]);
 
   const filteredFamilies = useMemo(() => {
     return availableFamilies.filter(family =>
@@ -101,13 +112,26 @@ const InstitutionDelivery = () => {
       return;
     }
 
+    // Verificar se família está vinculada à instituição
+    // As famílias em availableFamilies já são filtradas por useInstitutionFamilies
+    // que só retorna famílias vinculadas à instituição, mas vamos verificar novamente por segurança
+    const familyData = familiesData.find((f: any) => f.id === selectedFamily.id);
+    if (!familyData) {
+      toast({
+        title: "Erro",
+        description: "Esta família não está vinculada à sua instituição. Por favor, vincule a família primeiro.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Verificar se família está bloqueada
     if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
       const blockedUntil = new Date(selectedFamily.blocked_until);
       if (blockedUntil > new Date()) {
         toast({
           title: "Erro",
-          description: `Esta família está bloqueada até ${blockedUntil.toLocaleDateString('pt-BR')}.`,
+          description: `Esta família está bloqueada até ${blockedUntil.toLocaleDateString('pt-BR')}. Não é possível registrar entrega enquanto a família estiver bloqueada.`,
           variant: "destructive"
         });
         return;

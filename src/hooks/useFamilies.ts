@@ -65,22 +65,85 @@ export const useCreateFamily = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (family: FamilyInsert) => {
-      const { data, error } = await supabase
+    mutationFn: async ({
+      family,
+      institutionId
+    }: {
+      family: FamilyInsert;
+      institutionId?: string;
+    }) => {
+      // Criar família
+      const { data: createdFamily, error: createError } = await supabase
         .from("families")
         .insert(family)
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (createError) throw createError;
+
+      // Se institutionId foi fornecido, vincular automaticamente
+      if (institutionId && createdFamily) {
+        // Verificar se família já está vinculada (não deveria acontecer, mas por segurança)
+        const { data: existingAssociations, error: checkError } = await supabase
+          .from("institution_families")
+          .select(`
+            institution_id,
+            institution:institution_id(id, name)
+          `)
+          .eq("family_id", createdFamily.id);
+
+        if (checkError) {
+          // Se houver erro ao verificar, continuar mesmo assim
+          console.error("Error checking existing associations:", checkError);
+        }
+
+        // Se não tem vínculo, criar
+        if (!existingAssociations || existingAssociations.length === 0) {
+          const { error: associateError } = await supabase
+            .from("institution_families")
+            .insert({
+              family_id: createdFamily.id,
+              institution_id: institutionId
+            });
+
+          if (associateError) {
+            // Se falhar ao vincular, logar erro mas não falhar a criação da família
+            console.error("Error associating family with institution:", associateError);
+            toast({
+              title: "Aviso",
+              description: "Família criada, mas houve erro ao vincular à instituição. Você pode vincular manualmente.",
+              variant: "default"
+            });
+          }
+        } else {
+          // Se já tem vínculo, mostrar aviso
+          const existingInstitution = existingAssociations[0];
+          const institutionName = existingInstitution.institution?.name || "outra instituição";
+          toast({
+            title: "Aviso",
+            description: `Família criada, mas já está vinculada a ${institutionName}.`,
+            variant: "default"
+          });
+        }
+      }
+
+      return createdFamily;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["families"] });
-      toast({
-        title: "Sucesso",
-        description: "Família criada com sucesso!"
-      });
+      queryClient.invalidateQueries({ queryKey: ["institution-families"] });
+      
+      if (variables.institutionId) {
+        toast({
+          title: "Sucesso",
+          description: "Família criada e vinculada à instituição com sucesso!"
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: "Família criada com sucesso!"
+        });
+      }
     },
     onError: (error) => {
       toast({
@@ -172,7 +235,8 @@ export const useAssociateFamilyWithInstitution = () => {
       familyId: string;
       institutionId: string;
     }) => {
-      // Verificar se família já está vinculada a outra instituição
+      // NOVA REGRA: Uma família só pode ter UMA instituição
+      // Verificar se família já está vinculada a qualquer instituição
       const { data: existingAssociations, error: checkError } = await supabase
         .from("institution_families")
         .select(`
@@ -183,30 +247,25 @@ export const useAssociateFamilyWithInstitution = () => {
 
       if (checkError) throw checkError;
 
-      // Se já existe vínculo com outra instituição
+      // Se já existe qualquer vínculo
       if (existingAssociations && existingAssociations.length > 0) {
-        const existingInstitution = existingAssociations.find(
-          (assoc: any) => assoc.institution_id !== institutionId
-        );
+        const existingAssociation = existingAssociations[0];
+        const existingInstitutionId = existingAssociation.institution_id;
+        const institutionName = existingAssociation.institution?.name || "outra instituição";
         
-        if (existingInstitution) {
-          const institutionName = existingInstitution.institution?.name || "outra instituição";
-          const error = new Error(`FAMILY_ALREADY_ASSOCIATED:${institutionName}`);
-          (error as any).institutionName = institutionName;
-          throw error;
+        // Se já está vinculada à mesma instituição, não fazer nada
+        if (existingInstitutionId === institutionId) {
+          return { message: "Família já está vinculada a esta instituição" };
         }
+        
+        // Se está vinculada a outra instituição, retornar erro
+        const error = new Error(`FAMILY_ALREADY_ASSOCIATED:${institutionName}`);
+        (error as any).institutionName = institutionName;
+        (error as any).existingInstitutionId = existingInstitutionId;
+        throw error;
       }
 
-      // Se já está vinculada à mesma instituição, não fazer nada
-      const alreadyLinked = existingAssociations?.some(
-        (assoc: any) => assoc.institution_id === institutionId
-      );
-      
-      if (alreadyLinked) {
-        return { message: "Família já está vinculada a esta instituição" };
-      }
-
-      // Criar novo vínculo
+      // Se não tem vínculo, criar novo vínculo
       const { data, error } = await supabase
         .from("institution_families")
         .insert({

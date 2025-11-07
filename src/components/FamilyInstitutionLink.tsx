@@ -46,15 +46,25 @@ const FamilyInstitutionLink = ({ family, onAssociationChange }: FamilyInstitutio
     : null;
 
   // Filter available institutions based on user role
+  // NOVA REGRA: Uma família só pode ter UMA instituição
   const availableInstitutions = institutions.filter(inst => {
     // If admin, show all institutions not already associated
     if (profile?.role === 'admin') {
-      return !associatedInstitutionIds.includes(inst.id);
+      // Se família já tem instituição vinculada, não mostrar nenhuma
+      if (currentInstitution) {
+        return false;
+      }
+      return true; // Admin pode vincular a qualquer instituição se família não tem vínculo
     }
     
-    // If institution user, only show their own institution
+    // If institution user, only show their own institution if family has no association
     if (profile?.role === 'institution' && profile?.institution_id) {
-      return inst.id === profile.institution_id && !associatedInstitutionIds.includes(inst.id);
+      // Se família já tem vínculo, não mostrar nenhuma
+      if (currentInstitution) {
+        return false;
+      }
+      // Só mostrar própria instituição se família não tem vínculo
+      return inst.id === profile.institution_id;
     }
     
     return false;
@@ -194,8 +204,8 @@ const FamilyInstitutionLink = ({ family, onAssociationChange }: FamilyInstitutio
         </Alert>
       )}
 
-      {/* Link Section */}
-      {availableInstitutions.length > 0 && !isAssociatedWithOtherInstitution && (
+      {/* Link Section - Só mostrar se família não tem vínculo */}
+      {!currentInstitution && availableInstitutions.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">Vincular a Instituição:</p>
           <div className="flex gap-2">
@@ -230,7 +240,7 @@ const FamilyInstitutionLink = ({ family, onAssociationChange }: FamilyInstitutio
             </Select>
             <Button 
               onClick={handleAssociate}
-              disabled={!selectedInstitutionId || associateMutation.isPending || isAssociatedWithOtherInstitution}
+              disabled={!selectedInstitutionId || associateMutation.isPending}
               size="sm"
             >
               {associateMutation.isPending ? (
@@ -246,6 +256,15 @@ const FamilyInstitutionLink = ({ family, onAssociationChange }: FamilyInstitutio
               )}
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Mensagem se família já tem vínculo e não pode vincular outra */}
+      {currentInstitution && profile?.role === 'institution' && profile?.institution_id !== currentInstitution.id && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            <strong>Atenção:</strong> Esta família já está vinculada a outra instituição. Cada família só pode estar vinculada a uma instituição.
+          </p>
         </div>
       )}
 

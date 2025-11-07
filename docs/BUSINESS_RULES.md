@@ -33,13 +33,16 @@ Este documento define todas as regras de negócio do sistema Cesta Control Hub, 
 
 - **Permissões:**
   - ✅ Gerenciar apenas suas próprias famílias
+  - ✅ Cadastrar novas famílias (vinculando automaticamente à própria instituição)
   - ✅ Registrar entregas para suas famílias
   - ✅ Visualizar relatórios da própria instituição
   - ✅ Editar dados da própria instituição
+  - ✅ Vincular famílias à própria instituição (se família não tiver vínculo)
 - **Restrições:**
   - ❌ Não pode desbloquear famílias
   - ❌ Não pode ver dados de outras instituições
   - ❌ Não pode registrar entregas para famílias não vinculadas
+  - ❌ Não pode vincular famílias que já estão vinculadas a outra instituição
 
 ---
 
@@ -78,6 +81,9 @@ Este documento define todas as regras de negócio do sistema Cesta Control Hub, 
 
 ### 1. **Criação de Família**
 
+- **Quem pode criar:**
+  - Administradores (sem vínculo automático)
+  - Instituições (com vínculo automático à própria instituição)
 - **Campos Obrigatórios:**
   - Nome da família
   - Pessoa de contato
@@ -87,14 +93,18 @@ Este documento define todas as regras de negócio do sistema Cesta Control Hub, 
   - CPF único no sistema (se fornecido)
   - Número de membros deve ser positivo
   - Nome não pode estar vazio
+  - Se instituição cria: família é automaticamente vinculada à instituição
+  - Se família já existe e está vinculada a outra instituição: erro ao tentar vincular
 
 ### 2. **Associação Família-Instituição**
 
 - **Regras:**
-  - Uma família pode estar vinculada a múltiplas instituições
+  - **NOVA REGRA:** Uma família só pode estar vinculada a UMA instituição
   - Uma instituição pode atender múltiplas famílias
   - Associação é obrigatória para entregas
-  - Apenas admin pode criar associações
+  - Admin pode criar associações para qualquer família
+  - Instituições podem vincular famílias à própria instituição (se família não tiver vínculo)
+  - Se família já está vinculada a outra instituição, não pode ser vinculada a nova instituição
 
 ### 3. **Status da Família**
 
@@ -142,18 +152,20 @@ Este documento define todas as regras de negócio do sistema Cesta Control Hub, 
 
 ### 1. **Registro de Entrega**
 
+- **Quem pode registrar:**
+  - Administradores (para qualquer instituição)
+  - Instituições (apenas para suas próprias famílias vinculadas)
 - **Pré-condições:**
-  - Família deve estar ativa
+  - Família deve estar ativa (não bloqueada)
   - Família deve estar vinculada à instituição
   - Instituição deve ter cestas disponíveis
 - **Dados Obrigatórios:**
-  - Família
-  - Instituição
-  - Quantidade de cestas
-  - Período de bloqueio
+  - Família (deve estar vinculada à instituição)
+  - Instituição (automático para usuários de instituição)
+  - Itens da entrega (nome, quantidade, unidade)
+  - Período de bloqueio (7, 15, 20, 30 ou 45 dias)
 - **Dados Opcionais:**
-  - Itens adicionais
-  - Observações
+  - Observações adicionais
   - Data da entrega (padrão: hoje)
 
 ### 2. **Validações de Entrega**
@@ -161,13 +173,16 @@ Este documento define todas as regras de negócio do sistema Cesta Control Hub, 
 - **Família Bloqueada:**
   - ❌ Não permite entrega
   - Mostra data de desbloqueio
-  - Sugere contatar admin
+  - Mensagem: "Esta família está bloqueada até [data]"
 - **Família Não Vinculada:**
   - ❌ Não permite entrega
-  - Sugere vincular família primeiro
-- **Estoque Insuficiente:**
+  - Mensagem: "Esta família não está vinculada à sua instituição. Por favor, vincule a família primeiro."
+- **Família Vinculada a Outra Instituição:**
   - ❌ Não permite entrega
-  - Mostra quantidade disponível
+  - Mensagem: "Esta família já está sendo atendida por [Nome da Instituição]"
+- **Itens Inválidos:**
+  - ❌ Não permite entrega
+  - Mensagem: "Preencha todos os itens de entrega corretamente"
 
 ### 3. **Consequências da Entrega**
 
