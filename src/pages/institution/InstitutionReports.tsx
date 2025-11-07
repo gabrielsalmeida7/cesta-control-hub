@@ -9,51 +9,58 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
-import { useAuth } from '@/hooks/useAuth';
-import { useDeliveries } from '@/hooks/useDeliveries';
+import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
+import { useReportExport } from '@/hooks/useReportExport';
+
 
 const InstitutionReports = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const { profile } = useAuth();
-  const { data: deliveries = [], isLoading } = useDeliveries(profile?.institution_id);
 
-  // Map deliveries to DeliveryReport format
-  const deliveryReports = useMemo(() => {
-    return deliveries.map((delivery) => {
-      const family = delivery.family as { name?: string; contact_person?: string } | null;
-      return {
-        id: delivery.id,
-        delivery_date: delivery.delivery_date,
-        family_name: family?.name || family?.contact_person || 'N/A',
-        family_cpf: '', // CPF não está no schema atual, pode ser adicionado depois
-        items_delivered: delivery.notes ? [delivery.notes] : ['Cesta Básica'], // Usar notes ou padrão
-        blocking_period: delivery.blocking_period_days || 30,
-        notes: delivery.notes || undefined
-      };
-    });
-  }, [deliveries]);
+  const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(startDate, endDate);
+  const { exportDeliveriesReport } = useReportExport();
 
-  const filteredDeliveries = useMemo(() => {
-    return deliveryReports.filter(delivery => {
-      if (!startDate && !endDate) return true;
-      
-      const deliveryDate = new Date(delivery.delivery_date);
-      const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-      const end = endDate ? new Date(endDate) : new Date('2100-12-31');
-      
-      return deliveryDate >= start && deliveryDate <= end;
-    });
-  }, [deliveryReports, startDate, endDate]);
+  const filteredDeliveries = deliveries;
 
   const totalDeliveries = filteredDeliveries.length;
-  const totalFamilies = new Set(filteredDeliveries.map(d => d.family_name)).size;
-  const totalItems = filteredDeliveries.reduce((acc, d) => acc + d.items_delivered.length, 0);
+  const totalFamilies = new Set(filteredDeliveries.map(d => d.family?.id)).size;
+  const totalItems = filteredDeliveries.length; // Assumindo 1 item por entrega (cesta básica)
 
   const exportReport = () => {
-    // Aqui seria implementada a exportação do relatório
-    console.log('Exportando relatório...', filteredDeliveries);
+    exportDeliveriesReport(startDate, endDate);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <InstitutionNavigationButtons />
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-red-600">Erro ao carregar relatórios: {error.message}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -134,11 +141,50 @@ const InstitutionReports = () => {
               <CardTitle>Histórico de Entregas</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                </div>
-              ) : filteredDeliveries.length === 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Família</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Itens Entregues</TableHead>
+                    <TableHead>Período Bloqueio</TableHead>
+                    <TableHead>Observações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDeliveries.map((delivery) => (
+                    <TableRow key={delivery.id}>
+                      <TableCell>
+                        {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {delivery.family?.name || 'N/A'}
+                      </TableCell>
+                      <TableCell>{delivery.family?.contact_person || 'N/A'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary" className="text-xs">
+                            Cesta Básica
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {delivery.blocking_period_days} dias
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-600">
+                          {delivery.notes || '-'}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {filteredDeliveries.length === 0 && (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">

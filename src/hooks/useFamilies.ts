@@ -15,23 +15,29 @@ export const useFamilies = () => {
   return useQuery({
     queryKey: ["families"],
     queryFn: async () => {
+      console.log('👨‍👩‍👧‍👦 Fetching families...');
+      
       const { data, error } = await supabase
         .from("families")
         .select(
           `
           *,
           blocked_by_institution:blocked_by_institution_id(name),
-          institution_families(
-            institution_id,
-            institution:institution_id(id, name)
-          )
-        `
-        )
-        .order("name");
-
-      if (error) throw error;
+          institution_families(institution_id),
+          deliveries(delivery_date, blocking_period_days, notes)
+        `)
+        .order('name');
+      
+      if (error) {
+        console.error('❌ Error fetching families:', error);
+        throw error;
+      }
+      
+      console.log('✅ Families fetched:', data?.length || 0, 'records');
       return data;
-    }
+    },
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 };
 
@@ -47,12 +53,12 @@ export const useInstitutionFamilies = (institutionId?: string) => {
           `
           *,
           blocked_by_institution:blocked_by_institution_id(name),
-          institution_families!inner(institution_id)
-        `
-        )
-        .eq("institution_families.institution_id", institutionId)
-        .order("name");
-
+          institution_families!inner(institution_id),
+          deliveries(delivery_date, blocking_period_days, notes)
+        `)
+        .eq('institution_families.institution_id', institutionId)
+        .order('name');
+      
       if (error) throw error;
       return data;
     },

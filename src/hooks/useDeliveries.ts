@@ -89,9 +89,13 @@ export const useCreateDelivery = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
-      queryClient.invalidateQueries({ queryKey: ["families"] });
-      queryClient.invalidateQueries({ queryKey: ["institution-families"] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-recent-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries-by-institution'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['families'] });
+      queryClient.invalidateQueries({ queryKey: ['institution-families'] });
       toast({
         title: "Sucesso",
         description: "Entrega registrada com sucesso!"
@@ -150,8 +154,11 @@ export const useUpdateDelivery = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
-      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-recent-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries-by-institution'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({
         title: "Sucesso",
         description: "Entrega atualizada com sucesso!"
@@ -178,8 +185,11 @@ export const useDeleteDelivery = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["deliveries"] });
-      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-recent-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries-by-institution'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({
         title: "Sucesso",
         description: "Entrega excluída com sucesso!"

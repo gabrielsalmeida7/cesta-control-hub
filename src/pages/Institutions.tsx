@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
-import { Building, Edit, Info, Trash2 } from "lucide-react";
+import { Building, Edit, Info, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -11,22 +11,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useInstitutions, useCreateInstitution, useUpdateInstitution, useDeleteInstitution } from "@/hooks/useInstitutions";
-import { useAuth } from "@/hooks/useAuth";
-import type { Tables } from "@/integrations/supabase/types";
+import { useInstitutions, useCreateInstitution, useUpdateInstitution } from "@/hooks/useInstitutions";
+import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
-// Use Supabase types for institution data model
 type Institution = Tables<'institutions'>;
 
 const Institutions = () => {
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  const { data: institutions, isLoading } = useInstitutions();
+  const createInstitution = useCreateInstitution();
+  const updateInstitution = useUpdateInstitution();
   
   // State for dialog controls
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
   
@@ -36,16 +33,8 @@ const Institutions = () => {
   const updateInstitution = useUpdateInstitution();
   const deleteInstitution = useDeleteInstitution();
 
-  // Setup forms
-  const editForm = useForm<Institution>({
-    defaultValues: {
-      name: "",
-      address: "",
-      phone: "",
-    }
-  });
-  
-  const createForm = useForm<Omit<Institution, 'id' | 'created_at' | 'updated_at'>>({
+  // Setup form
+  const form = useForm<TablesInsert<'institutions'>>({
     defaultValues: {
       name: "",
       address: "",
@@ -53,16 +42,19 @@ const Institutions = () => {
     }
   });
 
+  // Function to handle creating new institution
+  const handleCreate = () => {
+    form.reset();
+    setIsCreateDialogOpen(true);
+  };
 
   // Function to handle opening the edit dialog
   const handleEdit = (institution: Institution) => {
     setSelectedInstitution(institution);
-    // Reset form with institution values
-    editForm.reset({
-      id: institution.id,
+    form.reset({
       name: institution.name,
-      address: institution.address,
-      phone: institution.phone,
+      address: institution.address || "",
+      phone: institution.phone || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -79,45 +71,27 @@ const Institutions = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  // Function to save edited institution
-  const onEditSubmit = (data: Institution) => {
-    if (!selectedInstitution?.id) return;
-    
-    updateInstitution.mutate({
-      id: selectedInstitution.id,
-      updates: {
-        name: data.name,
-        address: data.address,
-        phone: data.phone,
-      }
-    }, {
-      onSuccess: () => {
-        setIsEditDialogOpen(false);
-        setSelectedInstitution(null);
-      }
-    });
-  };
-  
-  // Function to create new institution
-  const onCreateSubmit = (data: Omit<Institution, 'id' | 'created_at' | 'updated_at'>) => {
-    createInstitution.mutate(data, {
-      onSuccess: () => {
-        setIsCreateDialogOpen(false);
-        createForm.reset();
-      }
-    });
-  };
-  
-  // Function to confirm delete
-  const onDeleteConfirm = () => {
-    if (!selectedInstitution?.id) return;
-    
-    deleteInstitution.mutate(selectedInstitution.id, {
-      onSuccess: () => {
-        setIsDeleteDialogOpen(false);
-        setSelectedInstitution(null);
-      }
-    });
+  // Function to save institution (create or update)
+  const onSubmit = (data: TablesInsert<'institutions'>) => {
+    if (selectedInstitution) {
+      // Update existing
+      updateInstitution.mutate(
+        { id: selectedInstitution.id, updates: data },
+        {
+          onSuccess: () => {
+            setIsEditDialogOpen(false);
+            setSelectedInstitution(null);
+          }
+        }
+      );
+    } else {
+      // Create new
+      createInstitution.mutate(data, {
+        onSuccess: () => {
+          setIsCreateDialogOpen(false);
+        }
+      });
+    }
   };
 
   // Function to handle opening the details dialog
@@ -196,27 +170,34 @@ const Institutions = () => {
           {/* Page title and add new institution button */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800">Instituições</h2>
-            <Button 
-              className="bg-primary hover:bg-primary/90"
-              onClick={handleCreate}
-            >
-              <Building className="mr-2 h-4 w-4" /> Nova Instituição
+            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90">
+              <Plus className="mr-2 h-4 w-4" /> Nova Instituição
             </Button>
           </div>
           
           {/* Grid layout for institution cards */}
-          {institutions.length === 0 ? (
-            <div className="text-center py-12">
-              <Building className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma instituição encontrada</h3>
-              <p className="text-gray-500 mb-4">Comece criando sua primeira instituição.</p>
-              <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90">
-                <Building className="mr-2 h-4 w-4" /> Nova Instituição
-              </Button>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-full" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-20 mb-4" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 flex-1" />
+                      <Skeleton className="h-8 flex-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {institutions.map((institution) => (
+              {institutions?.map((institution) => (
                 <Card key={institution.id} className="overflow-hidden">
                   {/* Card header with institution name */}
                   <CardHeader className="bg-primary text-white">
@@ -224,8 +205,8 @@ const Institutions = () => {
                   </CardHeader>
                   {/* Card content with institution details */}
                   <CardContent className="pt-4">
-                    <p className="mb-2"><strong>Endereço:</strong> {institution.address || 'Não informado'}</p>
-                    <p className="mb-4"><strong>Telefone:</strong> {institution.phone || 'Não informado'}</p>
+                    <p className="mb-2"><strong>Endereço:</strong> {institution.address || "Não informado"}</p>
+                    <p className="mb-4"><strong>Telefone:</strong> {institution.phone || "Não informado"}</p>
                     {/* Action buttons */}
                     <div className="flex gap-2">
                       <Button 
@@ -244,28 +225,20 @@ const Institutions = () => {
                       >
                         <Info className="mr-2 h-4 w-4" /> Detalhes
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDelete(institution)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )) || []}
             </div>
           )}
         </div>
       </main>
 
-      {/* Edit Institution Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {/* Create Institution Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Editar Instituição</DialogTitle>
+            <DialogTitle>Nova Instituição</DialogTitle>
           </DialogHeader>
           
           <Form {...editForm}>
@@ -316,15 +289,12 @@ const Institutions = () => {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsEditDialogOpen(false)}
+                  onClick={() => setIsCreateDialogOpen(false)}
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit"
-                  disabled={updateInstitution.isPending}
-                >
-                  {updateInstitution.isPending ? 'Salvando...' : 'Salvar Alterações'}
+                <Button type="submit" disabled={createInstitution.isPending}>
+                  {createInstitution.isPending ? "Criando..." : "Criar Instituição"}
                 </Button>
               </DialogFooter>
             </form>
@@ -332,17 +302,17 @@ const Institutions = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Create Institution Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      {/* Edit Institution Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Nova Instituição</DialogTitle>
+            <DialogTitle>Editar Instituição</DialogTitle>
           </DialogHeader>
           
-          <Form {...createForm}>
-            <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
-                control={createForm.control}
+                control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
@@ -356,7 +326,7 @@ const Institutions = () => {
               />
               
               <FormField
-                control={createForm.control}
+                control={form.control}
                 name="address"
                 render={({ field }) => (
                   <FormItem>
@@ -370,7 +340,7 @@ const Institutions = () => {
               />
               
               <FormField
-                control={createForm.control}
+                control={form.control}
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
@@ -391,11 +361,8 @@ const Institutions = () => {
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit"
-                  disabled={createInstitution.isPending}
-                >
-                  {createInstitution.isPending ? 'Criando...' : 'Criar Instituição'}
+                <Button type="submit" disabled={updateInstitution.isPending}>
+                  {updateInstitution.isPending ? "Salvando..." : "Salvar Alterações"}
                 </Button>
               </DialogFooter>
             </form>
@@ -449,25 +416,26 @@ const Institutions = () => {
           </DialogHeader>
           
           {selectedInstitution && (
-            <div className="py-4 space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-500">Nome</p>
-                <p>{selectedInstitution.name}</p>
+            <div className="py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-500">Nome</p>
+                  <p>{selectedInstitution.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-500">Data de Criação</p>
+                  <p>{selectedInstitution.created_at ? new Date(selectedInstitution.created_at).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                </div>
               </div>
               
-              <div>
+              <div className="mt-4">
                 <p className="text-sm font-semibold text-gray-500">Endereço</p>
-                <p>{selectedInstitution.address || 'Não informado'}</p>
+                <p>{selectedInstitution.address || "Não informado"}</p>
               </div>
               
-              <div>
+              <div className="mt-4">
                 <p className="text-sm font-semibold text-gray-500">Telefone</p>
-                <p>{selectedInstitution.phone || 'Não informado'}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-semibold text-gray-500">Criado em</p>
-                <p>{selectedInstitution.created_at ? new Date(selectedInstitution.created_at).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                <p>{selectedInstitution.phone || "Não informado"}</p>
               </div>
             </div>
           )}

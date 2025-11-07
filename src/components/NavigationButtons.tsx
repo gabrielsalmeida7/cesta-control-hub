@@ -9,6 +9,7 @@ import {
   BarChart3, 
   Package 
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 
 const NavigationButtons = () => {
@@ -22,38 +23,29 @@ const NavigationButtons = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navigationItems = [
-    {
-      label: "Dashboard",
-      path: "/",
-      icon: Home,
-      allowedRoles: ['admin', 'institution']
-    },
-    {
-      label: "Instituições",
-      path: "/institutions",
-      icon: Building2,
-      allowedRoles: ['admin']
-    },
-    {
-      label: "Famílias",
-      path: "/families",
-      icon: Users,
-      allowedRoles: ['admin', 'institution']
-    },
-    {
-      label: "Entregas",
-      path: "/delivery",
-      icon: Package,
-      allowedRoles: ['institution']
-    },
-    {
-      label: "Relatórios",
-      path: "/reports",
-      icon: BarChart3,
-      allowedRoles: ['admin', 'institution']
-    }
-  ];
+  const isInstitution = profile.role === 'institution';
+
+  type Role = 'admin' | 'institution';
+  type NavItem = {
+    label: string;
+    path: string;
+    icon: LucideIcon;
+    allowedRoles: Role[];
+  };
+
+  const navigationItems: NavItem[] = isInstitution
+    ? [
+        { label: "Dashboard", path: "/institution/dashboard", icon: Home, allowedRoles: ['institution'] },
+        { label: "Famílias", path: "/institution/families", icon: Users, allowedRoles: ['institution'] },
+        { label: "Entregas", path: "/institution/delivery", icon: Package, allowedRoles: ['institution'] },
+        { label: "Relatórios", path: "/institution/reports", icon: BarChart3, allowedRoles: ['institution'] },
+      ]
+    : [
+        { label: "Dashboard", path: "/", icon: Home, allowedRoles: ['admin'] },
+        { label: "Instituições", path: "/institutions", icon: Building2, allowedRoles: ['admin'] },
+        { label: "Famílias", path: "/families", icon: Users, allowedRoles: ['admin'] },
+        { label: "Relatórios", path: "/reports", icon: BarChart3, allowedRoles: ['admin'] },
+      ];
 
   const filteredItems = navigationItems.filter(item => 
     item.allowedRoles.includes(profile.role)

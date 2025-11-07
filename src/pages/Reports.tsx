@@ -2,29 +2,60 @@ import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import { FileText, Download, Calendar, AlertTriangle, BellRing, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
 import { useAlerts } from "@/hooks/useAlerts";
+import { useReportExport } from "@/hooks/useReportExport";
 
 const Reports = () => {
-  const { profile } = useAuth();
   const { data: alerts = [], isLoading: alertsLoading } = useAlerts();
-  
-  const username = profile?.full_name || "Admin";
+  const { 
+    exportDeliveriesReport, 
+    exportFamiliesReport, 
+    exportInstitutionsReport, 
+    exportSummaryReport 
+  } = useReportExport();
   
   const reportTypes = [
-    { id: 1, title: "Entregas por Período", description: "Relatório detalhado de todas as entregas em um período específico", icon: Calendar },
-    { id: 2, title: "Famílias Atendidas por Instituição", description: "Análise das famílias atendidas por cada instituição cadastrada", icon: FileText },
-    { id: 3, title: "Resumo Mensal de Entregas", description: "Totais e médias de cestas entregues por mês", icon: FileText },
-    { id: 4, title: "Instituições por Desempenho", description: "Ranking de instituições por número de entregas realizadas", icon: FileText },
+    { 
+      id: 1, 
+      title: "Entregas por Período", 
+      description: "Relatório detalhado de todas as entregas em um período específico", 
+      icon: Calendar,
+      action: () => exportDeliveriesReport()
+    },
+    { 
+      id: 2, 
+      title: "Famílias Cadastradas", 
+      description: "Lista completa de famílias cadastradas com status e informações", 
+      icon: FileText,
+      action: () => exportFamiliesReport()
+    },
+    { 
+      id: 3, 
+      title: "Instituições Cadastradas", 
+      description: "Lista de todas as instituições cadastradas no sistema", 
+      icon: FileText,
+      action: () => exportInstitutionsReport()
+    },
+    { 
+      id: 4, 
+      title: "Resumo Estatístico", 
+      description: "Resumo geral com totais e estatísticas do sistema", 
+      icon: FileText,
+      action: () => exportSummaryReport()
+    },
   ];
 
-  // State for alert filter
+  // State for alert filter and date filters
   const [alertFilter, setAlertFilter] = useState('todos');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Filter alerts based on selected type
   const filteredAlerts = useMemo(() => {
@@ -134,8 +165,19 @@ const Reports = () => {
           
           <div className="space-y-4">
             {alertsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="border rounded-lg p-4">
+                    <div className="flex items-start space-x-4">
+                      <Skeleton className="h-5 w-5 rounded" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredAlerts.length > 0 ? (
               filteredAlerts.map(alert => (
@@ -192,24 +234,44 @@ const Reports = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-gray-600 mb-4">{report.description}</p>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Período" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="last-month">Último Mês</SelectItem>
-                            <SelectItem value="last-3-months">Últimos 3 Meses</SelectItem>
-                            <SelectItem value="last-6-months">Últimos 6 Meses</SelectItem>
-                            <SelectItem value="last-year">Último Ano</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button>
+                     <div className="space-y-4">
+                      {report.id === 1 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Data Inicial</label>
+                            <Input
+                              type="date"
+                              value={startDate}
+                              onChange={(e) => setStartDate(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Data Final</label>
+                            <Input
+                              type="date"
+                              value={endDate}
+                              onChange={(e) => setEndDate(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button
+                              onClick={() => exportDeliveriesReport(startDate, endDate)}
+                              className="w-full"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Exportar CSV
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={report.action}
+                          className="w-full"
+                        >
                           <Download className="mr-2 h-4 w-4" />
-                          Gerar PDF
+                          Exportar CSV
                         </Button>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

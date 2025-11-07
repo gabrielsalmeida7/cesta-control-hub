@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,16 +5,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
-  const { signIn, user, profile, loading: authLoading } = useAuth();
+  const { signIn, signUp, user } = useAuth();
+  const { toast } = useToast();
 
   // Redirect if already logged in (simplified - let ProtectedRoute handle most of the logic)
   useEffect(() => {
@@ -36,57 +36,15 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (import.meta.env.DEV) {
-      console.log("[LOGIN]", "Form submission initiated:", {
-        email,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Clear previous errors
-    setError(null);
     setLoading(true);
 
-    if (!email || !password) {
-      setError("Por favor, preencha todos os campos.");
-      setLoading(false);
-      if (import.meta.env.DEV) {
-        console.warn("[LOGIN]", "Form submission failed: missing fields", {
-          emailEmpty: !email,
-          passwordEmpty: !password,
-          timestamp: new Date().toISOString()
-        });
-      }
-      return;
-    }
-
-    const { error: signInError } = await signIn(email, password);
+    const action = isSignup ? signUp : signIn;
+    const { error } = await action(email, password);
     
-    if (signInError) {
-      if (import.meta.env.DEV) {
-        console.error("[LOGIN]", "Form submission error:", {
-          error: signInError.message,
-          email,
-          timestamp: new Date().toISOString()
-        });
-      }
-      setError(signInError.message || "Erro ao fazer login. Tente novamente.");
-      setLoading(false);
-    } else {
-      if (import.meta.env.DEV) {
-        console.log("[LOGIN]", "Form submission successful, onAuthStateChange will handle state updates", {
-          email,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      // Reset form and wait for auth state to update
-      // The useEffect will handle redirection when user and profile are ready
-      setLoading(false);
-      // Don't set loginSuccess - let the auth state changes handle navigation
+    // For signup, the hook will show a toast to verify email
+    if (!error && !isSignup) {
+      // Let the auth state change handle the redirect
     }
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-blue-600 relative">
@@ -109,7 +67,7 @@ const Login = () => {
               alt="Logo" 
               className="w-[330px] h-[130px] mx-auto mb-0"
             />
-             <CardTitle className="text-2xl font-bold tracking-tight">
+            <CardTitle className="text-2xl font-bold tracking-tight">
               Sistema de Controle de Alimentos
             </CardTitle>
           </CardHeader>
@@ -135,9 +93,26 @@ const Login = () => {
                   <a 
                     href="#" 
                     className="text-sm text-primary hover:underline"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault();
-                      alert("Entre em contato com o administrador para recuperar sua senha.");
+                      const { supabase } = await import("@/integrations/supabase/client");
+                      const { useToast } = await import("@/hooks/use-toast");
+                      const { toast } = useToast();
+                      if (!email) {
+                        toast({ title: "Informe seu email", description: "Preencha o campo de email para receber o link de redefinição.", variant: "destructive" });
+                        return;
+                      }
+                      try {
+                        const redirectTo = `${window.location.origin}/reset-password`;
+                        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+                        if (error) {
+                          toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+                        } else {
+                          toast({ title: "Email enviado", description: "Verifique sua caixa de entrada para redefinir a senha." });
+                        }
+                      } catch (err: any) {
+                        toast({ title: "Erro inesperado", description: err?.message || String(err), variant: "destructive" });
+                      }
                     }}
                   >
                     Esqueceu a senha?
@@ -165,9 +140,28 @@ const Login = () => {
                 className="w-full bg-primary hover:bg-primary/90" 
                 disabled={loading || authLoading}
               >
-                {loading || authLoading ? "Entrando..." : "Entrar"}
+                {loading ? (isSignup ? "Cadastrando..." : "Entrando...") : (isSignup ? "Cadastrar" : "Entrar")}
               </Button>
+
+              <p className="text-center text-sm text-gray-600 mt-2">
+                {isSignup ? (
+                  <>
+                    Já tem uma conta?{' '}
+                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(false); }}>
+                      Entrar
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    Não tem conta?{' '}
+                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(true); }}>
+                      Cadastre-se
+                    </a>
+                  </>
+                )}
+              </p>
             </form>
+
           </CardContent>
           
           <CardFooter className="flex justify-center">

@@ -10,9 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useFamilies } from '@/hooks/useFamilies';
+import { useCreateDelivery } from '@/hooks/useInstitutionDeliveries';
 import { useAuth } from '@/hooks/useAuth';
-import { useInstitutionFamilies } from '@/hooks/useFamilies';
-import { useCreateDelivery } from '@/hooks/useDeliveries';
 
 interface DeliveryItem {
   item_name: string;
@@ -20,19 +20,9 @@ interface DeliveryItem {
   unit: string;
 }
 
-interface Family {
-  id: string;
-  family_name: string;
-  main_cpf: string;
-  address: string;
-  members_count: number;
-  is_blocked: boolean;
-  blocked_until?: string;
-}
-
 const InstitutionDelivery = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
+  const [selectedFamily, setSelectedFamily] = useState<any>(null);
   const [blockingPeriod, setBlockingPeriod] = useState('30');
   const [notes, setNotes] = useState('');
   const [deliveryItems, setDeliveryItems] = useState<DeliveryItem[]>([
@@ -40,42 +30,22 @@ const InstitutionDelivery = () => {
   ]);
   const { toast } = useToast();
   const { profile } = useAuth();
-  const { data: familiesData = [], isLoading: familiesLoading } = useInstitutionFamilies(profile?.institution_id);
-  const createDelivery = useCreateDelivery();
+  
+  const { data: families = [], isLoading } = useFamilies();
+  const createDeliveryMutation = useCreateDelivery();
 
-  // Filter families to show only non-blocked ones that are linked to this institution
-  // useInstitutionFamilies já retorna apenas famílias vinculadas, mas vamos garantir
-  const availableFamilies = useMemo(() => {
-    return familiesData
-      .filter((family: any) => {
-        // Verificar se família está vinculada à instituição (já filtrado pelo hook, mas garantindo)
-        const isLinked = family.institution_families?.some(
-          (assoc: any) => assoc.institution_id === profile?.institution_id
-        ) || true; // Se não tem institution_families no select, assumir que está vinculada (hook já filtra)
-        
-        // Verificar se não está bloqueada ou se o bloqueio expirou
-        const isNotBlocked = !family.is_blocked || 
-          (family.blocked_until && new Date(family.blocked_until) < new Date());
-        
-        return isLinked && isNotBlocked;
-      })
-      .map((family: any) => ({
-        id: family.id,
-        family_name: family.name || family.contact_person || 'N/A',
-        main_cpf: '', // CPF não está no schema atual
-        address: family.address || 'Não informado',
-        members_count: family.members_count || 0,
-        is_blocked: family.is_blocked || false,
-        blocked_until: family.blocked_until || undefined
-      }));
-  }, [familiesData, profile?.institution_id]);
+  // Filtrar famílias liberadas para entrega (da própria instituição)
+  const availableFamilies = families.filter(family => {
+    return !family.is_blocked && 
+           family.institution_families?.some((if_relation: any) => 
+             if_relation.institution_id === profile?.institution_id
+           );
+  });
 
-  const filteredFamilies = useMemo(() => {
-    return availableFamilies.filter(family =>
-      family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (family.main_cpf && family.main_cpf.includes(searchTerm))
-    );
-  }, [availableFamilies, searchTerm]);
+  const filteredFamilies = availableFamilies.filter(family =>
+    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const addDeliveryItem = () => {
     setDeliveryItems([...deliveryItems, { item_name: '', quantity: 1, unit: 'unidade' }]);
@@ -147,22 +117,16 @@ const InstitutionDelivery = () => {
       return;
     }
 
-    // Format delivery items for notes
-    const itemsDescription = deliveryItems
-      .map(item => `${item.item_name} (${item.quantity} ${item.unit})`)
-      .join(', ');
-
-    const deliveryNotes = notes 
-      ? `${itemsDescription}. Observações: ${notes}`
-      : itemsDescription;
-
     try {
-      await createDelivery.mutateAsync({
+      await createDeliveryMutation.mutateAsync({
         family_id: selectedFamily.id,
-        institution_id: profile.institution_id,
-        delivery_date: new Date().toISOString().split('T')[0],
         blocking_period_days: parseInt(blockingPeriod),
-        notes: deliveryNotes
+        notes: notes || undefined,
+      });
+
+      toast({
+        title: "Entrega Registrada",
+        description: `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingPeriod} dias.`
       });
 
       // Resetar formulário
@@ -171,8 +135,11 @@ const InstitutionDelivery = () => {
       setNotes('');
       setSearchTerm('');
     } catch (error) {
-      // Error is already handled by the hook
-      console.error('Error creating delivery:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao registrar entrega. Tente novamente.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -209,17 +176,13 @@ const InstitutionDelivery = () => {
                   />
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {familiesLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                    </div>
-                  ) : filteredFamilies.length === 0 ? (
-                    <p className="text-center text-gray-500 py-4">
-                      {searchTerm ? 'Nenhuma família encontrada' : 'Nenhuma família disponível para entrega'}
-                    </p>
-                  ) : (
-                    filteredFamilies.map((family) => (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {filteredFamilies.map((family) => (
                       <div
                         key={family.id}
                         className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -231,27 +194,34 @@ const InstitutionDelivery = () => {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium">{family.family_name}</p>
-                            <p className="text-sm text-gray-500">{family.address}</p>
+                            <p className="font-medium">{family.name}</p>
+                            <p className="text-sm text-gray-600">{family.contact_person}</p>
+                            <p className="text-sm text-gray-500">{family.phone || 'Sem telefone'}</p>
                           </div>
                           <Badge variant="default" className="bg-green-500">
                             Liberada
                           </Badge>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          {family.members_count} membros
+                          {family.members_count || 'N/A'} membros
                         </p>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
+                
+                {filteredFamilies.length === 0 && searchTerm && (
+                  <p className="text-center text-gray-500 py-4">
+                    Nenhuma família encontrada
+                  </p>
+                )}
 
                 {selectedFamily && (
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <h4 className="font-medium text-blue-800 mb-2">Família Selecionada</h4>
-                    <p className="text-sm"><strong>Nome:</strong> {selectedFamily.family_name}</p>
-                    <p className="text-sm"><strong>Membros:</strong> {selectedFamily.members_count}</p>
-                    <p className="text-sm"><strong>Endereço:</strong> {selectedFamily.address}</p>
+                    <p className="text-sm"><strong>Nome:</strong> {selectedFamily.name}</p>
+                    <p className="text-sm"><strong>Contato:</strong> {selectedFamily.contact_person}</p>
+                    <p className="text-sm"><strong>Membros:</strong> {selectedFamily.members_count || 'N/A'}</p>
                   </div>
                 )}
               </CardContent>
@@ -361,19 +331,14 @@ const InstitutionDelivery = () => {
                 <Button 
                   onClick={handleDeliverySubmit}
                   className="w-full"
-                  disabled={!selectedFamily || createDelivery.isPending}
+                  disabled={!selectedFamily || createDeliveryMutation.isPending}
                 >
-                  {createDelivery.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Registrando...
-                    </>
+                  {createDeliveryMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <>
-                      <Package className="h-4 w-4 mr-2" />
-                      Registrar Entrega
-                    </>
+                    <Package className="h-4 w-4 mr-2" />
                   )}
+                  {createDeliveryMutation.isPending ? 'Registrando...' : 'Registrar Entrega'}
                 </Button>
               </CardContent>
             </Card>

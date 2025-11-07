@@ -17,7 +17,8 @@ interface AuthContextType {
   session: Session | null;
   profile: UserProfile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -30,160 +31,102 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    let isInitialLoad = true;
-    let initialLoadComplete = false;
-
-    // Helper function to fetch profile
-    const fetchProfile = async (userId: string) => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log("[PROFILE]", "Profile fetch attempt:", {
-            userId,
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        if (error) {
-          if (import.meta.env.DEV) {
-            console.error("[PROFILE]", "Profile fetch error:", {
-              error: error.message,
-              code: error.code,
-              details: error.details,
-              userId,
-              timestamp: new Date().toISOString()
-            });
-          }
-          return null;
-        }
-
-        if (profileData) {
-          if (import.meta.env.DEV) {
-            console.log("[PROFILE]", "Profile fetch response:", {
-              profileId: profileData?.id,
-              email: profileData?.email,
-              role: profileData?.role,
-              hasInstitutionId: !!profileData?.institution_id,
-              timestamp: new Date().toISOString()
-            });
-          }
-          return profileData;
-        }
-
-        return null;
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error("[PROFILE]", "Unexpected error in profile fetch:", {
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            timestamp: new Date().toISOString()
-          });
-        }
-        return null;
+  const ADMIN_SEED_EMAIL = 'admin@teste.com';
+  const maybeBootstrapAdmin = async (email?: string | null) => {
+    try {
+      if (email && email.toLowerCase() === ADMIN_SEED_EMAIL) {
+        await (supabase as any).rpc('bootstrap_admin', { admin_email: email });
       }
-    };
+    } catch (e) {
+      console.warn('bootstrap_admin failed or not applicable:', e);
+    }
+  };
+
+  // Helper function to redirect user based on role
+  const redirectUserBasedOnRole = (role: 'admin' | 'institution') => {
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      
+      if (role === 'admin' && !currentPath.startsWith('/institution')) {
+        // Admin users go to main dashboard if not already there
+        if (currentPath === '/login') {
+          window.location.href = '/';
+        }
+      } else if (role === 'institution') {
+        // Institution users go to institution dashboard
+        if (!currentPath.startsWith('/institution')) {
+          window.location.href = '/institution/dashboard';
+        }
+      }
+    }
+  };
+
+
+  useEffect(() => {
+    console.log('🔐 Auth hook initializing...');
+    
 
     // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, authSession) => {
-        if (import.meta.env.DEV) {
-          console.log("[SESSION]", "Auth state changed:", {
-            event,
-            userEmail: authSession?.user?.email,
-            hasSession: !!authSession,
-            isInitialLoad,
-            initialLoadComplete,
-            timestamp: new Date().toISOString()
-          });
-          
-          if (event === 'SIGNED_OUT') {
-            console.log("[SESSION]", "SIGNED_OUT event detected - user logged out", {
-              timestamp: new Date().toISOString()
-            });
-          }
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      setSession(session);
+      setUser(session?.user ?? null);
 
-        // During initial load, let getSession() handle everything
-        if (isInitialLoad && !initialLoadComplete) {
-          if (import.meta.env.DEV) {
-            console.log("[SESSION]", "Ignoring onAuthStateChange during initial load", {
-              event,
-              timestamp: new Date().toISOString()
-            });
-          }
-          return;
-        }
+      if (session?.user) {
+        setTimeout(async () => {
+          try {
+            const { data: profileData, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user!.id)
+              .maybeSingle();
 
-        setSession(authSession);
-        setUser(authSession?.user ?? null);
-        
-        if (authSession?.user) {
-          const profileData = await fetchProfile(authSession.user.id);
-          setProfile(profileData);
-        } else {
-          setProfile(null);
-        }
-        
-        // Only set loading to false if not during initial load
-        if (!isInitialLoad) {
-          setLoading(false);
-        }
+              if (error) {
+                console.error('Error fetching profile:', error);
+                setProfile(null);
+              } else if (profileData) {
+                setProfile(profileData);
+                await maybeBootstrapAdmin(session.user!.email);
+                redirectUserBasedOnRole(profileData.role);
+              } else {
+              // Ensure profile exists
+              const insertPayload = {
+                id: session.user!.id,
+                email: session.user!.email,
+                full_name: (session.user!.user_metadata as any)?.full_name || 'Usuário',
+              } as any;
+
+              const { data: inserted, error: insertError } = await supabase
+                .from('profiles')
+                .insert(insertPayload)
+                .select('*')
+                .maybeSingle();
+
+                if (insertError) {
+                  console.error('Error creating profile:', insertError);
+                } else if (inserted) {
+                  setProfile(inserted);
+                  await maybeBootstrapAdmin(session.user!.email);
+                  redirectUserBasedOnRole(inserted.role);
+                }
+            }
+          } catch (err) {
+            console.error('Error in profile ensure:', err);
+          } finally {
+            setLoading(false);
+          }
+        }, 0);
+      } else {
+        setProfile(null);
+        setLoading(false);
       }
-    );
+    });
 
-    // Check for existing session FIRST (initial load)
-    const initializeAuth = async () => {
-      try {
-        if (import.meta.env.DEV) {
-          console.log("[SESSION]", "Initial session check started", {
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        const { data: { session: authSession }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          if (import.meta.env.DEV) {
-            console.error("[SESSION]", "Error getting session:", {
-              error: error.message,
-              timestamp: new Date().toISOString()
-            });
-          }
-          setLoading(false);
-          initialLoadComplete = true;
-          isInitialLoad = false;
-          return;
-        }
-
-        if (import.meta.env.DEV) {
-          console.log("[SESSION]", "Initial session check result:", {
-            hasSession: !!authSession,
-            userEmail: authSession?.user?.email,
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        setSession(authSession);
-        setUser(authSession?.user ?? null);
-
-        let profileData = null;
-        if (authSession?.user) {
-          // Fetch profile immediately
-          profileData = await fetchProfile(authSession.user.id);
-          setProfile(profileData);
-        } else {
-          setProfile(null);
-        }
-
-        // Mark initial load as complete
-        initialLoadComplete = true;
-        isInitialLoad = false;
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (!session) {
         setLoading(false);
 
         if (import.meta.env.DEV) {
@@ -280,32 +223,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signOut = async () => {
+  const signUp = async (email: string, password: string) => {
     try {
-      if (import.meta.env.DEV) {
-        console.log("[AUTH]", "Sign out initiated:", {
-          timestamp: new Date().toISOString()
+      const redirectUrl = `${window.location.origin}/`;
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: 'Erro no cadastro',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Verifique seu email',
+          description: 'Enviamos um link de confirmação para concluir o cadastro.',
         });
       }
 
-      // 1. Limpar bypass_user do localStorage (se existir)
-      localStorage.removeItem("bypass_user");
-      if (import.meta.env.DEV) {
-        console.log("[AUTH]", "Bypass user cleared from localStorage");
-      }
-
-      // 2. Limpar todos os tokens do Supabase do localStorage
-      const keys = Object.keys(localStorage);
-      let clearedTokens = 0;
-      keys.forEach(key => {
-        if (key.includes('sb-') && (key.includes('auth-token') || key.includes('auth'))) {
-          localStorage.removeItem(key);
-          clearedTokens++;
-        }
+      return { error };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast({
+        title: 'Erro no cadastro',
+        description: errorMessage,
+        variant: 'destructive',
       });
-      if (import.meta.env.DEV) {
-        console.log("[AUTH]", `Cleared ${clearedTokens} Supabase tokens from localStorage`);
-      }
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      console.log('🚪 Signing out...');
+      
       
       // 3. Sign out from Supabase (limpa sessão no servidor e localmente)
       const { error: signOutError } = await supabase.auth.signOut();
@@ -345,37 +302,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("[AUTH]", "Sign out complete - states reset. Navigation will be handled by ProtectedRoute or Header component");
       }
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[AUTH]", "Error during sign out:", {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      // Reset states anyway, mesmo se houver erro
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      
-      // Tentar limpar localStorage mesmo com erro
-      try {
-        localStorage.removeItem("bypass_user");
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
-          if (key.includes('sb-') && (key.includes('auth-token') || key.includes('auth'))) {
-            localStorage.removeItem(key);
-          }
-        });
-      } catch (localStorageError) {
-        if (import.meta.env.DEV) {
-          console.error("[AUTH]", "Error clearing localStorage:", localStorageError);
-        }
-      }
-      
-      if (import.meta.env.DEV) {
-        console.log("[AUTH]", "Sign out error handled - states reset. Navigation will be handled by ProtectedRoute or Header component");
-      }
+      console.error('❌ Error signing out:', error);
     }
   };
 
@@ -385,6 +312,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profile,
     loading,
     signIn,
+    signUp,
     signOut,
   };
 

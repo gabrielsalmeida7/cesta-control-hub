@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import DashboardCard from '@/components/DashboardCard';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useDashboardStats, type InstitutionStats } from '@/hooks/useDashboardStats';
 import { Users, Package, AlertTriangle, Calendar, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -36,28 +36,28 @@ const InstitutionDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <DashboardCard
               title="Famílias Atendidas"
-              value={isLoading ? "..." : (stats?.associatedFamilies || 0).toString()}
+              value={isLoading ? "..." : ((stats as InstitutionStats)?.associatedFamilies || 0).toString()}
               description="Total de famílias atendidas"
               icon={<Users className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Entregas Este Mês"
-              value={isLoading ? "..." : (stats?.recentDeliveries || 0).toString()}
+              value={isLoading ? "..." : ((stats as InstitutionStats)?.recentDeliveries || 0).toString()}
               description="Cestas entregues no mês"
               icon={<Package className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Famílias Bloqueadas"
-              value={isLoading ? "..." : (stats?.blockedByInstitution || 0).toString()}
+              value={isLoading ? "..." : ((stats as InstitutionStats)?.blockedByInstitution || 0).toString()}
               description="Bloqueadas por esta instituição"
               icon={<AlertTriangle className="h-6 w-6" />}
             />
 
             <DashboardCard
               title="Total de Entregas"
-              value={isLoading ? "..." : (stats?.institutionDeliveries || 0).toString()}
+              value={isLoading ? "..." : ((stats as InstitutionStats)?.institutionDeliveries || 0).toString()}
               description="Entregas realizadas"
               icon={<Calendar className="h-6 w-6" />}
             />
