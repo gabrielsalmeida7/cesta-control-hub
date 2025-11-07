@@ -10,16 +10,32 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, session, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirecionar imediatamente se user for null, mesmo durante loading
-    // Isso garante redirecionamento rápido após logout
-    if (!user) {
+    // CRITICAL: Wait for loading to complete before making any decisions
+    // During refresh (F5), loading will be true while getSession() is checking
+    // We must not redirect during this time
+    if (loading) {
       if (import.meta.env.DEV) {
-        console.log("[PROTECTED_ROUTE]", "User is null, redirecting to login", {
-          loading,
+        console.log("[PROTECTED_ROUTE]", "Still loading, waiting...", {
+          hasUser: !!user,
+          hasSession: !!session,
+          hasProfile: !!profile,
+          currentPath: window.location.pathname,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return;
+    }
+
+    // After loading is complete, check authentication
+    if (!user || !session) {
+      if (import.meta.env.DEV) {
+        console.log("[PROTECTED_ROUTE]", "No user or session after loading, redirecting to login", {
+          hasUser: !!user,
+          hasSession: !!session,
           hasProfile: !!profile,
           currentPath: window.location.pathname,
           timestamp: new Date().toISOString()
@@ -29,21 +45,33 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
       return;
     }
 
-    if (!loading) {
-      if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-        if (import.meta.env.DEV) {
-          console.log("[PROTECTED_ROUTE]", "User role not allowed, redirecting to home", {
-            userRole: profile.role,
-            allowedRoles,
-            timestamp: new Date().toISOString()
-          });
-        }
-        navigate('/', { replace: true });
-        return;
+    // Check role permissions if specified
+    if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+      if (import.meta.env.DEV) {
+        console.log("[PROTECTED_ROUTE]", "User role not allowed, redirecting to home", {
+          userRole: profile.role,
+          allowedRoles,
+          timestamp: new Date().toISOString()
+        });
       }
+      navigate('/', { replace: true });
+      return;
     }
-  }, [user, profile, loading, navigate, allowedRoles]);
 
+    if (import.meta.env.DEV) {
+      console.log("[PROTECTED_ROUTE]", "Access granted", {
+        hasUser: !!user,
+        hasSession: !!session,
+        hasProfile: !!profile,
+        userRole: profile?.role,
+        allowedRoles,
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [user, profile, session, loading, navigate, allowedRoles]);
+
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -52,10 +80,12 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  if (!user) {
+  // After loading, check if user is authenticated
+  if (!user || !session) {
     return null;
   }
 
+  // Check role permissions
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
     return null;
   }

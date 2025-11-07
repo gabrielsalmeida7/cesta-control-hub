@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Package, AlertTriangle, Plus, Minus } from 'lucide-react';
+import { Search, Package, AlertTriangle, Plus, Minus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useInstitutionFamilies } from '@/hooks/useFamilies';
+import { useCreateDelivery } from '@/hooks/useDeliveries';
 
 interface DeliveryItem {
   item_name: string;
@@ -36,31 +39,32 @@ const InstitutionDelivery = () => {
     { item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }
   ]);
   const { toast } = useToast();
+  const { profile } = useAuth();
+  const { data: familiesData = [], isLoading: familiesLoading } = useInstitutionFamilies(profile?.institution_id);
+  const createDelivery = useCreateDelivery();
 
-  // Mock data - famílias liberadas para entrega
-  const availableFamilies: Family[] = [
-    {
-      id: '2',
-      family_name: 'Família Santos',
-      main_cpf: '987.654.321-00',
-      address: 'Av. Principal, 456',
-      members_count: 3,
-      is_blocked: false
-    },
-    {
-      id: '4',
-      family_name: 'Família Costa',
-      main_cpf: '321.654.987-88',
-      address: 'Rua Nova, 321',
-      members_count: 2,
-      is_blocked: false
-    }
-  ];
+  // Filter families to show only non-blocked ones
+  const availableFamilies = useMemo(() => {
+    return familiesData
+      .filter((family: any) => !family.is_blocked || 
+        (family.blocked_until && new Date(family.blocked_until) < new Date()))
+      .map((family: any) => ({
+        id: family.id,
+        family_name: family.name || family.contact_person || 'N/A',
+        main_cpf: '', // CPF não está no schema atual
+        address: family.address || 'Não informado',
+        members_count: family.members_count || 0,
+        is_blocked: family.is_blocked || false,
+        blocked_until: family.blocked_until || undefined
+      }));
+  }, [familiesData]);
 
-  const filteredFamilies = availableFamilies.filter(family =>
-    family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.main_cpf.includes(searchTerm)
-  );
+  const filteredFamilies = useMemo(() => {
+    return availableFamilies.filter(family =>
+      family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (family.main_cpf && family.main_cpf.includes(searchTerm))
+    );
+  }, [availableFamilies, searchTerm]);
 
   const addDeliveryItem = () => {
     setDeliveryItems([...deliveryItems, { item_name: '', quantity: 1, unit: 'unidade' }]);
@@ -78,7 +82,7 @@ const InstitutionDelivery = () => {
     setDeliveryItems(updated);
   };
 
-  const handleDeliverySubmit = () => {
+  const handleDeliverySubmit = async () => {
     if (!selectedFamily) {
       toast({
         title: "Erro",
@@ -86,6 +90,28 @@ const InstitutionDelivery = () => {
         variant: "destructive"
       });
       return;
+    }
+
+    if (!profile?.institution_id) {
+      toast({
+        title: "Erro",
+        description: "Instituição não identificada. Faça login novamente.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verificar se família está bloqueada
+    if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
+      const blockedUntil = new Date(selectedFamily.blocked_until);
+      if (blockedUntil > new Date()) {
+        toast({
+          title: "Erro",
+          description: `Esta família está bloqueada até ${blockedUntil.toLocaleDateString('pt-BR')}.`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     if (deliveryItems.some(item => !item.item_name || item.quantity <= 0)) {
@@ -97,24 +123,33 @@ const InstitutionDelivery = () => {
       return;
     }
 
-    // Aqui seria feita a chamada para o Supabase para registrar a entrega
-    console.log('Registrando entrega:', {
-      family: selectedFamily,
-      items: deliveryItems,
-      blockingPeriod,
-      notes
-    });
+    // Format delivery items for notes
+    const itemsDescription = deliveryItems
+      .map(item => `${item.item_name} (${item.quantity} ${item.unit})`)
+      .join(', ');
 
-    toast({
-      title: "Entrega Registrada",
-      description: `Entrega registrada para ${selectedFamily.family_name}. Família bloqueada por ${blockingPeriod} dias.`
-    });
+    const deliveryNotes = notes 
+      ? `${itemsDescription}. Observações: ${notes}`
+      : itemsDescription;
 
-    // Resetar formulário
-    setSelectedFamily(null);
-    setDeliveryItems([{ item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }]);
-    setNotes('');
-    setSearchTerm('');
+    try {
+      await createDelivery.mutateAsync({
+        family_id: selectedFamily.id,
+        institution_id: profile.institution_id,
+        delivery_date: new Date().toISOString().split('T')[0],
+        blocking_period_days: parseInt(blockingPeriod),
+        notes: deliveryNotes
+      });
+
+      // Resetar formulário
+      setSelectedFamily(null);
+      setDeliveryItems([{ item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }]);
+      setNotes('');
+      setSearchTerm('');
+    } catch (error) {
+      // Error is already handled by the hook
+      console.error('Error creating delivery:', error);
+    }
   };
 
   return (
@@ -151,36 +186,39 @@ const InstitutionDelivery = () => {
                 </div>
 
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {filteredFamilies.map((family) => (
-                    <div
-                      key={family.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedFamily?.id === family.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setSelectedFamily(family)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium">{family.family_name}</p>
-                          <p className="text-sm text-gray-600">{family.main_cpf}</p>
-                          <p className="text-sm text-gray-500">{family.address}</p>
-                        </div>
-                        <Badge variant="default" className="bg-green-500">
-                          Liberada
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {family.members_count} membros
-                      </p>
+                  {familiesLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
                     </div>
-                  ))}
-                  
-                  {filteredFamilies.length === 0 && searchTerm && (
+                  ) : filteredFamilies.length === 0 ? (
                     <p className="text-center text-gray-500 py-4">
-                      Nenhuma família encontrada
+                      {searchTerm ? 'Nenhuma família encontrada' : 'Nenhuma família disponível para entrega'}
                     </p>
+                  ) : (
+                    filteredFamilies.map((family) => (
+                      <div
+                        key={family.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedFamily?.id === family.id 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setSelectedFamily(family)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{family.family_name}</p>
+                            <p className="text-sm text-gray-500">{family.address}</p>
+                          </div>
+                          <Badge variant="default" className="bg-green-500">
+                            Liberada
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {family.members_count} membros
+                        </p>
+                      </div>
+                    ))
                   )}
                 </div>
 
@@ -188,8 +226,8 @@ const InstitutionDelivery = () => {
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <h4 className="font-medium text-blue-800 mb-2">Família Selecionada</h4>
                     <p className="text-sm"><strong>Nome:</strong> {selectedFamily.family_name}</p>
-                    <p className="text-sm"><strong>CPF:</strong> {selectedFamily.main_cpf}</p>
                     <p className="text-sm"><strong>Membros:</strong> {selectedFamily.members_count}</p>
+                    <p className="text-sm"><strong>Endereço:</strong> {selectedFamily.address}</p>
                   </div>
                 )}
               </CardContent>
@@ -299,10 +337,19 @@ const InstitutionDelivery = () => {
                 <Button 
                   onClick={handleDeliverySubmit}
                   className="w-full"
-                  disabled={!selectedFamily}
+                  disabled={!selectedFamily || createDelivery.isPending}
                 >
-                  <Package className="h-4 w-4 mr-2" />
-                  Registrar Entrega
+                  {createDelivery.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Registrando...
+                    </>
+                  ) : (
+                    <>
+                      <Package className="h-4 w-4 mr-2" />
+                      Registrar Entrega
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>

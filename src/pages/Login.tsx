@@ -14,94 +14,25 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loginSuccess, setLoginSuccess] = useState(false);
   const navigate = useNavigate();
-  const { signIn, user, profile } = useAuth();
+  const { signIn, user, profile, loading: authLoading } = useAuth();
 
-  // Redirect if already logged in OR after successful login
+  // Redirect if already logged in (simplified - let ProtectedRoute handle most of the logic)
   useEffect(() => {
-    if (user && profile) {
+    // Only redirect if we're not loading and user is authenticated
+    // The ProtectedRoute will handle redirecting away from /login if user is logged in
+    if (!authLoading && user && profile) {
       if (import.meta.env.DEV) {
-        console.log("[LOGIN]", "User authenticated, redirecting to home", {
-          email: user.email,
-          role: profile.role,
-          loginSuccess,
-          timestamp: new Date().toISOString()
-        });
-      }
-      setLoading(false);
-      setLoginSuccess(false);
-      navigate("/");
-    }
-  }, [user, profile, navigate, loginSuccess]);
-
-  // Effect adicional para garantir redirecionamento após login bem-sucedido
-  // Verifica periodicamente se user e profile estão prontos após login
-  useEffect(() => {
-    if (!loginSuccess) return;
-
-    if (import.meta.env.DEV) {
-      console.log("[LOGIN]", "Login success detected, checking for user and profile", {
-        hasUser: !!user,
-        hasProfile: !!profile,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Se já tiver user e profile, navegar imediatamente
-    if (user && profile) {
-      if (import.meta.env.DEV) {
-        console.log("[LOGIN]", "User and profile ready immediately, navigating", {
+        console.log("[LOGIN]", "User already authenticated, redirecting to home", {
           email: user.email,
           role: profile.role,
           timestamp: new Date().toISOString()
         });
       }
       setLoading(false);
-      setLoginSuccess(false);
-      navigate("/");
-      return;
+      navigate("/", { replace: true });
     }
-
-    // Se não tiver ainda, aguardar um pouco e verificar novamente
-    const checkInterval = setInterval(() => {
-      if (user && profile) {
-        if (import.meta.env.DEV) {
-          console.log("[LOGIN]", "User and profile ready after check, navigating", {
-            email: user.email,
-            role: profile.role,
-            timestamp: new Date().toISOString()
-          });
-        }
-        setLoading(false);
-        setLoginSuccess(false);
-        clearInterval(checkInterval);
-        navigate("/");
-      }
-    }, 100);
-
-    // Limpar intervalo após 5 segundos ou quando componente desmontar
-    const timeout = setTimeout(() => {
-      clearInterval(checkInterval);
-      if (window.location.pathname === '/login') {
-        if (import.meta.env.DEV) {
-          console.warn("[LOGIN]", "Check interval timeout - attempting navigation anyway", {
-            hasUser: !!user,
-            hasProfile: !!profile,
-            timestamp: new Date().toISOString()
-          });
-        }
-        setLoading(false);
-        setLoginSuccess(false);
-        navigate("/");
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(checkInterval);
-      clearTimeout(timeout);
-    };
-  }, [loginSuccess, user, profile, navigate]);
+  }, [user, profile, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,17 +73,18 @@ const Login = () => {
       }
       setError(signInError.message || "Erro ao fazer login. Tente novamente.");
       setLoading(false);
-      setLoginSuccess(false);
     } else {
       if (import.meta.env.DEV) {
-        console.log("[LOGIN]", "Form submission successful, waiting for profile fetch", {
+        console.log("[LOGIN]", "Form submission successful, onAuthStateChange will handle state updates", {
           email,
           timestamp: new Date().toISOString()
         });
       }
       
-      // Marcar login como bem-sucedido - o useEffect vai detectar quando user e profile estiverem prontos
-      setLoginSuccess(true);
+      // Reset form and wait for auth state to update
+      // The useEffect will handle redirection when user and profile are ready
+      setLoading(false);
+      // Don't set loginSuccess - let the auth state changes handle navigation
     }
   };
 
@@ -231,9 +163,9 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90" 
-                disabled={loading}
+                disabled={loading || authLoading}
               >
-                {loading ? "Entrando..." : "Entrar"}
+                {loading || authLoading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
           </CardContent>

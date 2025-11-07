@@ -1,16 +1,21 @@
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
-import { FileText, Download, Calendar, AlertTriangle, BellRing } from "lucide-react";
+import { FileText, Download, Calendar, AlertTriangle, BellRing, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useAlerts } from "@/hooks/useAlerts";
 
 const Reports = () => {
-  // Mock data
-  const username = "Gabriel Admin";
+  const { profile } = useAuth();
+  const { data: alerts = [], isLoading: alertsLoading } = useAlerts();
+  
+  const username = profile?.full_name || "Admin";
+  
   const reportTypes = [
     { id: 1, title: "Entregas por Período", description: "Relatório detalhado de todas as entregas em um período específico", icon: Calendar },
     { id: 2, title: "Famílias Atendidas por Instituição", description: "Análise das famílias atendidas por cada instituição cadastrada", icon: FileText },
@@ -18,58 +23,15 @@ const Reports = () => {
     { id: 4, title: "Instituições por Desempenho", description: "Ranking de instituições por número de entregas realizadas", icon: FileText },
   ];
 
-  // Mock data for alerts
-  const alerts = [
-    { 
-      id: 1, 
-      type: 'fraude', 
-      severity: 'alta', 
-      title: 'Possível tentativa de fraude detectada', 
-      description: 'A família Silva solicitou cestas em 3 instituições diferentes no mesmo mês.', 
-      familyId: 123, 
-      institutionId: 2, 
-      createdAt: '2025-05-01', 
-      resolved: false 
-    },
-    { 
-      id: 2, 
-      type: 'duplicado', 
-      severity: 'média', 
-      title: 'Solicitação duplicada', 
-      description: 'A família Oliveira aparece registrada em múltiplas instituições.', 
-      familyId: 456, 
-      institutionId: 1, 
-      createdAt: '2025-05-02', 
-      resolved: false 
-    },
-    { 
-      id: 3, 
-      type: 'expirado', 
-      severity: 'baixa', 
-      title: 'Cestas prestes a expirar', 
-      description: '15 cestas básicas estão próximas da data de validade na instituição Centro Comunitário São José.', 
-      institutionId: 1, 
-      createdAt: '2025-05-03', 
-      resolved: false 
-    },
-    { 
-      id: 4, 
-      type: 'outro', 
-      severity: 'média', 
-      title: 'Aumento anormal de solicitações', 
-      description: 'Detectamos um aumento de 40% nas solicitações na região Norte da cidade.', 
-      createdAt: '2025-05-04', 
-      resolved: false 
-    },
-  ];
-
   // State for alert filter
   const [alertFilter, setAlertFilter] = useState('todos');
 
   // Filter alerts based on selected type
-  const filteredAlerts = alertFilter === 'todos' 
-    ? alerts 
-    : alerts.filter(alert => alert.type === alertFilter);
+  const filteredAlerts = useMemo(() => {
+    return alertFilter === 'todos' 
+      ? alerts 
+      : alerts.filter(alert => alert.type === alertFilter);
+  }, [alerts, alertFilter]);
 
   // Get alert count by severity
   const highSeverityCount = alerts.filter(alert => alert.severity === 'alta').length;
@@ -171,35 +133,41 @@ const Reports = () => {
           </div>
           
           <div className="space-y-4">
-            {filteredAlerts.length > 0 ? filteredAlerts.map(alert => (
-              <Alert key={alert.id} className="border-l-4 relative" style={{ borderLeftColor: alert.severity === 'alta' ? '#dc2626' : alert.severity === 'média' ? '#f97316' : '#3b82f6' }}>
-                <div className="flex items-start">
-                  <div className="mr-3 mt-0.5">
-                    {getAlertIcon(alert.type)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <AlertTitle className="text-base flex items-center gap-2">
-                        {alert.title}
-                        <Badge className={getSeverityColor(alert.severity)}>
-                          {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
-                        </Badge>
-                      </AlertTitle>
-                      <span className="text-xs text-gray-500">
-                        {new Date(alert.createdAt).toLocaleDateString('pt-BR')}
-                      </span>
+            {alertsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : filteredAlerts.length > 0 ? (
+              filteredAlerts.map(alert => (
+                <Alert key={alert.id} className="border-l-4 relative" style={{ borderLeftColor: alert.severity === 'alta' ? '#dc2626' : alert.severity === 'média' ? '#f97316' : '#3b82f6' }}>
+                  <div className="flex items-start">
+                    <div className="mr-3 mt-0.5">
+                      {getAlertIcon(alert.type)}
                     </div>
-                    <AlertDescription className="text-sm">
-                      {alert.description}
-                    </AlertDescription>
-                    <div className="flex justify-end mt-2">
-                      <Button variant="outline" size="sm">Resolver</Button>
-                      <Button variant="ghost" size="sm" className="ml-2">Ver Detalhes</Button>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <AlertTitle className="text-base flex items-center gap-2">
+                          {alert.title}
+                          <Badge className={getSeverityColor(alert.severity)}>
+                            {alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)}
+                          </Badge>
+                        </AlertTitle>
+                        <span className="text-xs text-gray-500">
+                          {new Date(alert.createdAt).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                      <AlertDescription className="text-sm">
+                        {alert.description}
+                      </AlertDescription>
+                      <div className="flex justify-end mt-2">
+                        <Button variant="outline" size="sm">Resolver</Button>
+                        <Button variant="ghost" size="sm" className="ml-2">Ver Detalhes</Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Alert>
-            )) : (
+                </Alert>
+              ))
+            ) : (
               <div className="text-center py-8 text-gray-500">
                 Nenhum alerta encontrado para o filtro selecionado
               </div>

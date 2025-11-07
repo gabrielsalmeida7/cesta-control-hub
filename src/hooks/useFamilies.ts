@@ -172,6 +172,41 @@ export const useAssociateFamilyWithInstitution = () => {
       familyId: string;
       institutionId: string;
     }) => {
+      // Verificar se família já está vinculada a outra instituição
+      const { data: existingAssociations, error: checkError } = await supabase
+        .from("institution_families")
+        .select(`
+          institution_id,
+          institution:institution_id(id, name)
+        `)
+        .eq("family_id", familyId);
+
+      if (checkError) throw checkError;
+
+      // Se já existe vínculo com outra instituição
+      if (existingAssociations && existingAssociations.length > 0) {
+        const existingInstitution = existingAssociations.find(
+          (assoc: any) => assoc.institution_id !== institutionId
+        );
+        
+        if (existingInstitution) {
+          const institutionName = existingInstitution.institution?.name || "outra instituição";
+          const error = new Error(`FAMILY_ALREADY_ASSOCIATED:${institutionName}`);
+          (error as any).institutionName = institutionName;
+          throw error;
+        }
+      }
+
+      // Se já está vinculada à mesma instituição, não fazer nada
+      const alreadyLinked = existingAssociations?.some(
+        (assoc: any) => assoc.institution_id === institutionId
+      );
+      
+      if (alreadyLinked) {
+        return { message: "Família já está vinculada a esta instituição" };
+      }
+
+      // Criar novo vínculo
       const { data, error } = await supabase
         .from("institution_families")
         .insert({
@@ -184,21 +219,35 @@ export const useAssociateFamilyWithInstitution = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["families"] });
       queryClient.invalidateQueries({ queryKey: ["institution-families"] });
       queryClient.invalidateQueries({ queryKey: ["institutions"] });
-      toast({
-        title: "Sucesso",
-        description: "Família associada à instituição com sucesso!"
-      });
+      
+      // Só mostrar toast se realmente criou um novo vínculo
+      if (data && !data.message) {
+        toast({
+          title: "Sucesso",
+          description: "Família associada à instituição com sucesso!"
+        });
+      }
     },
-    onError: (error) => {
-      toast({
-        title: "Erro",
-        description: "Erro ao associar família: " + error.message,
-        variant: "destructive"
-      });
+    onError: (error: any) => {
+      // Verificar se é erro de família já vinculada
+      if (error.message?.startsWith("FAMILY_ALREADY_ASSOCIATED:")) {
+        const institutionName = error.institutionName || "outra instituição";
+        toast({
+          title: "Erro",
+          description: `Esta família já está sendo atendida por ${institutionName}.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao associar família: " + error.message,
+          variant: "destructive"
+        });
+      }
     }
   });
 };
@@ -229,7 +278,7 @@ export const useDisassociateFamilyFromInstitution = () => {
       queryClient.invalidateQueries({ queryKey: ["institutions"] });
       toast({
         title: "Sucesso",
-        description: "Família desassociada da instituição com sucesso!"
+        description: "Família desvinculada da instituição com sucesso!"
       });
     },
     onError: (error) => {

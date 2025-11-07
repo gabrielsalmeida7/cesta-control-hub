@@ -31,6 +31,64 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
+    let isInitialLoad = true;
+    let initialLoadComplete = false;
+
+    // Helper function to fetch profile
+    const fetchProfile = async (userId: string) => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log("[PROFILE]", "Profile fetch attempt:", {
+            userId,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (error) {
+          if (import.meta.env.DEV) {
+            console.error("[PROFILE]", "Profile fetch error:", {
+              error: error.message,
+              code: error.code,
+              details: error.details,
+              userId,
+              timestamp: new Date().toISOString()
+            });
+          }
+          return null;
+        }
+
+        if (profileData) {
+          if (import.meta.env.DEV) {
+            console.log("[PROFILE]", "Profile fetch response:", {
+              profileId: profileData?.id,
+              email: profileData?.email,
+              role: profileData?.role,
+              hasInstitutionId: !!profileData?.institution_id,
+              timestamp: new Date().toISOString()
+            });
+          }
+          return profileData;
+        }
+
+        return null;
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("[PROFILE]", "Unexpected error in profile fetch:", {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            timestamp: new Date().toISOString()
+          });
+        }
+        return null;
+      }
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, authSession) => {
@@ -39,99 +97,121 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             event,
             userEmail: authSession?.user?.email,
             hasSession: !!authSession,
+            isInitialLoad,
+            initialLoadComplete,
             timestamp: new Date().toISOString()
           });
           
-          // Log específico para evento SIGNED_OUT
           if (event === 'SIGNED_OUT') {
             console.log("[SESSION]", "SIGNED_OUT event detected - user logged out", {
               timestamp: new Date().toISOString()
             });
           }
         }
+
+        // During initial load, let getSession() handle everything
+        if (isInitialLoad && !initialLoadComplete) {
+          if (import.meta.env.DEV) {
+            console.log("[SESSION]", "Ignoring onAuthStateChange during initial load", {
+              event,
+              timestamp: new Date().toISOString()
+            });
+          }
+          return;
+        }
+
         setSession(authSession);
         setUser(authSession?.user ?? null);
         
         if (authSession?.user) {
-          // Fetch user profile data
-          try {
-            if (import.meta.env.DEV) {
-              console.log("[PROFILE]", "Profile fetch attempt:", {
-                userId: authSession.user.id,
-                timestamp: new Date().toISOString()
-              });
-            }
-
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', authSession.user.id)
-              .single();
-
-            if (error) {
-              if (import.meta.env.DEV) {
-                console.error("[PROFILE]", "Profile fetch error:", {
-                  error: error.message,
-                  code: error.code,
-                  details: error.details,
-                  userId: authSession.user.id,
-                  timestamp: new Date().toISOString()
-                });
-              }
-              // Don't return - continue anyway
-            } else if (profileData) {
-              if (import.meta.env.DEV) {
-                console.log("[PROFILE]", "Profile fetch response:", {
-                  profileId: profileData?.id,
-                  email: profileData?.email,
-                  role: profileData?.role,
-                  hasInstitutionId: !!profileData?.institution_id,
-                  timestamp: new Date().toISOString()
-                });
-              }
-              setProfile(profileData);
-            } else {
-              if (import.meta.env.DEV) {
-                console.warn("[PROFILE]", "Profile data is null:", {
-                  userId: authSession.user.id,
-                  timestamp: new Date().toISOString()
-                });
-              }
-            }
-          } catch (error) {
-            if (import.meta.env.DEV) {
-              console.error("[PROFILE]", "Unexpected error in profile fetch:", {
-                error: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                timestamp: new Date().toISOString()
-              });
-            }
-          }
+          const profileData = await fetchProfile(authSession.user.id);
+          setProfile(profileData);
         } else {
           setProfile(null);
         }
         
-        setLoading(false);
+        // Only set loading to false if not during initial load
+        if (!isInitialLoad) {
+          setLoading(false);
+        }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session: authSession } }) => {
-      if (import.meta.env.DEV) {
-        console.log("[SESSION]", "Initial session check:", {
-          hasSession: !!authSession,
-          userEmail: authSession?.user?.email,
-          timestamp: new Date().toISOString()
-        });
-      }
-      setSession(authSession);
-      setUser(authSession?.user ?? null);
-      if (!authSession) {
-        setLoading(false);
-      }
-    });
+    // Check for existing session FIRST (initial load)
+    const initializeAuth = async () => {
+      try {
+        if (import.meta.env.DEV) {
+          console.log("[SESSION]", "Initial session check started", {
+            timestamp: new Date().toISOString()
+          });
+        }
 
-    return () => subscription.unsubscribe();
+        const { data: { session: authSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          if (import.meta.env.DEV) {
+            console.error("[SESSION]", "Error getting session:", {
+              error: error.message,
+              timestamp: new Date().toISOString()
+            });
+          }
+          setLoading(false);
+          initialLoadComplete = true;
+          isInitialLoad = false;
+          return;
+        }
+
+        if (import.meta.env.DEV) {
+          console.log("[SESSION]", "Initial session check result:", {
+            hasSession: !!authSession,
+            userEmail: authSession?.user?.email,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        setSession(authSession);
+        setUser(authSession?.user ?? null);
+
+        let profileData = null;
+        if (authSession?.user) {
+          // Fetch profile immediately
+          profileData = await fetchProfile(authSession.user.id);
+          setProfile(profileData);
+        } else {
+          setProfile(null);
+        }
+
+        // Mark initial load as complete
+        initialLoadComplete = true;
+        isInitialLoad = false;
+        setLoading(false);
+
+        if (import.meta.env.DEV) {
+          console.log("[SESSION]", "Initial load complete", {
+            hasSession: !!authSession,
+            hasUser: !!authSession?.user,
+            hasProfile: !!profileData,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("[SESSION]", "Unexpected error during initial load:", {
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString()
+          });
+        }
+        setLoading(false);
+        initialLoadComplete = true;
+        isInitialLoad = false;
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -164,48 +244,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        if (import.meta.env.DEV) {
-          console.log("[AUTH]", "Supabase auth response: success", {
-            email,
-            user_id: data?.user?.id,
-            session_id: data?.session?.access_token ? "exists" : "null",
-            timestamp: new Date().toISOString()
-          });
-        }
-
-        // Wait for onAuthStateChange listener to process and profile to be fetched
-        // This ensures the user, session, and profile states are all set before returning
-        let waitTime = 0;
-        const maxWait = 5000; // 5 second max wait
-        const checkInterval = 100;
-        
-        while ((!user || !profile) && waitTime < maxWait) {
-          if (import.meta.env.DEV && waitTime % 500 === 0) {
-            console.log("[AUTH]", "Waiting for profile...", {
-              has_user: !!user,
-              has_profile: !!profile,
-              wait_time: waitTime,
-              timestamp: new Date().toISOString()
-            });
-          }
-          await new Promise(resolve => setTimeout(resolve, checkInterval));
-          waitTime += checkInterval;
-        }
-
-        if (import.meta.env.DEV) {
-          console.log("[AUTH]", "Sign in complete:", {
-            has_user: !!user,
-            has_profile: !!profile,
-            user_email: user?.email,
-            profile_role: profile?.role,
-            wait_time: waitTime,
-            timestamp: new Date().toISOString()
-          });
-        }
+        return { error };
       }
 
-      return { error };
+      if (import.meta.env.DEV) {
+        console.log("[AUTH]", "Supabase auth response: success", {
+          email,
+          user_id: data?.user?.id,
+          session_id: data?.session?.access_token ? "exists" : "null",
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // The onAuthStateChange listener will handle updating user, session, and profile
+      // We don't need to wait here - the ProtectedRoute and Login page will handle navigation
+      // based on the auth state changes
+
+      return { error: null };
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("[AUTH]", "Unexpected error during sign in:", {
@@ -221,7 +276,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: errorMessage,
         variant: "destructive",
       });
-      return { error };
+      return { error: error instanceof Error ? error : new Error(errorMessage) };
     }
   };
 

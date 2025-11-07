@@ -7,11 +7,13 @@ import DashboardCard from '@/components/DashboardCard';
 import DeliveriesChart from '@/components/DeliveriesChart';
 import RecentDeliveriesTable from '@/components/RecentDeliveriesTable';
 import { useAuth } from '@/hooks/useAuth';
-import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { Users, Building2, Package, AlertTriangle, Loader2 } from 'lucide-react';
 
 const Index = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
   useEffect(() => {
     // Se user for null (durante logout), não fazer nada - ProtectedRoute vai redirecionar
@@ -66,28 +68,28 @@ const Index = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <DashboardCard
               title="Total de Famílias"
-              value="0"
+              value={statsLoading ? "..." : (stats?.totalFamilies || 0).toString()}
               description="Famílias cadastradas"
               icon={<Users className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Instituições Ativas"
-              value="0"
+              value={statsLoading ? "..." : (stats?.totalInstitutions || 0).toString()}
               description="Instituições cadastradas"
               icon={<Building2 className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Entregas Este Mês"
-              value="0"
+              value={statsLoading ? "..." : (stats?.totalDeliveries || 0).toString()}
               description="Cestas entregues"
               icon={<Package className="h-6 w-6" />}
             />
             
             <DashboardCard
               title="Famílias Bloqueadas"
-              value="0"
+              value={statsLoading ? "..." : (stats?.blockedFamilies || 0).toString()}
               description="Aguardando liberação"
               icon={<AlertTriangle className="h-6 w-6" />}
             />

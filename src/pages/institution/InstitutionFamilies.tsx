@@ -1,14 +1,17 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useAuth } from '@/hooks/useAuth';
+import { useInstitutionFamilies } from '@/hooks/useFamilies';
+import { useDeliveries } from '@/hooks/useDeliveries';
 
 interface Family {
   id: string;
@@ -28,51 +31,45 @@ const InstitutionFamilies = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  
+  const { profile } = useAuth();
+  const { data: familiesData = [], isLoading: familiesLoading } = useInstitutionFamilies(profile?.institution_id);
+  const { data: deliveries = [] } = useDeliveries(profile?.institution_id);
 
-  // Mock data - Em uma implementação real, viria do Supabase
-  const families: Family[] = [
-    {
-      id: '1',
-      family_name: 'Família Silva',
-      main_cpf: '123.456.789-10',
-      address: 'Rua das Flores, 123',
-      members_count: 4,
-      is_blocked: true,
-      blocked_until: '2024-07-15',
-      block_reason: 'Recebeu cesta básica',
-      blocked_by_institution: 'Centro Comunitário São José',
-      last_delivery_date: '2024-06-15',
-      last_delivery_institution: 'Centro Comunitário São José'
-    },
-    {
-      id: '2', 
-      family_name: 'Família Santos',
-      main_cpf: '987.654.321-00',
-      address: 'Av. Principal, 456',
-      members_count: 3,
-      is_blocked: false,
-      last_delivery_date: '2024-05-10',
-      last_delivery_institution: 'Associação Bem-Estar'
-    },
-    {
-      id: '3',
-      family_name: 'Família Oliveira', 
-      main_cpf: '456.789.123-45',
-      address: 'Rua do Campo, 789',
-      members_count: 5,
-      is_blocked: true,
-      blocked_until: '2024-07-20',
-      block_reason: 'Recebeu cesta básica',
-      blocked_by_institution: 'Igreja Nossa Senhora',
-      last_delivery_date: '2024-06-20',
-      last_delivery_institution: 'Igreja Nossa Senhora'
-    }
-  ];
+  // Map families data and enrich with last delivery info
+  const families = useMemo(() => {
+    return familiesData.map((family: any) => {
+      // Find last delivery for this family
+      const familyDeliveries = deliveries
+        .filter((d: any) => d.family_id === family.id)
+        .sort((a: any, b: any) => 
+          new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime()
+        );
+      
+      const lastDelivery = familyDeliveries[0];
+      
+      return {
+        id: family.id,
+        family_name: family.name || family.contact_person || 'N/A',
+        main_cpf: '', // CPF não está no schema atual
+        address: family.address || 'Não informado',
+        members_count: family.members_count || 0,
+        is_blocked: family.is_blocked || false,
+        blocked_until: family.blocked_until || undefined,
+        block_reason: family.block_reason || undefined,
+        blocked_by_institution: family.blocked_by_institution?.name || undefined,
+        last_delivery_date: lastDelivery?.delivery_date || undefined,
+        last_delivery_institution: lastDelivery?.institution?.name || undefined
+      };
+    });
+  }, [familiesData, deliveries]);
 
-  const filteredFamilies = families.filter(family =>
-    family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.main_cpf.includes(searchTerm)
-  );
+  const filteredFamilies = useMemo(() => {
+    return families.filter(family =>
+      family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (family.main_cpf && family.main_cpf.includes(searchTerm))
+    );
+  }, [families, searchTerm]);
 
   const getStatusBadge = (family: Family) => {
     if (family.is_blocked) {
@@ -173,48 +170,58 @@ const InstitutionFamilies = () => {
               <CardTitle>Lista de Famílias</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome da Família</TableHead>
-                    <TableHead>CPF Principal</TableHead>
-                    <TableHead>Membros</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Última Entrega</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredFamilies.map((family) => (
-                    <TableRow key={family.id}>
-                      <TableCell className="font-medium">{family.family_name}</TableCell>
-                      <TableCell>{family.main_cpf}</TableCell>
-                      <TableCell>{family.members_count}</TableCell>
-                      <TableCell>{getStatusBadge(family)}</TableCell>
-                      <TableCell>
-                        {family.last_delivery_date ? (
-                          <div>
-                            <p className="text-sm">{new Date(family.last_delivery_date).toLocaleDateString('pt-BR')}</p>
-                            <p className="text-xs text-gray-500">{family.last_delivery_institution}</p>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">Nunca</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewDetails(family)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Detalhes
-                        </Button>
-                      </TableCell>
+              {familiesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : filteredFamilies.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Nenhuma família encontrada</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome da Família</TableHead>
+                      <TableHead>Membros</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Última Entrega</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFamilies.map((family) => (
+                      <TableRow key={family.id}>
+                        <TableCell className="font-medium">{family.family_name}</TableCell>
+                        <TableCell>{family.members_count}</TableCell>
+                        <TableCell>{getStatusBadge(family)}</TableCell>
+                        <TableCell>
+                          {family.last_delivery_date ? (
+                            <div>
+                              <p className="text-sm">{new Date(family.last_delivery_date).toLocaleDateString('pt-BR')}</p>
+                              {family.last_delivery_institution && (
+                                <p className="text-xs text-gray-500">{family.last_delivery_institution}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">Nunca</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleViewDetails(family)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Detalhes
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -235,16 +242,12 @@ const InstitutionFamilies = () => {
                   <p className="font-medium">{selectedFamily.family_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">CPF Principal</p>
-                  <p className="font-medium">{selectedFamily.main_cpf}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Endereço</p>
-                  <p className="font-medium">{selectedFamily.address}</p>
-                </div>
-                <div>
                   <p className="text-sm text-gray-600">Número de Membros</p>
                   <p className="font-medium">{selectedFamily.members_count}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-600">Endereço</p>
+                  <p className="font-medium">{selectedFamily.address}</p>
                 </div>
               </div>
               

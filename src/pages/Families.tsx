@@ -15,6 +15,8 @@ import { useFamilies, useUpdateFamily, useCreateFamily } from "@/hooks/useFamili
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import FamilyInstitutionAssociation from "@/components/FamilyInstitutionAssociation";
+import FamilyInstitutionLink from "@/components/FamilyInstitutionLink";
+import { useAuth } from "@/hooks/useAuth";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 // Use Supabase types for families
@@ -32,8 +34,8 @@ type Family = Tables<'families'> & {
 };
 
 const Families = () => {
-  // Real data from Supabase
-  const isAdmin = true; // Simulating admin privileges - would come from auth context
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   
   // Dialog states
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
@@ -583,6 +585,19 @@ const Families = () => {
                   </FormItem>
                 )}
               />
+
+              {/* Institution Association Section */}
+              {selectedFamily && (
+                <div className="pt-4 border-t">
+                  <FamilyInstitutionLink 
+                    family={selectedFamily}
+                    onAssociationChange={() => {
+                      // Refresh family data after association
+                      // React Query will handle invalidation
+                    }}
+                  />
+                </div>
+              )}
               
               <DialogFooter>
                 <Button 

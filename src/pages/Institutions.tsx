@@ -13,14 +13,15 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useInstitutions, useCreateInstitution, useUpdateInstitution, useDeleteInstitution } from "@/hooks/useInstitutions";
+import { useAuth } from "@/hooks/useAuth";
 import type { Tables } from "@/integrations/supabase/types";
 
 // Use Supabase types for institution data model
 type Institution = Tables<'institutions'>;
 
 const Institutions = () => {
-  // Mock data
-  const isAdmin = true; // Mock user role - would be from authentication context in a real app
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   
   // State for dialog controls
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

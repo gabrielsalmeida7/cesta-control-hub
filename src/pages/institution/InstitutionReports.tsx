@@ -1,72 +1,53 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Calendar, Download, Package, Users, BarChart3 } from 'lucide-react';
+import { Calendar, Download, Package, Users, BarChart3, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
-
-interface DeliveryReport {
-  id: string;
-  delivery_date: string;
-  family_name: string;
-  family_cpf: string;
-  items_delivered: string[];
-  blocking_period: number;
-  notes?: string;
-}
+import { useAuth } from '@/hooks/useAuth';
+import { useDeliveries } from '@/hooks/useDeliveries';
 
 const InstitutionReports = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const { profile } = useAuth();
+  const { data: deliveries = [], isLoading } = useDeliveries(profile?.institution_id);
 
-  // Mock data - entregas feitas pela instituição
-  const deliveries: DeliveryReport[] = [
-    {
-      id: '1',
-      delivery_date: '2024-06-15',
-      family_name: 'Família Silva',
-      family_cpf: '123.456.789-10',
-      items_delivered: ['Cesta Básica', 'Leite (2L)', 'Óleo (1L)'],
-      blocking_period: 30,
-      notes: 'Entrega realizada normalmente'
-    },
-    {
-      id: '2',
-      delivery_date: '2024-06-10',
-      family_name: 'Família Oliveira',
-      family_cpf: '456.789.123-45',
-      items_delivered: ['Cesta Básica', 'Arroz (5kg)'],
-      blocking_period: 30
-    },
-    {
-      id: '3',
-      delivery_date: '2024-06-05',
-      family_name: 'Família Costa',
-      family_cpf: '321.654.987-88',
-      items_delivered: ['Cesta Básica'],
-      blocking_period: 15,
-      notes: 'Família com urgência'
-    }
-  ];
+  // Map deliveries to DeliveryReport format
+  const deliveryReports = useMemo(() => {
+    return deliveries.map((delivery) => {
+      const family = delivery.family as { name?: string; contact_person?: string } | null;
+      return {
+        id: delivery.id,
+        delivery_date: delivery.delivery_date,
+        family_name: family?.name || family?.contact_person || 'N/A',
+        family_cpf: '', // CPF não está no schema atual, pode ser adicionado depois
+        items_delivered: delivery.notes ? [delivery.notes] : ['Cesta Básica'], // Usar notes ou padrão
+        blocking_period: delivery.blocking_period_days || 30,
+        notes: delivery.notes || undefined
+      };
+    });
+  }, [deliveries]);
 
-  const filteredDeliveries = deliveries.filter(delivery => {
-    if (!startDate && !endDate) return true;
-    
-    const deliveryDate = new Date(delivery.delivery_date);
-    const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-    const end = endDate ? new Date(endDate) : new Date('2100-12-31');
-    
-    return deliveryDate >= start && deliveryDate <= end;
-  });
+  const filteredDeliveries = useMemo(() => {
+    return deliveryReports.filter(delivery => {
+      if (!startDate && !endDate) return true;
+      
+      const deliveryDate = new Date(delivery.delivery_date);
+      const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+      const end = endDate ? new Date(endDate) : new Date('2100-12-31');
+      
+      return deliveryDate >= start && deliveryDate <= end;
+    });
+  }, [deliveryReports, startDate, endDate]);
 
   const totalDeliveries = filteredDeliveries.length;
-  const totalFamilies = new Set(filteredDeliveries.map(d => d.family_cpf)).size;
+  const totalFamilies = new Set(filteredDeliveries.map(d => d.family_name)).size;
   const totalItems = filteredDeliveries.reduce((acc, d) => acc + d.items_delivered.length, 0);
 
   const exportReport = () => {
@@ -153,58 +134,60 @@ const InstitutionReports = () => {
               <CardTitle>Histórico de Entregas</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Família</TableHead>
-                    <TableHead>CPF</TableHead>
-                    <TableHead>Itens Entregues</TableHead>
-                    <TableHead>Período Bloqueio</TableHead>
-                    <TableHead>Observações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDeliveries.map((delivery) => (
-                    <TableRow key={delivery.id}>
-                      <TableCell>
-                        {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {delivery.family_name}
-                      </TableCell>
-                      <TableCell>{delivery.family_cpf}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {delivery.items_delivered.map((item, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {item}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {delivery.blocking_period} dias
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {delivery.notes || '-'}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              {filteredDeliveries.length === 0 && (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : filteredDeliveries.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">
                     Nenhuma entrega encontrada no período selecionado
                   </p>
                 </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Família</TableHead>
+                      <TableHead>Itens Entregues</TableHead>
+                      <TableHead>Período Bloqueio</TableHead>
+                      <TableHead>Observações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeliveries.map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>
+                          {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {delivery.family_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {delivery.items_delivered.map((item, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {item}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {delivery.blocking_period} dias
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {delivery.notes || '-'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
