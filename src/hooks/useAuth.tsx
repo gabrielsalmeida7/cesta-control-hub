@@ -129,8 +129,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(authSession);
         setUser(authSession?.user ?? null);
         
+        let profileData = null;
+        
         if (authSession?.user) {
-          const { data: profileData, error } = await supabase
+          const { data: fetchedProfile, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authSession.user.id)
@@ -139,8 +141,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (error) {
             console.error('Error fetching profile:', error);
             setProfile(null);
-          } else if (profileData) {
-            setProfile(profileData);
+          } else if (fetchedProfile) {
+            profileData = fetchedProfile;
+            setProfile(fetchedProfile);
           }
         }
 
@@ -154,12 +157,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             timestamp: new Date().toISOString()
           });
         }
-      } catch (error) {
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
         if (import.meta.env.DEV) {
-          console.error("[SESSION]", "Unexpected error during initial load:", {
-            error: error instanceof Error ? error.message : String(error),
-            timestamp: new Date().toISOString()
-          });
+          console.error("[SESSION]", "Unexpected error during initial load:", errorMessage);
         }
         setLoading(false);
       }
