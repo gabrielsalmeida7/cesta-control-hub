@@ -2,39 +2,115 @@
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useFamilies } from '@/hooks/useFamilies';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution } from '@/hooks/useFamilies';
+import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
+type Family = Tables<'families'> & {
+  blocked_by_institution?: { name?: string } | null;
+  institution_families?: Array<{ institution_id: string }>;
+  lastDelivery?: {
+    delivery_date: string;
+    institution?: { id?: string; name?: string } | null;
+  };
+  family_name?: string;
+  main_cpf?: string;
+  address?: string;
+  last_delivery_date?: string;
+  last_delivery_institution?: string;
+};
 
 const InstitutionFamilies = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<any>(null);
+  const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const { profile } = useAuth();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
+  const [familyToUnlink, setFamilyToUnlink] = useState<Family | null>(null);
   
-  const { data: families = [], isLoading, error } = useFamilies();
+  const { profile } = useAuth();
+  const { data: familiesData = [], isLoading: familiesLoading, error } = useInstitutionFamilies(profile?.institution_id);
+  const { data: deliveries = [] } = useDeliveries(profile?.institution_id);
+  const createFamilyMutation = useCreateFamily();
+  const disassociateMutation = useDisassociateFamilyFromInstitution();
+  const { toast } = useToast();
 
-  // Filtrar apenas famílias da instituição
-  const institutionFamilies = families.filter(family => {
-    // Verificar se a família está associada à instituição através da tabela institution_families
-    return family.institution_families?.some((if_relation: any) => 
-      if_relation.institution_id === profile?.institution_id
-    );
+  // Form for creating new family
+  const createForm = useForm<TablesInsert<'families'>>({
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      phone: "",
+      members_count: 1,
+      is_blocked: false,
+    }
   });
 
-  const filteredFamilies = institutionFamilies.filter(family =>
-    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Map families data and enrich with last delivery info
+  const families = useMemo(() => {
+    return familiesData.map((family) => {
+      // Find last delivery for this family from THIS institution only
+      // useDeliveries already filters by institution_id, but let's ensure we're using the right data
+      const familyDeliveries = deliveries
+        .filter((d) => {
+          // Ensure delivery is for this family AND from this institution
+          return d.family_id === family.id && 
+                 d.institution_id === profile?.institution_id &&
+                 d.institution?.id === profile?.institution_id;
+        })
+        .sort((a, b) => {
+          const dateA = a.delivery_date ? new Date(a.delivery_date).getTime() : 0;
+          const dateB = b.delivery_date ? new Date(b.delivery_date).getTime() : 0;
+          return dateB - dateA;
+        });
+      
+      const lastDelivery = familyDeliveries[0];
+      
+      const blockedByInstitution = family.blocked_by_institution as { name?: string } | null | undefined;
+      
+      // Get institution name from the delivery's institution relation
+      // This should always be the current institution since we filtered above
+      const lastDeliveryInstitution = lastDelivery?.institution as { id?: string; name?: string } | null | undefined;
+      
+      return {
+        id: family.id,
+        family_name: family.name || family.contact_person || 'N/A',
+        main_cpf: '', // CPF não está no schema atual
+        address: 'Não informado', // Address não está no schema atual de families
+        members_count: family.members_count || 0,
+        is_blocked: family.is_blocked || false,
+        blocked_until: family.blocked_until || undefined,
+        block_reason: family.block_reason || undefined,
+        blocked_by_institution: blockedByInstitution?.name || undefined,
+        last_delivery_date: lastDelivery?.delivery_date || undefined,
+        last_delivery_institution: lastDeliveryInstitution?.name || undefined,
+        name: family.name,
+        contact_person: family.contact_person,
+        phone: family.phone,
+        ...family
+      };
+    });
+  }, [familiesData, deliveries, profile?.institution_id]);
 
-  const getStatusBadge = (family: any) => {
+  const filteredFamilies = useMemo(() => {
+    return families.filter(family =>
+      family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (family.main_cpf && family.main_cpf.includes(searchTerm))
+    );
+  }, [families, searchTerm]);
+
+  const getStatusBadge = (family: Family) => {
     if (family.is_blocked) {
       const daysRemaining = family.blocked_until ? 
         Math.ceil((new Date(family.blocked_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
@@ -55,12 +131,59 @@ const InstitutionFamilies = () => {
     );
   };
 
-  const handleViewDetails = (family: any) => {
+  const handleViewDetails = (family: Family) => {
     setSelectedFamily(family);
     setIsDetailsOpen(true);
   };
 
-  if (isLoading) {
+  const handleCreateFamily = () => {
+    createForm.reset();
+    setIsCreateDialogOpen(true);
+  };
+
+  const onSubmitCreate = async (data: TablesInsert<'families'>) => {
+    if (!profile?.institution_id) {
+      toast({
+        title: "Erro",
+        description: "Instituição não identificada",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await createFamilyMutation.mutateAsync({
+        family: data,
+        institutionId: profile.institution_id
+      });
+      setIsCreateDialogOpen(false);
+      createForm.reset();
+    } catch (error) {
+      // Error toast is handled by the mutation
+    }
+  };
+
+  const handleUnlinkClick = (family: Family) => {
+    setFamilyToUnlink(family);
+    setIsUnlinkDialogOpen(true);
+  };
+
+  const handleConfirmUnlink = async () => {
+    if (!familyToUnlink || !profile?.institution_id) return;
+
+    try {
+      await disassociateMutation.mutateAsync({
+        familyId: familyToUnlink.id,
+        institutionId: profile.institution_id
+      });
+      setIsUnlinkDialogOpen(false);
+      setFamilyToUnlink(null);
+    } catch (error) {
+      // Error toast is handled by the mutation
+    }
+  };
+
+  if (familiesLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
@@ -140,7 +263,7 @@ const InstitutionFamilies = () => {
                 <CardTitle className="text-lg">Total de Famílias</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{institutionFamilies.length}</p>
+                <p className="text-3xl font-bold">{families.length}</p>
               </CardContent>
             </Card>
             
@@ -150,7 +273,7 @@ const InstitutionFamilies = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-green-600">
-                  {institutionFamilies.filter(f => !f.is_blocked).length}
+                  {families.filter(f => !f.is_blocked).length}
                 </p>
               </CardContent>
             </Card>
@@ -161,7 +284,7 @@ const InstitutionFamilies = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-red-600">
-                  {institutionFamilies.filter(f => f.is_blocked).length}
+                  {families.filter(f => f.is_blocked).length}
                 </p>
               </CardContent>
             </Card>
@@ -212,55 +335,14 @@ const InstitutionFamilies = () => {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredFamilies.map((family) => (
-                      <TableRow key={family.id}>
-                        <TableCell className="font-medium">{family.family_name}</TableCell>
-                        <TableCell>{family.members_count}</TableCell>
-                        <TableCell>{getStatusBadge(family)}</TableCell>
-                        <TableCell>
-                          {family.last_delivery_date ? (
-                            <div>
-                              <p className="text-sm">{new Date(family.last_delivery_date).toLocaleDateString('pt-BR')}</p>
-                              {family.last_delivery_institution && (
-                                <p className="text-xs text-gray-500">{family.last_delivery_institution}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-500">Nunca</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleViewDetails(family)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Detalhes
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleUnlinkClick(family)}
-                              disabled={disassociateMutation.isPending}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                            >
-                              {disassociateMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              ) : (
-                                <Unlink className="h-4 w-4 mr-1" />
-                              )}
-                              Desvincular
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {filteredFamilies.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Nenhuma família encontrada</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -310,14 +392,13 @@ const InstitutionFamilies = () => {
                 </div>
               )}
               
-              {selectedFamily.deliveries && selectedFamily.deliveries.length > 0 && (
+              {selectedFamily.last_delivery_date && (
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Data:</strong> {new Date(selectedFamily.deliveries[0].delivery_date).toLocaleDateString('pt-BR')}</p>
-                    <p><strong>Período de Bloqueio:</strong> {selectedFamily.deliveries[0].blocking_period_days} dias</p>
-                    {selectedFamily.deliveries[0].notes && (
-                      <p><strong>Observações:</strong> {selectedFamily.deliveries[0].notes}</p>
+                    <p><strong>Data:</strong> {new Date(selectedFamily.last_delivery_date).toLocaleDateString('pt-BR')}</p>
+                    {selectedFamily.last_delivery_institution && (
+                      <p><strong>Instituição:</strong> {selectedFamily.last_delivery_institution}</p>
                     )}
                   </div>
                 </div>
@@ -451,7 +532,7 @@ const InstitutionFamilies = () => {
           {familyToUnlink && (
             <div className="py-4">
               <p className="text-sm text-gray-600 mb-2">
-                Tem certeza que deseja desvincular a família <strong>{familyToUnlink.family_name}</strong> da sua instituição?
+                Tem certeza que deseja desvincular a família <strong>{familyToUnlink.name || familyToUnlink.contact_person || 'N/A'}</strong> da sua instituição?
               </p>
               <p className="text-sm text-gray-500">
                 Após desvincular, você não poderá mais registrar entregas para esta família até que ela seja vinculada novamente.

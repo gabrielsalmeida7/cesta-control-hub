@@ -263,8 +263,6 @@ const Families = () => {
                     <Badge className="bg-green-500">Ativa</Badge>
                   ) : (
                     <Badge className="bg-red-500">Bloqueada</Badge>
-                  ) : (
-                    <Badge className="bg-green-500">Ativa</Badge>
                   )}
                 </div>
               </div>
