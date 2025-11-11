@@ -123,10 +123,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        setSession(authSession);
+        setUser(authSession?.user ?? null);
+        
+        if (authSession?.user) {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authSession.user.id)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Error fetching profile:', error);
+            setProfile(null);
+          } else if (profileData) {
+            setProfile(profileData);
+          }
+        }
+
         setLoading(false);
 
         if (import.meta.env.DEV) {
@@ -145,8 +162,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           });
         }
         setLoading(false);
-        initialLoadComplete = true;
-        isInitialLoad = false;
       }
     };
 

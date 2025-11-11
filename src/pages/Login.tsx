@@ -14,7 +14,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   // Redirect if already logged in (simplified - let ProtectedRoute handle most of the logic)
@@ -41,10 +41,13 @@ const Login = () => {
     const action = isSignup ? signUp : signIn;
     const { error } = await action(email, password);
     
+    setLoading(false);
+    
     // For signup, the hook will show a toast to verify email
     if (!error && !isSignup) {
       // Let the auth state change handle the redirect
     }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-blue-600 relative">

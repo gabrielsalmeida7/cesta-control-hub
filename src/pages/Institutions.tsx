@@ -17,10 +17,6 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase
 type Institution = Tables<'institutions'>;
 
 const Institutions = () => {
-  const { data: institutions, isLoading } = useInstitutions();
-  const createInstitution = useCreateInstitution();
-  const updateInstitution = useUpdateInstitution();
-  
   // State for dialog controls
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -57,12 +53,6 @@ const Institutions = () => {
       phone: institution.phone || "",
     });
     setIsEditDialogOpen(true);
-  };
-  
-  // Function to handle opening the create dialog
-  const handleCreate = () => {
-    createForm.reset();
-    setIsCreateDialogOpen(true);
   };
   
   // Function to handle opening the delete dialog
