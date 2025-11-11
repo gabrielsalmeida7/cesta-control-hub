@@ -130,13 +130,6 @@ const Login = () => {
                   required
                 />
               </div>
-              
-              {error && (
-                <Alert variant="destructive" className="w-full">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
 
               <Button 
                 type="submit" 
