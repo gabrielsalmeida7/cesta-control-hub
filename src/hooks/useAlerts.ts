@@ -211,3 +211,101 @@ export const useAlerts = () => {
     retry: 1
   });
 };
+
+export interface FamilyWithMultipleInstitutions {
+  id: string;
+  name: string;
+  cpf: string | null;
+  contact_person: string;
+  institutions: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+/**
+ * Busca famílias vinculadas a múltiplas instituições
+ * @param institutionId - Se fornecido, retorna apenas famílias dessa instituição que estão em múltiplas instituições
+ */
+export const useFamiliesWithMultipleInstitutions = (institutionId?: string) => {
+  return useQuery({
+    queryKey: ['families-multiple-institutions', institutionId],
+    queryFn: async (): Promise<FamilyWithMultipleInstitutions[]> => {
+      console.log('🔍 Fetching families with multiple institutions...', institutionId ? `for institution ${institutionId}` : 'all');
+      
+      // Buscar todas as associações família-instituição
+      let query = supabase
+        .from('institution_families')
+        .select(`
+          family_id,
+          institution_id,
+          family:families(
+            id,
+            name,
+            cpf,
+            contact_person
+          ),
+          institution:institutions(
+            id,
+            name
+          )
+        `);
+
+      // Se institutionId fornecido, filtrar apenas associações dessa instituição
+      if (institutionId) {
+        query = query.eq('institution_id', institutionId);
+      }
+
+      const { data: associations, error } = await query;
+
+      if (error) {
+        console.error('❌ Error fetching families with multiple institutions:', error);
+        throw error;
+      }
+
+      if (!associations || associations.length === 0) {
+        console.log('✅ No families found');
+        return [];
+      }
+
+      // Agrupar por família e contar instituições
+      const familiesMap = new Map<string, FamilyWithMultipleInstitutions>();
+
+      associations.forEach((assoc: any) => {
+        const familyId = assoc.family_id;
+        const family = assoc.family;
+        const institution = assoc.institution;
+
+        if (!family || !institution) return;
+
+        if (!familiesMap.has(familyId)) {
+          familiesMap.set(familyId, {
+            id: family.id,
+            name: family.name,
+            cpf: family.cpf,
+            contact_person: family.contact_person,
+            institutions: []
+          });
+        }
+
+        const familyData = familiesMap.get(familyId)!;
+        // Evitar duplicatas
+        if (!familyData.institutions.some(inst => inst.id === institution.id)) {
+          familyData.institutions.push({
+            id: institution.id,
+            name: institution.name
+          });
+        }
+      });
+
+      // Filtrar apenas famílias com mais de 1 instituição
+      const familiesWithMultiple = Array.from(familiesMap.values())
+        .filter(family => family.institutions.length > 1);
+
+      console.log('✅ Found', familiesWithMultiple.length, 'families with multiple institutions');
+      return familiesWithMultiple;
+    },
+    enabled: true,
+    retry: 1
+  });
+};

@@ -1,11 +1,11 @@
 
-import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminRecentDeliveries } from "@/hooks/useAdminRecentDeliveries";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { Package } from "lucide-react";
 
 const RecentDeliveriesTable = () => {
   const { profile } = useAuth();
@@ -41,7 +41,7 @@ const RecentDeliveriesTable = () => {
               <TableHead className="font-semibold text-primary">Família</TableHead>
               <TableHead className="font-semibold text-primary">Data da Entrega</TableHead>
               <TableHead className="font-semibold text-primary">Instituição</TableHead>
-              <TableHead className="font-semibold text-primary text-right">Quantidade</TableHead>
+              <TableHead className="font-semibold text-primary text-right">Cestas Básicas</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -58,7 +58,12 @@ const RecentDeliveriesTable = () => {
                     }
                   </TableCell>
                   <TableCell>{delivery.institution?.name || 'N/A'}</TableCell>
-                  <TableCell className="text-right">1</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">1</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (

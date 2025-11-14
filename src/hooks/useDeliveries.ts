@@ -63,7 +63,8 @@ export const useCreateDelivery = () => {
       const { data: validationResult, error: validationError } = await supabase
         .rpc('validate_delivery', {
           p_family_id: delivery.family_id,
-          p_institution_id: delivery.institution_id
+          p_institution_id: delivery.institution_id,
+          p_blocking_justification: (delivery as any).blocking_justification || null
         });
 
       if (validationError) {
@@ -74,6 +75,14 @@ export const useCreateDelivery = () => {
       if (validationResult && typeof validationResult === 'object') {
         const validation = validationResult as any;
         if (!validation.valid) {
+          // Se erro é de justificativa obrigatória, não mostrar toast genérico
+          if (validation.error === 'BLOCKING_JUSTIFICATION_REQUIRED') {
+            const error = new Error(validation.message || 'Justificativa obrigatória');
+            (error as any).validationError = validation.error;
+            (error as any).requiresJustification = true;
+            throw error;
+          }
+          
           // Criar erro customizado com mensagem do backend
           const error = new Error(validation.message || 'Validação falhou');
           (error as any).validationError = validation.error;

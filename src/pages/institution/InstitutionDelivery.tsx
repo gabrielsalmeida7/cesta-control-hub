@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFamilies } from '@/hooks/useFamilies';
 import { useCreateDelivery } from '@/hooks/useInstitutionDeliveries';
 import { useAuth } from '@/hooks/useAuth';
+import FraudAlertDialog from '@/components/FraudAlertDialog';
 
 interface DeliveryItem {
   item_name: string;
@@ -28,18 +29,19 @@ const InstitutionDelivery = () => {
   const [deliveryItems, setDeliveryItems] = useState<DeliveryItem[]>([
     { item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }
   ]);
+  const [showFraudAlert, setShowFraudAlert] = useState(false);
+  const [blockingJustification, setBlockingJustification] = useState<string>('');
   const { toast } = useToast();
   const { profile } = useAuth();
   
   const { data: families = [], isLoading } = useFamilies();
   const createDeliveryMutation = useCreateDelivery();
 
-  // Filtrar famílias liberadas para entrega (da própria instituição)
+  // Filtrar famílias vinculadas à instituição (incluindo bloqueadas)
   const availableFamilies = families.filter(family => {
-    return !family.is_blocked && 
-           family.institution_families?.some((if_relation: any) => 
-             if_relation.institution_id === profile?.institution_id
-           );
+    return family.institution_families?.some((if_relation: any) => 
+      if_relation.institution_id === profile?.institution_id
+    );
   });
 
   const filteredFamilies = availableFamilies.filter(family =>
@@ -94,20 +96,6 @@ const InstitutionDelivery = () => {
       return;
     }
 
-    // Verificar se família está bloqueada
-    if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
-      const blockedUntil = new Date(selectedFamily.blocked_until);
-      if (blockedUntil > new Date()) {
-        const institutionName = (selectedFamily.blocked_by_institution as any)?.name || "outra instituição";
-        toast({
-          title: "Família Bloqueada",
-          description: `Esta família já foi atendida pela instituição ${institutionName}. Não é possível realizar nova entrega até ${blockedUntil.toLocaleDateString('pt-BR')}.`,
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-
     if (deliveryItems.some(item => !item.item_name || item.quantity <= 0)) {
       toast({
         title: "Erro", 
@@ -117,11 +105,48 @@ const InstitutionDelivery = () => {
       return;
     }
 
+    // Verificar se família está bloqueada - se sim, mostrar modal de fraude
+    if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
+      const blockedUntil = new Date(selectedFamily.blocked_until);
+      if (blockedUntil > new Date()) {
+        // Família está bloqueada, mostrar modal de fraude
+        setShowFraudAlert(true);
+        return;
+      }
+    }
+
+    // Se chegou aqui, família não está bloqueada ou bloqueio expirou - processar entrega
+    processDelivery();
+  };
+
+  const processDelivery = async (justification?: string) => {
+    if (!selectedFamily || !profile?.institution_id) return;
+
     try {
+      // Filtrar itens adicionais (excluindo "Cesta Básica")
+      const additionalItems = deliveryItems.filter(
+        item => item.item_name && item.item_name.trim() !== '' && item.item_name !== 'Cesta Básica'
+      );
+
+      // Serializar itens adicionais em formato estruturado
+      let notesToSave = '';
+      if (additionalItems.length > 0) {
+        const itemsString = additionalItems
+          .map(item => `${item.item_name}|${item.quantity}|${item.unit}`)
+          .join('\n');
+        notesToSave = `__ITEMS_START__\n${itemsString}\n__ITEMS_END__`;
+        if (notes && notes.trim()) {
+          notesToSave += `\n\n${notes}`;
+        }
+      } else if (notes && notes.trim()) {
+        notesToSave = notes;
+      }
+
       await createDeliveryMutation.mutateAsync({
         family_id: selectedFamily.id,
         blocking_period_days: parseInt(blockingPeriod),
-        notes: notes || undefined,
+        notes: notesToSave || undefined,
+        blocking_justification: justification || undefined,
       });
 
       toast({
@@ -134,6 +159,8 @@ const InstitutionDelivery = () => {
       setDeliveryItems([{ item_name: 'Cesta Básica', quantity: 1, unit: 'unidade' }]);
       setNotes('');
       setSearchTerm('');
+      setBlockingJustification('');
+      setShowFraudAlert(false);
     } catch (error) {
       toast({
         title: "Erro",
@@ -141,6 +168,17 @@ const InstitutionDelivery = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleFraudAlertConfirm = (justification: string) => {
+    setBlockingJustification(justification);
+    setShowFraudAlert(false);
+    processDelivery(justification);
+  };
+
+  const handleFraudAlertCancel = () => {
+    setShowFraudAlert(false);
+    setBlockingJustification('');
   };
 
   return (
@@ -182,31 +220,34 @@ const InstitutionDelivery = () => {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {filteredFamilies.map((family) => (
-                      <div
-                        key={family.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedFamily?.id === family.id 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setSelectedFamily(family)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">{family.name}</p>
-                            <p className="text-sm text-gray-600">{family.contact_person}</p>
-                            <p className="text-sm text-gray-500">{family.phone || 'Sem telefone'}</p>
+                    {filteredFamilies.map((family) => {
+                      const isBlocked = family.is_blocked && family.blocked_until && new Date(family.blocked_until) > new Date();
+                      return (
+                        <div
+                          key={family.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedFamily?.id === family.id 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => setSelectedFamily(family)}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{family.name}</p>
+                              <p className="text-sm text-gray-600">{family.contact_person}</p>
+                              <p className="text-sm text-gray-500">{family.phone || 'Sem telefone'}</p>
+                            </div>
+                            <Badge variant={isBlocked ? "destructive" : "default"} className={isBlocked ? "" : "bg-green-500"}>
+                              {isBlocked ? "Bloqueada" : "Liberada"}
+                            </Badge>
                           </div>
-                          <Badge variant="default" className="bg-green-500">
-                            Liberada
-                          </Badge>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {family.members_count || 'N/A'} membros
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {family.members_count || 'N/A'} membros
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 
@@ -345,6 +386,18 @@ const InstitutionDelivery = () => {
           </div>
         </div>
       </main>
+
+      {/* Modal de Alerta de Fraude */}
+      <FraudAlertDialog
+        open={showFraudAlert}
+        onOpenChange={setShowFraudAlert}
+        onConfirm={handleFraudAlertConfirm}
+        onCancel={handleFraudAlertCancel}
+        familyName={selectedFamily?.name || ''}
+        blockedByInstitutionName={(selectedFamily?.blocked_by_institution as any)?.name}
+        blockedUntil={selectedFamily?.blocked_until}
+        isLoading={createDeliveryMutation.isPending}
+      />
     </div>
   );
 };

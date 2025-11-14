@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { formatDateTimeBrasilia } from '@/utils/dateFormat';
+import { formatDateTimeBrasilia, formatDateBrasilia } from '@/utils/dateFormat';
 
 type Family = Tables<'families'> & {
   blocked_by_institution?: { name?: string } | null;
@@ -422,13 +422,13 @@ const InstitutionFamilies = () => {
 
       {/* Dialog de detalhes */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
             <DialogTitle>Detalhes da Família: {selectedFamily?.name}</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
-            <div className="py-4 space-y-4">
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Nome da Família</p>
@@ -474,21 +474,46 @@ const InstitutionFamilies = () => {
                 </div>
               )}
               
-              {selectedFamily.last_delivery_date && (
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
+              {/* Instituições Vinculadas */}
+              {selectedFamily.institution_families && selectedFamily.institution_families.length > 0 && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-gray-800 mb-2">Instituições Vinculadas</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Data e Hora:</strong> {formatDateTimeBrasilia(selectedFamily.last_delivery_date)}</p>
-                    {selectedFamily.last_delivery_institution && (
-                      <p><strong>Instituição:</strong> {selectedFamily.last_delivery_institution}</p>
-                    )}
+                    {selectedFamily.institution_families.map((assoc: any, index: number) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Building className="h-4 w-4 text-gray-500" />
+                        <span>{assoc.institution?.name || 'Instituição não encontrada'}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
+
+              {/* Última Entrega Global */}
+              {selectedFamily.deliveries && selectedFamily.deliveries.length > 0 && (() => {
+                // Ordenar entregas por data (mais recente primeiro)
+                const sortedDeliveries = [...selectedFamily.deliveries].sort((a: any, b: any) => {
+                  const dateA = new Date(a.delivery_date).getTime();
+                  const dateB = new Date(b.delivery_date).getTime();
+                  return dateB - dateA;
+                });
+                const lastDelivery = sortedDeliveries[0];
+                const lastDeliveryInstitution = lastDelivery.institution?.name || 'Instituição não identificada';
+                
+                return (
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Data:</strong> {formatDateBrasilia(lastDelivery.delivery_date)}</p>
+                      <p><strong>Instituição:</strong> {lastDeliveryInstitution}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-4 border-t">
             <Button onClick={() => setIsDetailsOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>

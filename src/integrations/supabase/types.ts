@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       deliveries: {
         Row: {
+          blocking_justification: string | null
           blocking_period_days: number
           created_at: string | null
           delivered_by_user_id: string | null
@@ -26,6 +27,7 @@ export type Database = {
           notes: string | null
         }
         Insert: {
+          blocking_justification?: string | null
           blocking_period_days?: number
           created_at?: string | null
           delivered_by_user_id?: string | null
@@ -36,6 +38,7 @@ export type Database = {
           notes?: string | null
         }
         Update: {
+          blocking_justification?: string | null
           blocking_period_days?: number
           created_at?: string | null
           delivered_by_user_id?: string | null
@@ -261,7 +264,7 @@ export type Database = {
         Returns: boolean
       }
       validate_delivery: {
-        Args: { p_family_id: string; p_institution_id: string }
+        Args: { p_family_id: string; p_institution_id: string; p_blocking_justification?: string | null }
         Returns: Json
       }
     }

@@ -27,7 +27,12 @@ export const useFamilies = () => {
             institution_id,
             institution:institution_id(id, name)
           ),
-          deliveries(delivery_date, blocking_period_days, notes)
+          deliveries(
+            delivery_date, 
+            blocking_period_days, 
+            notes,
+            institution:institution_id(id, name)
+          )
         `)
         .order('name');
       
@@ -318,37 +323,26 @@ export const useAssociateFamilyWithInstitution = () => {
       familyId: string;
       institutionId: string;
     }) => {
-      // NOVA REGRA: Uma família só pode ter UMA instituição
-      // Verificar se família já está vinculada a qualquer instituição
-      const { data: existingAssociations, error: checkError } = await supabase
+      // NOVA REGRA: Famílias podem estar vinculadas a múltiplas instituições
+      // Verificar apenas se já está vinculada à MESMA instituição (evitar duplicatas)
+      const { data: existingAssociation, error: checkError } = await supabase
         .from("institution_families")
         .select(`
           institution_id,
           institution:institution_id(id, name)
         `)
-        .eq("family_id", familyId);
+        .eq("family_id", familyId)
+        .eq("institution_id", institutionId)
+        .maybeSingle();
 
       if (checkError) throw checkError;
 
-      // Se já existe qualquer vínculo
-      if (existingAssociations && existingAssociations.length > 0) {
-        const existingAssociation = existingAssociations[0];
-        const existingInstitutionId = existingAssociation.institution_id;
-        const institutionName = existingAssociation.institution?.name || "outra instituição";
-        
-        // Se já está vinculada à mesma instituição, não fazer nada
-        if (existingInstitutionId === institutionId) {
-          return { message: "Família já está vinculada a esta instituição" };
-        }
-        
-        // Se está vinculada a outra instituição, retornar erro
-        const error = new Error(`FAMILY_ALREADY_ASSOCIATED:${institutionName}`);
-        (error as any).institutionName = institutionName;
-        (error as any).existingInstitutionId = existingInstitutionId;
-        throw error;
+      // Se já está vinculada à mesma instituição, não fazer nada
+      if (existingAssociation) {
+        return { message: "Família já está vinculada a esta instituição" };
       }
 
-      // Se não tem vínculo, criar novo vínculo
+      // Criar novo vínculo (mesmo que já tenha outros vínculos)
       const { data, error } = await supabase
         .from("institution_families")
         .insert({
@@ -358,7 +352,13 @@ export const useAssociateFamilyWithInstitution = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Se for erro de constraint única (duplicata), tratar como sucesso silencioso
+        if (error.code === '23505' || error.message?.includes('duplicate')) {
+          return { message: "Família já está vinculada a esta instituição" };
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: (data) => {
@@ -375,21 +375,11 @@ export const useAssociateFamilyWithInstitution = () => {
       }
     },
     onError: (error: any) => {
-      // Verificar se é erro de família já vinculada
-      if (error.message?.startsWith("FAMILY_ALREADY_ASSOCIATED:")) {
-        const institutionName = error.institutionName || "outra instituição";
-        toast({
-          title: "Erro",
-          description: `Esta família já está sendo atendida por ${institutionName}.`,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Erro",
-          description: "Erro ao associar família: " + error.message,
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Erro",
+        description: "Erro ao associar família: " + error.message,
+        variant: "destructive"
+      });
     }
   });
 };
@@ -510,7 +500,37 @@ export const searchFamilyByCpf = async (
   const family = families[0];
   const associations = family.institution_families || [];
 
-  // Verificar se família tem vínculo
+  // Verificar se está vinculada à própria instituição
+  if (currentInstitutionId) {
+    const isLinkedToCurrentInstitution = associations.some(
+      assoc => assoc.institution_id === currentInstitutionId
+    );
+    
+    if (isLinkedToCurrentInstitution) {
+      // Cenário 4: Família já vinculada à própria instituição
+      const currentInstitutionAssociation = associations.find(
+        assoc => assoc.institution_id === currentInstitutionId
+      );
+      const institutionName = currentInstitutionAssociation?.institution?.name || "sua instituição";
+      
+      return {
+        scenario: 4,
+        family: family as Family & {
+          institution_families?: Array<{
+            institution_id: string;
+            institution: {
+              id: string;
+              name: string;
+            };
+          }>;
+        },
+        message: `A família '${family.name}' já está na lista de famílias da sua instituição.`,
+        institutionName: institutionName
+      };
+    }
+  }
+
+  // Verificar se família tem vínculo com outras instituições
   if (associations.length === 0) {
     // Cenário 1: Família encontrada e desvinculada
     return {
@@ -528,31 +548,11 @@ export const searchFamilyByCpf = async (
     };
   }
 
-  // Família tem vínculo
-  const association = associations[0];
-  const institutionName = association.institution?.name || "outra instituição";
-  const associatedInstitutionId = association.institution_id;
-
-  // Verificar se está vinculada à própria instituição
-  if (currentInstitutionId && associatedInstitutionId === currentInstitutionId) {
-    // Cenário 4: Família já vinculada à própria instituição
-    return {
-      scenario: 4,
-      family: family as Family & {
-        institution_families?: Array<{
-          institution_id: string;
-          institution: {
-            id: string;
-            name: string;
-          };
-        }>;
-      },
-      message: `A família '${family.name}' já está na lista de famílias da sua instituição.`,
-      institutionName: institutionName
-    };
-  }
-
-  // Cenário 2: Família encontrada e já vinculada a outra instituição
+  // Cenário 2: Família encontrada e já vinculada a outra(s) instituição(ões) - mas agora pode vincular também
+  const otherInstitutions = associations
+    .map(assoc => assoc.institution?.name || "outra instituição")
+    .join(", ");
+  
   return {
     scenario: 2,
     family: family as Family & {
@@ -564,7 +564,7 @@ export const searchFamilyByCpf = async (
         };
       }>;
     },
-    message: `A família '${family.name}' já está sendo atendida por ${institutionName}. Não é possível realizar o vínculo.`,
-    institutionName: institutionName
+    message: `A família '${family.name}' já está vinculada à(s) instituição(ões): ${otherInstitutions}. Você pode vincular esta família à sua instituição também.`,
+    institutionName: otherInstitutions
   };
 };

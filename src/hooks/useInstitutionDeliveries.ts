@@ -14,15 +14,16 @@ export const useInstitutionDeliveries = (startDate?: string, endDate?: string) =
       let query = supabase
         .from('deliveries')
         .select(`
-          id,
-          delivery_date,
-          blocking_period_days,
-          notes,
-          family:families(
             id,
-            name,
-            contact_person
-          )
+            delivery_date,
+            blocking_period_days,
+            notes,
+            blocking_justification,
+            family:families(
+              id,
+              name,
+              contact_person
+            )
         `)
         .eq('institution_id', profile.institution_id)
         .order('delivery_date', { ascending: false });
@@ -55,6 +56,7 @@ interface CreateDeliveryData {
   family_id: string;
   blocking_period_days: number;
   notes?: string;
+  blocking_justification?: string;
 }
 
 export const useCreateDelivery = () => {
@@ -70,7 +72,8 @@ export const useCreateDelivery = () => {
       const { data: validationResult, error: validationError } = await supabase
         .rpc('validate_delivery', {
           p_family_id: data.family_id,
-          p_institution_id: profile.institution_id
+          p_institution_id: profile.institution_id,
+          p_blocking_justification: data.blocking_justification || null
         });
 
       if (validationError) {
@@ -81,6 +84,14 @@ export const useCreateDelivery = () => {
       if (validationResult && typeof validationResult === 'object') {
         const validation = validationResult as any;
         if (!validation.valid) {
+          // Se erro é de justificativa obrigatória, não mostrar toast genérico
+          if (validation.error === 'BLOCKING_JUSTIFICATION_REQUIRED') {
+            const error = new Error(validation.message || 'Justificativa obrigatória');
+            (error as any).validationError = validation.error;
+            (error as any).requiresJustification = true;
+            throw error;
+          }
+          
           // Criar erro customizado com mensagem do backend
           const error = new Error(validation.message || 'Validação falhou');
           (error as any).validationError = validation.error;
@@ -99,6 +110,7 @@ export const useCreateDelivery = () => {
           blocking_period_days: data.blocking_period_days,
           delivered_by_user_id: user?.id || null,
           notes: data.notes,
+          blocking_justification: data.blocking_justification || null,
           delivery_date: new Date().toISOString().split('T')[0],
         });
 

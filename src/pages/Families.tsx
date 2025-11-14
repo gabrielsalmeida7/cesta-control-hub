@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
 import { useFamilies, useUpdateFamily, useCreateFamily } from "@/hooks/useFamilies";
@@ -18,7 +20,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import FamilyInstitutionAssociation from "@/components/FamilyInstitutionAssociation";
 import FamilyInstitutionLink from "@/components/FamilyInstitutionLink";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
-import { formatDateTimeBrasilia } from "@/utils/dateFormat";
+import { formatDateTimeBrasilia, formatDateBrasilia } from "@/utils/dateFormat";
 
 type Family = Tables<'families'> & {
   blocked_by_institution?: { name: string } | null;
@@ -43,6 +45,8 @@ const Families = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [unblockReason, setUnblockReason] = useState("");
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const { user } = useAuth();
 
@@ -81,15 +85,28 @@ const Families = () => {
   });
 
   // Filter families based on search term
-  const filteredFamilies = families?.filter(family => {
-    const searchLower = searchTerm.toLowerCase();
-    const searchNumbers = searchTerm.replace(/\D/g, '');
-    return (
-      family.name.toLowerCase().includes(searchLower) ||
-      family.contact_person.toLowerCase().includes(searchLower) ||
-      (family.cpf && family.cpf.replace(/\D/g, '').includes(searchNumbers))
-    );
-  }) || [];
+  const filteredFamilies = useMemo(() => {
+    return families?.filter(family => {
+      const searchLower = searchTerm.toLowerCase();
+      const searchNumbers = searchTerm.replace(/\D/g, '');
+      return (
+        family.name.toLowerCase().includes(searchLower) ||
+        family.contact_person.toLowerCase().includes(searchLower) ||
+        (family.cpf && family.cpf.replace(/\D/g, '').includes(searchNumbers))
+      );
+    }) || [];
+  }, [families, searchTerm]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredFamilies.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedFamilies = filteredFamilies.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term or items per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, itemsPerPage]);
 
   // Function to unblock a family
   const handleUnblock = (family: Family) => {
@@ -227,6 +244,29 @@ const Families = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 whitespace-nowrap">Mostrar:</label>
+                <Select 
+                  value={itemsPerPage.toString()} 
+                  onValueChange={(value) => {
+                    setItemsPerPage(parseInt(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="15">15</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-600 whitespace-nowrap">por página</span>
+              </div>
               <Button 
                 className="bg-primary hover:bg-primary/90"
                 onClick={handleCreateFamily}
@@ -265,7 +305,8 @@ const Families = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFamilies.map((family) => (
+                    {paginatedFamilies.length > 0 ? (
+                      paginatedFamilies.map((family) => (
                       <TableRow key={family.id}>
                         <TableCell className="font-medium">{family.name}</TableCell>
                         <TableCell>{family.contact_person}</TableCell>
@@ -305,24 +346,61 @@ const Families = () => {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                          Nenhuma família encontrada
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}
             </div>
+            
+            {/* Pagination Controls */}
+            {!isLoading && filteredFamilies.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-4 border-t">
+                <div className="text-sm text-gray-600">
+                  Mostrando {startIndex + 1} a {Math.min(endIndex, filteredFamilies.length)} de {filteredFamilies.length} famílias
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
       
       {/* Family Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
             <DialogTitle>Detalhes da Família</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
-            <div className="space-y-4">
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Nome da Família</p>
@@ -432,10 +510,32 @@ const Families = () => {
                   }}
                 />
               </div>
+
+              {/* Última Entrega Global */}
+              {selectedFamily.deliveries && selectedFamily.deliveries.length > 0 && (() => {
+                // Ordenar entregas por data (mais recente primeiro)
+                const sortedDeliveries = [...selectedFamily.deliveries].sort((a: any, b: any) => {
+                  const dateA = new Date(a.delivery_date).getTime();
+                  const dateB = new Date(b.delivery_date).getTime();
+                  return dateB - dateA;
+                });
+                const lastDelivery = sortedDeliveries[0];
+                const lastDeliveryInstitution = lastDelivery.institution?.name || 'Instituição não identificada';
+                
+                return (
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Data:</strong> {formatDateBrasilia(lastDelivery.delivery_date)}</p>
+                      <p><strong>Instituição:</strong> {lastDeliveryInstitution}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
           
-          <DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-4 border-t">
             <Button onClick={() => setIsDetailsOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>

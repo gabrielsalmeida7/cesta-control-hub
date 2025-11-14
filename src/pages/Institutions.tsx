@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
-import { Building, Edit, Info, Plus } from "lucide-react";
+import { Building, Edit, Info, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,12 +27,25 @@ const Institutions = () => {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
+  const [itemsPerPage, setItemsPerPage] = useState(9); // 9 para grid 3x3
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Hooks for data management
   const { data: institutions = [], isLoading, error } = useInstitutions();
   const createInstitution = useCreateInstitution();
   const updateInstitution = useUpdateInstitution();
   const deleteInstitution = useDeleteInstitution();
+
+  // Pagination calculations
+  const totalPages = Math.ceil(institutions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInstitutions = institutions.slice(startIndex, endIndex);
+
+  // Reset to page 1 when items per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   // Form data type
   type InstitutionFormData = {
@@ -243,11 +257,36 @@ const Institutions = () => {
       <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
         <div className="mb-8">
           {/* Page title and add new institution button */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-800">Instituições</h2>
-            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 h-4 w-4" /> Nova Instituição
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 whitespace-nowrap">Mostrar:</label>
+                <Select 
+                  value={itemsPerPage.toString()} 
+                  onValueChange={(value) => {
+                    setItemsPerPage(parseInt(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6</SelectItem>
+                    <SelectItem value="9">9</SelectItem>
+                    <SelectItem value="12">12</SelectItem>
+                    <SelectItem value="15">15</SelectItem>
+                    <SelectItem value="18">18</SelectItem>
+                    <SelectItem value="24">24</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-600 whitespace-nowrap">por página</span>
+              </div>
+              <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" /> Nova Instituição
+              </Button>
+            </div>
           </div>
           
           {/* Grid layout for institution cards */}
@@ -271,8 +310,9 @@ const Institutions = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {institutions?.map((institution) => (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedInstitutions.map((institution) => (
                 <Card key={institution.id} className="overflow-hidden">
                   {/* Card header with institution name */}
                   <CardHeader className="bg-primary text-white">
@@ -303,8 +343,39 @@ const Institutions = () => {
                     </div>
                   </CardContent>
                 </Card>
-              )) || []}
-            </div>
+              ))}
+              </div>
+              
+              {/* Pagination Controls */}
+              {!isLoading && institutions.length > 0 && (
+                <div className="flex items-center justify-between mt-6 px-4 py-4 border-t">
+                  <div className="text-sm text-gray-600">
+                    Mostrando {startIndex + 1} a {Math.min(endIndex, institutions.length)} de {institutions.length} instituições
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Página {currentPage} de {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

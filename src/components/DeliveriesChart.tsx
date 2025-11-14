@@ -30,11 +30,39 @@ const DeliveriesChart = () => {
   const [showChart, setShowChart] = useState<boolean>(true);
   const [selectedInstitution, setSelectedInstitution] = useState<string>("all");
 
-  // Cores para as instituições
-  const institutionColors = [
-    "#004E64", "#007F5F", "#2D6A4F", "#40916C", "#52B788", 
-    "#74C69D", "#95D5B2", "#B7E4C7", "#D8F3DC", "#F1F8E9"
-  ];
+  // Função para gerar cores dinamicamente baseadas na paleta do sistema
+  const generateColor = (index: number, total: number): string => {
+    // Cores base da paleta do sistema
+    const baseColors = [
+      { h: 195, s: 100, l: 20 },  // #004E64 (Primary - azul petróleo)
+      { h: 160, s: 100, l: 25 },  // #007F5F (Success - verde escuro)
+      { h: 345, s: 80, l: 65 },   // #EF476F (Danger - vermelho suave)
+      { h: 210, s: 70, l: 45 },   // Azul médio
+      { h: 180, s: 60, l: 40 },   // Ciano escuro
+      { h: 280, s: 70, l: 50 },   // Roxo
+      { h: 30, s: 90, l: 55 },    // Laranja
+      { h: 220, s: 80, l: 35 },   // Azul escuro
+    ];
+
+    // Se temos poucas instituições, usar cores base
+    if (index < baseColors.length) {
+      const color = baseColors[index];
+      return `hsl(${color.h}, ${color.s}%, ${color.l}%)`;
+    }
+
+    // Para muitas instituições, gerar cores harmonicamente distribuídas
+    // Usar o círculo de cores HSL (0-360) e distribuir uniformemente
+    const hue = (index * 137.508) % 360; // 137.508 é o ângulo dourado, garante boa distribuição
+    const saturation = 60 + (index % 3) * 10; // Varia entre 60-80%
+    const lightness = 35 + (index % 4) * 8; // Varia entre 35-59%
+    
+    return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
+  };
+
+  const getInstitutionColor = (index: number): string => {
+    const totalInstitutions = deliveriesData?.institutions?.length || 0;
+    return generateColor(index, totalInstitutions);
+  };
 
   const getFilteredData = () => {
     if (!deliveriesData?.chartData) return [];
@@ -137,7 +165,7 @@ const DeliveriesChart = () => {
                 <Bar 
                   key={institutionName}
                   dataKey={institutionName} 
-                  fill={institutionColors[index % institutionColors.length]} 
+                  fill={getInstitutionColor(index)} 
                 />
               ))}
             </BarChart>

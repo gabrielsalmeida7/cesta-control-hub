@@ -18,6 +18,7 @@ import { useDeliveries, useCreateDelivery } from "@/hooks/useDeliveries";
 import { useInstitutions } from "@/hooks/useInstitutions";
 import { useInstitutionFamilies } from "@/hooks/useFamilies";
 import { useAuth } from "@/hooks/useAuth";
+import FraudAlertDialog from '@/components/FraudAlertDialog';
 import type { Tables } from "@/integrations/supabase/types";
 
 // Types from Supabase
@@ -70,6 +71,8 @@ const DeliveryManagement = () => {
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("active");
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
+  const [showFraudAlert, setShowFraudAlert] = useState(false);
+  const [pendingDeliveryData, setPendingDeliveryData] = useState<DeliveryFormValues | null>(null);
   
   // Data hooks
   const institutions = useInstitutions();
@@ -130,20 +133,6 @@ const DeliveryManagement = () => {
 
   // Open delivery dialog for a family
   const handleDelivery = (family: Family) => {
-    // Verificar se família está bloqueada ANTES de abrir dialog
-    if (isFamilyBlocked(family)) {
-      const blockedUntil = family.blocked_until ? new Date(family.blocked_until) : null;
-      const institutionName = (family.blocked_by_institution as any)?.name || "outra instituição";
-      const blockedUntilFormatted = blockedUntil ? blockedUntil.toLocaleDateString('pt-BR') : "data não definida";
-      
-      toast({
-        title: "Família Bloqueada",
-        description: `Esta família já foi atendida pela instituição ${institutionName}. Não é possível realizar nova entrega até ${blockedUntilFormatted}.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     setSelectedFamily(family);
     form.reset({
       familyId: family.id,
@@ -186,16 +175,6 @@ const DeliveryManagement = () => {
   // Process delivery submission
   const onSubmit = (data: DeliveryFormValues) => {
     if (!selectedFamily || !currentInstitution || !selectedInstitutionId) return;
-    
-    // Validation checks
-    if (isFamilyBlocked(selectedFamily)) {
-      toast({
-        title: "Erro",
-        description: "Esta família está bloqueada e não pode receber entregas no momento.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (!isFamilyAssociatedWithInstitution(selectedFamily, selectedInstitutionId)) {
       toast({
@@ -206,8 +185,21 @@ const DeliveryManagement = () => {
       return;
     }
     
+    // Verificar se família está bloqueada - se sim, mostrar modal de fraude
+    if (isFamilyBlocked(selectedFamily)) {
+      setPendingDeliveryData(data);
+      setShowFraudAlert(true);
+      return;
+    }
+
+    // Se chegou aqui, família não está bloqueada - processar entrega
+    processDelivery(data);
+  };
+
+  const processDelivery = (data: DeliveryFormValues, justification?: string) => {
+    if (!selectedFamily || !currentInstitution || !selectedInstitutionId) return;
+    
     const blockPeriod = parseInt(data.blockPeriod);
-    const blockUntilDate = calculateBlockUntilDate(blockPeriod);
     
     // Create delivery data for Supabase
     const deliveryData = {
@@ -216,15 +208,30 @@ const DeliveryManagement = () => {
       delivery_date: new Date().toISOString().split('T')[0],
       blocking_period_days: blockPeriod,
       notes: data.otherItems || null,
+      blocking_justification: justification || null,
       delivered_by_user_id: user?.id || null
     };
     
     createDelivery.mutate(deliveryData, {
       onSuccess: () => {
         setIsDeliveryDialogOpen(false);
+        setShowFraudAlert(false);
+        setPendingDeliveryData(null);
         form.reset();
       }
     });
+  };
+
+  const handleFraudAlertConfirm = (justification: string) => {
+    if (pendingDeliveryData) {
+      setShowFraudAlert(false);
+      processDelivery(pendingDeliveryData, justification);
+    }
+  };
+
+  const handleFraudAlertCancel = () => {
+    setShowFraudAlert(false);
+    setPendingDeliveryData(null);
   };
 
   // Show loading state
@@ -636,6 +643,18 @@ const DeliveryManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Alerta de Fraude */}
+      <FraudAlertDialog
+        open={showFraudAlert}
+        onOpenChange={setShowFraudAlert}
+        onConfirm={handleFraudAlertConfirm}
+        onCancel={handleFraudAlertCancel}
+        familyName={selectedFamily?.name || ''}
+        blockedByInstitutionName={(selectedFamily?.blocked_by_institution as any)?.name}
+        blockedUntil={selectedFamily?.blocked_until || undefined}
+        isLoading={createDelivery.isPending}
+      />
       
       <Footer />
     </div>

@@ -231,14 +231,46 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               </div>
             )}
 
-            {/* Cenário 2: Família já vinculada a outra instituição */}
-            {searchResult.scenario === 2 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {searchResult.message}
-                </AlertDescription>
-              </Alert>
+            {/* Cenário 2: Família já vinculada a outra(s) instituição(ões) - mas pode vincular também */}
+            {searchResult.scenario === 2 && searchResult.family && (
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    {searchResult.message}
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                  <p><strong>Nome:</strong> {searchResult.family.name}</p>
+                  <p><strong>Contato:</strong> {searchResult.family.contact_person}</p>
+                  {searchResult.family.cpf && (
+                    <p><strong>CPF:</strong> {formatCpf(searchResult.family.cpf)}</p>
+                  )}
+                  {searchResult.family.phone && (
+                    <p><strong>Telefone:</strong> {searchResult.family.phone}</p>
+                  )}
+                  <p><strong>Membros:</strong> {searchResult.family.members_count || 1}</p>
+                </div>
+
+                <Button
+                  onClick={handleAssociate}
+                  disabled={associateMutation.isPending}
+                  className="w-full bg-primary hover:bg-primary/90"
+                >
+                  {associateMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Vinculando...
+                    </>
+                  ) : (
+                    <>
+                      <Link className="mr-2 h-4 w-4" />
+                      Vincular à Minha Instituição
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
 
             {/* Cenário 3: Família não encontrada */}
