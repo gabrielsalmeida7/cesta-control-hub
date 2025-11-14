@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useInstitutions } from "@/hooks/useInstitutions";
 import { useAssociateFamilyWithInstitution, useDisassociateFamilyFromInstitution } from "@/hooks/useFamilies";
+import { useAuth } from "@/hooks/useAuth";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Family = Tables<'families'> & {
@@ -28,8 +29,11 @@ interface FamilyInstitutionAssociationProps {
 
 const FamilyInstitutionAssociation = ({ family, onAssociationChange }: FamilyInstitutionAssociationProps) => {
   const [isAssociationDialogOpen, setIsAssociationDialogOpen] = useState(false);
+  const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("");
+  const [institutionToRemove, setInstitutionToRemove] = useState<{ id: string; name: string } | null>(null);
 
+  const { profile } = useAuth();
   const { data: institutions = [], isLoading: institutionsLoading } = useInstitutions();
   const associateMutation = useAssociateFamilyWithInstitution();
   const disassociateMutation = useDisassociateFamilyFromInstitution();
@@ -56,12 +60,35 @@ const FamilyInstitutionAssociation = ({ family, onAssociationChange }: FamilyIns
     });
   };
 
-  const handleDisassociate = (institutionId: string) => {
+  // Check if user can remove association
+  const canRemoveAssociation = (institutionId: string) => {
+    if (profile?.role === 'admin') {
+      return true; // Admin can remove from any institution
+    }
+    if (profile?.role === 'institution' && profile?.institution_id === institutionId) {
+      return true; // Institution can only remove from their own institution
+    }
+    return false;
+  };
+
+  const handleDisassociateClick = (institutionId: string, institutionName: string) => {
+    if (!canRemoveAssociation(institutionId)) {
+      return; // Não deve aparecer o botão se não tiver permissão
+    }
+    setInstitutionToRemove({ id: institutionId, name: institutionName });
+    setIsRemoveDialogOpen(true);
+  };
+
+  const handleConfirmDisassociate = () => {
+    if (!institutionToRemove) return;
+
     disassociateMutation.mutate({
       familyId: family.id,
-      institutionId
+      institutionId: institutionToRemove.id
     }, {
       onSuccess: () => {
+        setIsRemoveDialogOpen(false);
+        setInstitutionToRemove(null);
         onAssociationChange?.();
       }
     });
@@ -74,25 +101,33 @@ const FamilyInstitutionAssociation = ({ family, onAssociationChange }: FamilyIns
         <div>
           <h4 className="text-sm font-medium text-gray-700 mb-2">Instituições Associadas:</h4>
           <div className="flex flex-wrap gap-2">
-            {associatedInstitutions.map((assoc) => (
-              <Badge key={assoc.institution_id} variant="secondary" className="flex items-center gap-1">
-                <Building className="h-3 w-3" />
-                {assoc.institution.name}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-4 w-4 p-0 hover:bg-red-100"
-                  onClick={() => handleDisassociate(assoc.institution_id)}
-                  disabled={disassociateMutation.isPending}
-                >
-                  {disassociateMutation.isPending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Unlink className="h-3 w-3 text-red-500" />
+            {associatedInstitutions.map((assoc) => {
+              const institutionName = assoc.institution?.name || "Instituição não encontrada";
+              const institutionId = assoc.institution_id;
+              const canRemove = canRemoveAssociation(institutionId);
+              
+              return (
+                <Badge key={institutionId} variant="secondary" className="flex items-center gap-1">
+                  <Building className="h-3 w-3" />
+                  {institutionName}
+                  {canRemove && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0 hover:bg-red-100"
+                      onClick={() => handleDisassociateClick(institutionId, institutionName)}
+                      disabled={disassociateMutation.isPending}
+                    >
+                      {disassociateMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Unlink className="h-3 w-3 text-red-500" />
+                      )}
+                    </Button>
                   )}
-                </Button>
-              </Badge>
-            ))}
+                </Badge>
+              );
+            })}
           </div>
         </div>
       )}
@@ -166,6 +201,56 @@ const FamilyInstitutionAssociation = ({ family, onAssociationChange }: FamilyIns
                 </>
               ) : (
                 "Vincular"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Confirmation Dialog */}
+      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Remoção de Vínculo</DialogTitle>
+          </DialogHeader>
+          
+          {institutionToRemove && (
+            <div className="py-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Tem certeza que deseja remover o vínculo da família <strong>{family.name}</strong> com a instituição <strong>{institutionToRemove.name}</strong>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Após remover, a família não poderá mais receber entregas desta instituição até que seja vinculada novamente.
+              </p>
+              <p className="text-sm text-red-600 mt-2 font-medium">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsRemoveDialogOpen(false);
+                setInstitutionToRemove(null);
+              }}
+              disabled={disassociateMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmDisassociate}
+              disabled={disassociateMutation.isPending}
+            >
+              {disassociateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removendo...
+                </>
+              ) : (
+                "Confirmar Remoção"
               )}
             </Button>
           </DialogFooter>

@@ -85,6 +85,16 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     return null;
   }
 
+  // If allowedRoles is specified, we need profile to check permissions
+  // Show loading if profile is still null (might be loading asynchronously)
+  if (allowedRoles && !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   // Check role permissions
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
     return null;

@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,9 @@ import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInsti
 import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { formatDateTimeBrasilia } from '@/utils/dateFormat';
 
 type Family = Tables<'families'> & {
   blocked_by_institution?: { name?: string } | null;
@@ -37,7 +39,9 @@ const InstitutionFamilies = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [familyToUnlink, setFamilyToUnlink] = useState<Family | null>(null);
+  const [prefilledCpf, setPrefilledCpf] = useState<string | undefined>(undefined);
   
   const { profile } = useAuth();
   const { data: familiesData = [], isLoading: familiesLoading, error } = useInstitutionFamilies(profile?.institution_id);
@@ -46,12 +50,23 @@ const InstitutionFamilies = () => {
   const disassociateMutation = useDisassociateFamilyFromInstitution();
   const { toast } = useToast();
 
+  // Função para formatar CPF
+  const formatCpf = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
   // Form for creating new family
   const createForm = useForm<TablesInsert<'families'>>({
     defaultValues: {
       name: "",
       contact_person: "",
       phone: "",
+      cpf: "",
+      address: "",
       members_count: 1,
       is_blocked: false,
     }
@@ -86,8 +101,8 @@ const InstitutionFamilies = () => {
       return {
         id: family.id,
         family_name: family.name || family.contact_person || 'N/A',
-        main_cpf: '', // CPF não está no schema atual
-        address: 'Não informado', // Address não está no schema atual de families
+        main_cpf: family.cpf || '',
+        address: family.address || 'Não informado',
         members_count: family.members_count || 0,
         is_blocked: family.is_blocked || false,
         blocked_until: family.blocked_until || undefined,
@@ -98,15 +113,19 @@ const InstitutionFamilies = () => {
         name: family.name,
         contact_person: family.contact_person,
         phone: family.phone,
+        cpf: family.cpf,
         ...family
       };
     });
   }, [familiesData, deliveries, profile?.institution_id]);
 
   const filteredFamilies = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
+    const searchNumbers = searchTerm.replace(/\D/g, '');
     return families.filter(family =>
-      family.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (family.main_cpf && family.main_cpf.includes(searchTerm))
+      family.family_name.toLowerCase().includes(searchLower) ||
+      (family.main_cpf && family.main_cpf.replace(/\D/g, '').includes(searchNumbers)) ||
+      (family.contact_person && family.contact_person.toLowerCase().includes(searchLower))
     );
   }, [families, searchTerm]);
 
@@ -136,9 +155,29 @@ const InstitutionFamilies = () => {
     setIsDetailsOpen(true);
   };
 
-  const handleCreateFamily = () => {
+  const handleCreateFamily = (cpf?: string) => {
     createForm.reset();
+    if (cpf && typeof cpf === 'string') {
+      // CPF vem sem máscara (apenas números) do componente de busca
+      createForm.setValue("cpf" as any, cpf.replace(/\D/g, ''));
+      setPrefilledCpf(cpf);
+    }
     setIsCreateDialogOpen(true);
+    setIsSearchDialogOpen(false);
+  };
+
+  const handleFamilyFound = (familyId: string, cpf?: string) => {
+    if (familyId) {
+      // Família foi vinculada com sucesso, fechar dialog
+      setIsSearchDialogOpen(false);
+      toast({
+        title: "Sucesso",
+        description: "Família vinculada à sua instituição com sucesso!"
+      });
+    } else {
+      // Família não encontrada, abrir formulário de cadastro com CPF preenchido
+      handleCreateFamily(cpf);
+    }
   };
 
   const onSubmitCreate = async (data: TablesInsert<'families'>) => {
@@ -152,8 +191,14 @@ const InstitutionFamilies = () => {
     }
 
     try {
+      // Limpar CPF (remover máscara) antes de salvar
+      const familyData = {
+        ...data,
+        cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
+      };
+      
       await createFamilyMutation.mutateAsync({
-        family: data,
+        family: familyData,
         institutionId: profile.institution_id
       });
       setIsCreateDialogOpen(false);
@@ -231,12 +276,20 @@ const InstitutionFamilies = () => {
                 Visualize o status das famílias e histórico de entregas
               </p>
             </div>
-            <Button 
-              className="bg-primary hover:bg-primary/90"
-              onClick={handleCreateFamily}
-            >
-              <UserPlus className="mr-2 h-4 w-4" /> Cadastrar Nova Família
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => setIsSearchDialogOpen(true)}
+              >
+                <LinkIcon className="mr-2 h-4 w-4" /> Adicionar Família Existente
+              </Button>
+              <Button 
+                className="bg-primary hover:bg-primary/90"
+                onClick={handleCreateFamily}
+              >
+                <UserPlus className="mr-2 h-4 w-4" /> Cadastrar Nova Família
+              </Button>
+            </div>
           </div>
 
           {/* Barra de pesquisa */}
@@ -315,9 +368,9 @@ const InstitutionFamilies = () => {
                       <TableCell>{family.members_count || 'N/A'}</TableCell>
                       <TableCell>{getStatusBadge(family)}</TableCell>
                       <TableCell>
-                        {family.deliveries && family.deliveries.length > 0 ? (
+                        {family.last_delivery_date ? (
                           <div>
-                            <p className="text-sm">{new Date(family.deliveries[0].delivery_date).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-sm">{formatDateTimeBrasilia(family.last_delivery_date)}</p>
                             <p className="text-xs text-gray-500">Esta instituição</p>
                           </div>
                         ) : (
@@ -325,14 +378,32 @@ const InstitutionFamilies = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewDetails(family)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Detalhes
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleViewDetails(family)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Detalhes
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleUnlinkClick(family)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            disabled={disassociateMutation.isPending}
+                          >
+                            {disassociateMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Unlink className="h-4 w-4 mr-1" />
+                                Desvincular
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -372,10 +443,21 @@ const InstitutionFamilies = () => {
                   <p className="font-medium">{selectedFamily.phone || 'N/A'}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-600">CPF</p>
+                  <p className="font-medium">{selectedFamily.cpf ? formatCpf(selectedFamily.cpf) : 'Não informado'}</p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-600">Número de Membros</p>
                   <p className="font-medium">{selectedFamily.members_count || 'N/A'}</p>
                 </div>
               </div>
+              
+              {selectedFamily.address && (
+                <div>
+                  <p className="text-sm text-gray-600">Endereço</p>
+                  <p className="font-medium">{selectedFamily.address}</p>
+                </div>
+              )}
               
               <div>
                 <p className="text-sm text-gray-600">Status Atual</p>
@@ -396,7 +478,7 @@ const InstitutionFamilies = () => {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Data:</strong> {new Date(selectedFamily.last_delivery_date).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Data e Hora:</strong> {formatDateTimeBrasilia(selectedFamily.last_delivery_date)}</p>
                     {selectedFamily.last_delivery_institution && (
                       <p><strong>Instituição:</strong> {selectedFamily.last_delivery_institution}</p>
                     )}
@@ -453,12 +535,51 @@ const InstitutionFamilies = () => {
               
               <FormField
                 control={createForm.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF (opcional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formatted = formatCpf(e.target.value);
+                          // Salvar apenas números no banco
+                          const numbers = formatted.replace(/\D/g, '');
+                          field.onChange(numbers.length === 11 ? numbers : formatted);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Telefone</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="(11) 99999-9999" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço (opcional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -519,6 +640,29 @@ const InstitutionFamilies = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Search Family Dialog */}
+      <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Família Existente</DialogTitle>
+          </DialogHeader>
+          
+          <SearchFamilyByCpf
+            onFamilyFound={handleFamilyFound}
+            onClose={() => setIsSearchDialogOpen(false)}
+          />
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSearchDialogOpen(false)}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
 import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
 import { useReportExport } from '@/hooks/useReportExport';
+import { formatDateBrasilia } from '@/utils/dateFormat';
 
 
 const InstitutionReports = () => {
@@ -153,45 +154,49 @@ const InstitutionReports = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDeliveries.map((delivery) => (
-                    <TableRow key={delivery.id}>
-                      <TableCell>
-                        {new Date(delivery.delivery_date).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {delivery.family?.name || 'N/A'}
-                      </TableCell>
-                      <TableCell>{delivery.family?.contact_person || 'N/A'}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            Cesta Básica
+                  {filteredDeliveries.length > 0 ? (
+                    filteredDeliveries.map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>
+                          {formatDateBrasilia(delivery.delivery_date)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {delivery.family?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell>{delivery.family?.contact_person || 'N/A'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              Cesta Básica
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {delivery.blocking_period_days} dias
                           </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {delivery.blocking_period_days} dias
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {delivery.notes || '-'}
-                        </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {delivery.notes || '-'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">
+                          {startDate || endDate 
+                            ? 'Nenhuma entrega encontrada no período selecionado'
+                            : 'Nenhuma entrega registrada ainda'}
+                        </p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
-              
-              {filteredDeliveries.length === 0 ? (
-                <div className="text-center py-8">
-                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    Nenhuma entrega encontrada no período selecionado
-                  </p>
-                </div>
-              ) : null}
             </CardContent>
           </Card>
         </div>

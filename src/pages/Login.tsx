@@ -17,20 +17,28 @@ const Login = () => {
   const { signIn, signUp, user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  // Redirect if already logged in (simplified - let ProtectedRoute handle most of the logic)
+  // Redirect if already logged in based on user role
   useEffect(() => {
-    // Only redirect if we're not loading and user is authenticated
-    // The ProtectedRoute will handle redirecting away from /login if user is logged in
+    // Only redirect if we're not loading and user is authenticated with profile
     if (!authLoading && user && profile) {
       if (import.meta.env.DEV) {
-        console.log("[LOGIN]", "User already authenticated, redirecting to home", {
+        console.log("[LOGIN]", "User already authenticated, redirecting based on role", {
           email: user.email,
           role: profile.role,
           timestamp: new Date().toISOString()
         });
       }
       setLoading(false);
-      navigate("/", { replace: true });
+      
+      // Redirect based on role
+      if (profile.role === 'admin') {
+        navigate("/", { replace: true });
+      } else if (profile.role === 'institution') {
+        navigate("/institution/dashboard", { replace: true });
+      } else {
+        // Fallback to home if role is unknown
+        navigate("/", { replace: true });
+      }
     }
   }, [user, profile, authLoading, navigate]);
 

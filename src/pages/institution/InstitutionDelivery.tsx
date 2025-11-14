@@ -83,9 +83,8 @@ const InstitutionDelivery = () => {
     }
 
     // Verificar se família está vinculada à instituição
-    // As famílias em availableFamilies já são filtradas por useInstitutionFamilies
-    // que só retorna famílias vinculadas à instituição, mas vamos verificar novamente por segurança
-    const familyData = familiesData.find((f: any) => f.id === selectedFamily.id);
+    // As famílias em availableFamilies já são filtradas e só incluem famílias vinculadas
+    const familyData = availableFamilies.find((f: any) => f.id === selectedFamily.id);
     if (!familyData) {
       toast({
         title: "Erro",
@@ -99,9 +98,10 @@ const InstitutionDelivery = () => {
     if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
       const blockedUntil = new Date(selectedFamily.blocked_until);
       if (blockedUntil > new Date()) {
+        const institutionName = (selectedFamily.blocked_by_institution as any)?.name || "outra instituição";
         toast({
-          title: "Erro",
-          description: `Esta família está bloqueada até ${blockedUntil.toLocaleDateString('pt-BR')}. Não é possível registrar entrega enquanto a família estiver bloqueada.`,
+          title: "Família Bloqueada",
+          description: `Esta família já foi atendida pela instituição ${institutionName}. Não é possível realizar nova entrega até ${blockedUntil.toLocaleDateString('pt-BR')}.`,
           variant: "destructive"
         });
         return;

@@ -130,6 +130,20 @@ const DeliveryManagement = () => {
 
   // Open delivery dialog for a family
   const handleDelivery = (family: Family) => {
+    // Verificar se família está bloqueada ANTES de abrir dialog
+    if (isFamilyBlocked(family)) {
+      const blockedUntil = family.blocked_until ? new Date(family.blocked_until) : null;
+      const institutionName = (family.blocked_by_institution as any)?.name || "outra instituição";
+      const blockedUntilFormatted = blockedUntil ? blockedUntil.toLocaleDateString('pt-BR') : "data não definida";
+      
+      toast({
+        title: "Família Bloqueada",
+        description: `Esta família já foi atendida pela instituição ${institutionName}. Não é possível realizar nova entrega até ${blockedUntilFormatted}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSelectedFamily(family);
     form.reset({
       familyId: family.id,
@@ -380,7 +394,9 @@ const DeliveryManagement = () => {
                                   size="sm" 
                                   variant="outline" 
                                   disabled
-                                  title={`Bloqueada até ${formatDate(family.blocked_until)}`}
+                                  title={
+                                    `Esta família já foi atendida pela instituição ${(family.blocked_by_institution as any)?.name || "outra instituição"}. Bloqueada até ${formatDate(family.blocked_until)}`
+                                  }
                                 >
                                   Bloqueada
                                 </Button>

@@ -1,0 +1,87 @@
+Roles-RDN-Fluxos
+
+Regra de negocio principal
+1- usuários:
+Admin: tem acesso total ao sistema, pode gerenciar todas instituições e familias, é o unico que desbloqueia familias manualmente.
+ele cadastra instituições e fornece o login a elas.
+pode cadastrar familias e vincular familias a instuições( mas quem deve fazer isso são as instituições
+Instituição: tem acesso restrito somente a sua instituição. só pode gerenciar e visualizar as familias vinculadas a sua própria instituição, pode registrar entregas, mas não pode desbloquear familias
+a familia cadastrada pela instituição estará vinculada a ela
+
+2- Regra de bloqueio:
+1- uma familia só poderá estar vinculada a apenas uma instituição 
+2- Quando uma instituição (ou Admin) registra uma entrega para uma família, o sistema automaticamente define o status dessa família como "Bloqueada".
+Isso é feito no banco de dados por um trigger (on_delivery_created) que chama a função update_family_blocking após cada inserção na tabela deliveries.
+A família permanece bloqueada por um período configurável (ex: 30, 60, 90 dias).
+3- Enquanto estiver "Bloqueada", a família não pode receber outra cesta de nenhuma instituição, evitando duplicidade.
+ Caso uma instituição tentar realizar a entrega com a familia bloqueada, um erro será gerado, informando que aquela familia já foi atendida pela instituição anterior 
+4- Apenas um Admin pode reverter isso manualmente.( gera um aviso ou um log de reversão? auditabilidade?)
+
+3- Fluxo de Autenticação e Roteamento
+O fluxo de login e o direcionamento do usuário são controlados por uma combinação de React Context (useAuth), Rotas Protegidas (ProtectedRoute) e lógica de redirecionamento.
+Início: O usuário acessa a aplicação. O AuthProvider (src/hooks/useAuth.tsx) é inicializado e verifica se existe uma sessão válida no Supabase.
+Proteção de Rotas: Quase todas as páginas são envoltas pelo ProtectedRoute.
+Verificação: O ProtectedRoute verifica o estado loading do useAuth. Enquanto loading for true, um spinner é exibido. Se, após o carregamento, não houver user ou session, o usuário é redirecionado para /login.
+Login (Sucesso): O usuário insere credenciais na página /login. O useAuth.signIn é chamado.
+Busca de Perfil: O useAuth (através do listener onAuthStateChange) detecta o login, busca o profile do usuário na tabela profiles do Supabase para obter sua role ('admin' ou 'institution').
+Redirecionamento por Role: O próprio useAuth contém uma função redirectUserBasedOnRole que direciona o usuário imediatamente após a busca do perfil.
+Se role === 'admin', ele é enviado para /.
+Se role === 'institution', ele é enviado para /institution/dashboard.
+
+/* Problema Crítico (BLOQUEIO): O projeto está atualmente BLOQUEADO por um problema crítico: o login expira após 106 segundos. Isso ocorre porque as Políticas de RLS (Row Level Security) no Supabase estão causando um deadlock (dependência circular), impedindo que o perfil do usuário seja buscado a tempo.
+Solução Imediata: A solução proposta é desabilitar o RLS temporariamente para permitir o teste do MVP. O arquivo docs/RLS_POLICY_FIX.md contém o script SQL exato que precisa ser executado no painel do Supabase para remover todas as políticas e desabilitar o RLS nas tabelas, resolvendo o problema de login instantaneamente.
+*/
+
+Fluxo de usuários: 
+Admin:
+1- Login ( atualmente teste@admin) faz login
+2- Dashboard: o admin é redirecionado para a rota / que vai renderizar a página index.tsx (dashboard admin)
+3- visualização: o Admin vê estatisticas globais: total de familias cadastradas, instituições ativas, entregas no Mês e familias bloqueadas ( full, de todas as instituições) 
+4- Ações (Navegação): O admin tem acesso total às rotas definidas em App.tsx que exigem allowedRoles={['admin']}:
+/institutions: Gerenciar (criar, editar, excluir) todas as instituições.
+/families: Gerenciar todas as famílias, incluindo a capacidade de desbloquear manualmente uma família.
+/delivery: Registrar entregas em nome de qualquer instituição.
+/reports: Ver relatórios globais.
+
+Instituição:
+Login: A instituição( atualmente teste@instituicao.com) faz login.
+Dashboard: É redirecionado para a rota /institution/dashboard, que renderiza a página InstitutionDashboard.tsx.
+Visualização: O usuário vê estatísticas restritas (escopadas) apenas da sua instituição: Famílias Atendidas (por ela), Entregas no Mês (por ela), Famílias Bloqueadas (por ela) e Total de Entregas (histórico dela).
+Ações (Navegação): O usuário só pode acessar as rotas prefixadas com /institution/:
+/institution/families: Ver apenas as famílias vinculadas à sua instituição.
+
+/institution/delivery: Registrar entregas apenas para suas famílias vinculadas.
+/institution/reports: Ver relatórios apenas de sua instituição.
+
+Acesso Negado: Se este usuário tentar acessar uma rota de admin (ex: /families), o ProtectedRoute verificará que profile.role é 'institution', que não está em allowedRoles={['admin']}. O usuário será então redirecionado de volta para / (a rota raiz), que por sua vez o redireciona para seu dashboard correto (/institution/dashboard).
+
+Fluxo para cadastro de familias:
+
+Regras de Negócio para Criação de Família:
+Se um usuário institution cadastra uma família: A família é criada na tabela families E uma entrada é criada automaticamente na tabela institution_families, vinculando essa nova família à instituição que a cadastrou.
+Se um usuário admin cadastra uma família: A família é criada apenas na tabela families e permanece "desvinculada" (sem entrada na institution_families). O admin pode, posteriormente, criar essa vinculação manualmente.
+
+Sugestão de Fluxo Otimizado (Busca e Vínculo):
+Na página de gerenciamento de famílias da instituição (/institution/families), em vez de ter apenas o botão "Cadastrar Nova Família", poderíamos ter duas ações claras:
+Ação A: "Cadastrar Nova Família" (O fluxo que já conhecemos)
+Ação B: "Adicionar Família Existente" (O novo fluxo proativo)
+Como funcionaria a "Ação B: Adicionar Família Existente":
+A instituição clica em "Adicionar Família Existente".
+O sistema abre um modal ou uma seção de busca. O campo de busca principal deve ser o CPF (pois é o identificador único), com busca secundária por nome.
+A instituição digita o CPF e clica em "Buscar".
+O sistema executa a busca na tabela families e verifica a tabela institution_families.
+O sistema então apresenta um dos 4 cenários possíveis:
+Cenário 1: Família Encontrada e Desvinculada
+O que o sistema vê: Família existe no families, mas não tem nenhum vínculo no institution_families.
+O que o sistema mostra: "Família 'Silva' (CPF: ...xxx) encontrada e sem vínculo. Deseja vincular esta família à sua instituição?"
+Ação: Botão [Vincular].
+Cenário 2: Família Encontrada e JÁ VINCULADA
+O que o sistema vê: Família existe e já tem um vínculo com a Instituição B.
+O que o sistema mostra: "Erro: A família 'Silva' (CPF: ...xxx) já está sendo atendida pela [Nome da Outra Instituição]. Não é possível realizar o vínculo." (Isso reforça a regra de 1 família por 1 instituição).
+Cenário 3: Família Não Encontrada
+O que o sistema vê: Nenhum registro no families com aquele CPF.
+O que o sistema mostra: "Nenhuma família encontrada com este CPF. [Deseja cadastrá-la agora?]"
+Ação: Botão que leva ao formulário de "Cadastrar Nova Família" (Ação A), idealmente já preenchendo o CPF.
+Cenário 4: Família Já Vinculada à Própria Instituição
+O que o sistema vê: Família existe e já está vinculada à instituição que está buscando.
+O que o sistema mostra: "A família 'Silva' (CPF: ...xxx) já está na lista de famílias da sua instituição."

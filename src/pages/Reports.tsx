@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useReportExport } from "@/hooks/useReportExport";
 

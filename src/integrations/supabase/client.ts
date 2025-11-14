@@ -2,8 +2,26 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://eslfcjhnaojghzuswpgz.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzbGZjamhuYW9qZ2h6dXN3cGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4ODcyMzIsImV4cCI6MjA2NDQ2MzIzMn0.NdhfRgC8fvdQ-XxPiVSUkffQiayg0NZnwaixC12Ey5o";
+// Get environment variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!SUPABASE_URL) {
+  throw new Error(
+    'Missing VITE_SUPABASE_URL environment variable. ' +
+    'Please create a .env.local file with your Supabase project URL. ' +
+    'See .env.example for reference.'
+  );
+}
+
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error(
+    'Missing VITE_SUPABASE_ANON_KEY environment variable. ' +
+    'Please create a .env.local file with your Supabase anon key. ' +
+    'See .env.example for reference.'
+  );
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

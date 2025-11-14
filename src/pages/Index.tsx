@@ -9,10 +9,10 @@ import RecentDeliveriesTable from '@/components/RecentDeliveriesTable';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardStats, type AdminStats } from '@/hooks/useDashboardStats';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Building2, Package, AlertTriangle } from 'lucide-react';
+import { Users, Building2, Package, AlertTriangle, Loader2 } from 'lucide-react';
 
 const Index = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
@@ -28,9 +28,13 @@ const Index = () => {
     return null;
   }
 
-  // Se profile ainda não carregou, mostrar loading ou null
-  if (!profile) {
-    return null;
+  // Se ainda está carregando ou profile ainda não carregou, mostrar loading
+  if (loading || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   // Se for instituição, não renderizar nada (será redirecionado)

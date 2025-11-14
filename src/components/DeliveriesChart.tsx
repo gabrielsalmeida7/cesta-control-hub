@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { 
   BarChart, 
   Bar, 
@@ -29,66 +29,6 @@ const DeliveriesChart = () => {
   const { data: deliveriesData, isLoading } = useDeliveriesByInstitution();
   const [showChart, setShowChart] = useState<boolean>(true);
   const [selectedInstitution, setSelectedInstitution] = useState<string>("all");
-  
-  const { data: deliveries = [], isLoading: deliveriesLoading } = useDeliveries();
-  const { data: institutions = [], isLoading: institutionsLoading } = useInstitutions();
-
-  // Process deliveries data to group by month and institution
-  const chartData = useMemo(() => {
-    if (!deliveries || deliveries.length === 0) {
-      return [];
-    }
-
-    // Get last 6 months
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho'];
-    const now = new Date();
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      return {
-        month: months[i],
-        monthName: monthNames[i],
-        monthIndex: date.getMonth(),
-        year: date.getFullYear()
-      };
-    });
-
-    // Initialize data structure
-    const dataMap: Record<string, Record<string, number>> = {};
-    last6Months.forEach(({ month }) => {
-      dataMap[month] = {};
-      institutions.forEach(inst => {
-        dataMap[month][inst.name] = 0;
-      });
-    });
-
-    // Count deliveries by month and institution
-    deliveries.forEach((delivery: any) => {
-      if (!delivery.delivery_date || !delivery.institution) return;
-      
-      const deliveryDate = new Date(delivery.delivery_date);
-      const monthIndex = deliveryDate.getMonth();
-      const year = deliveryDate.getFullYear();
-      
-      const monthData = last6Months.find(m => 
-        m.monthIndex === monthIndex && m.year === year
-      );
-      
-      if (monthData && delivery.institution.name) {
-        const institutionName = delivery.institution.name;
-        if (!dataMap[monthData.month][institutionName]) {
-          dataMap[monthData.month][institutionName] = 0;
-        }
-        dataMap[monthData.month][institutionName]++;
-      }
-    });
-
-    // Convert to array format for chart
-    return last6Months.map(({ month }) => ({
-      name: month,
-      ...dataMap[month]
-    }));
-  }, [deliveries, institutions]);
 
   // Cores para as instituições
   const institutionColors = [

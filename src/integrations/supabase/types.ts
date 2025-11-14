@@ -64,42 +64,57 @@ export type Database = {
       }
       families: {
         Row: {
+          address: string | null
           block_reason: string | null
           blocked_by_institution_id: string | null
           blocked_until: string | null
           contact_person: string
+          cpf: string | null
           created_at: string | null
           id: string
           is_blocked: boolean | null
           members_count: number | null
           name: string
           phone: string | null
+          unblock_reason: string | null
+          unblocked_at: string | null
+          unblocked_by_user_id: string | null
           updated_at: string | null
         }
         Insert: {
+          address?: string | null
           block_reason?: string | null
           blocked_by_institution_id?: string | null
           blocked_until?: string | null
           contact_person: string
+          cpf?: string | null
           created_at?: string | null
           id?: string
           is_blocked?: boolean | null
           members_count?: number | null
           name: string
           phone?: string | null
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by_user_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          address?: string | null
           block_reason?: string | null
           blocked_by_institution_id?: string | null
           blocked_until?: string | null
           contact_person?: string
+          cpf?: string | null
           created_at?: string | null
           id?: string
           is_blocked?: boolean | null
           members_count?: number | null
           name?: string
           phone?: string | null
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by_user_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -149,25 +164,31 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string | null
+          email: string | null
           id: string
           name: string
           phone: string | null
+          responsible_name: string | null
           updated_at: string | null
         }
         Insert: {
           address?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           name: string
           phone?: string | null
+          responsible_name?: string | null
           updated_at?: string | null
         }
         Update: {
           address?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
           name?: string
           phone?: string | null
+          responsible_name?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -223,6 +244,14 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      link_institution_user: {
+        Args: { p_institution_id: string; p_responsible_name: string; p_user_id: string }
+        Returns: boolean
+      }
+      validate_institution_user_creation: {
+        Args: { p_email: string }
+        Returns: boolean
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
@@ -230,6 +259,10 @@ export type Database = {
       is_bypass_user: {
         Args: { user_id: string }
         Returns: boolean
+      }
+      validate_delivery: {
+        Args: { p_family_id: string; p_institution_id: string }
+        Returns: Json
       }
     }
     Enums: {

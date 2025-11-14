@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const ADMIN_SEED_EMAIL = 'admin@teste.com';
+  const ADMIN_SEED_EMAIL = 'teste@admin.com';
   const maybeBootstrapAdmin = async (email?: string | null) => {
     try {
       if (email && email.toLowerCase() === ADMIN_SEED_EMAIL) {
@@ -42,22 +42,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Helper function to redirect user based on role
-  const redirectUserBasedOnRole = (role: 'admin' | 'institution') => {
-    if (typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
-      
-      if (role === 'admin' && !currentPath.startsWith('/institution')) {
-        // Admin users go to main dashboard if not already there
-        if (currentPath === '/login') {
-          window.location.href = '/';
+  // Helper function to validate role
+  const isValidRole = (role: any): role is 'admin' | 'institution' => {
+    return role === 'admin' || role === 'institution';
+  };
+
+  // Helper function to reload profile from database
+  const reloadProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.error('[AUTH] Error reloading profile:', error);
         }
-      } else if (role === 'institution') {
-        // Institution users go to institution dashboard
-        if (!currentPath.startsWith('/institution')) {
-          window.location.href = '/institution/dashboard';
-        }
+        return null;
       }
+
+      if (profileData) {
+        setProfile(profileData);
+        return profileData;
+      }
+
+      return null;
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[AUTH] Unexpected error reloading profile:', err);
+      }
+      return null;
     }
   };
 
@@ -86,29 +102,109 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setProfile(null);
               } else if (profileData) {
                 setProfile(profileData);
-                await maybeBootstrapAdmin(session.user!.email);
-                redirectUserBasedOnRole(profileData.role);
+                // Bootstrap admin and reload profile if bootstrap was executed
+                const shouldBootstrap = session.user!.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+                if (shouldBootstrap) {
+                  await maybeBootstrapAdmin(session.user!.email);
+                  // Reload profile after bootstrap to get updated role
+                  await reloadProfile(session.user!.id);
+                }
               } else {
               // Ensure profile exists
+              // Determine default role based on email
+              const userEmail = session.user!.email?.toLowerCase() || '';
+              const defaultRole: 'admin' | 'institution' = userEmail === ADMIN_SEED_EMAIL ? 'admin' : 'institution';
+              
               const insertPayload = {
                 id: session.user!.id,
                 email: session.user!.email,
                 full_name: (session.user!.user_metadata as any)?.full_name || 'Usuário',
+                role: defaultRole,
               } as any;
 
-              const { data: inserted, error: insertError } = await supabase
-                .from('profiles')
-                .insert(insertPayload)
-                .select('*')
-                .maybeSingle();
+              // Retry logic for profile creation (max 2 retries)
+              let retryCount = 0;
+              const maxRetries = 2;
+              let inserted = null;
+              let insertError = null;
 
-                if (insertError) {
-                  console.error('Error creating profile:', insertError);
-                } else if (inserted) {
-                  setProfile(inserted);
-                  await maybeBootstrapAdmin(session.user!.email);
-                  redirectUserBasedOnRole(inserted.role);
+              while (retryCount <= maxRetries && !inserted) {
+                const { data, error } = await supabase
+                  .from('profiles')
+                  .insert(insertPayload)
+                  .select('*')
+                  .maybeSingle();
+
+                if (error) {
+                  insertError = error;
+                  if (import.meta.env.DEV) {
+                    console.error(`[PROFILE] Error creating profile (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
+                      error: error.message,
+                      code: error.code,
+                      timestamp: new Date().toISOString()
+                    });
+                  }
+                  
+                  // If it's a duplicate key error, try to fetch existing profile instead
+                  if (error.code === '23505' && retryCount < maxRetries) {
+                    if (import.meta.env.DEV) {
+                      console.log('[PROFILE] Profile might already exist, attempting to fetch...');
+                    }
+                    const { data: existingProfile } = await supabase
+                      .from('profiles')
+                      .select('*')
+                      .eq('id', session.user!.id)
+                      .maybeSingle();
+                    
+                    if (existingProfile) {
+                      inserted = existingProfile;
+                      insertError = null;
+                      break;
+                    }
+                  }
+                  
+                  retryCount++;
+                  if (retryCount <= maxRetries) {
+                    // Wait a bit before retrying (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+                  }
+                } else {
+                  inserted = data;
+                  insertError = null;
                 }
+              }
+
+              if (insertError) {
+                const errorMessage = insertError.message || 'Erro desconhecido ao criar perfil';
+                if (import.meta.env.DEV) {
+                  console.error('[PROFILE] Failed to create profile after retries:', {
+                    error: errorMessage,
+                    code: insertError.code,
+                    timestamp: new Date().toISOString()
+                  });
+                }
+                toast({
+                  title: "Erro ao criar perfil",
+                  description: errorMessage,
+                  variant: "destructive",
+                });
+                setProfile(null);
+              } else if (inserted) {
+                setProfile(inserted);
+                // Try to bootstrap admin, but don't fail if it doesn't work
+                const shouldBootstrap = session.user!.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+                if (shouldBootstrap) {
+                  try {
+                    await maybeBootstrapAdmin(session.user!.email);
+                    // Reload profile after bootstrap to get updated role
+                    await reloadProfile(session.user!.id);
+                  } catch (bootstrapError) {
+                    if (import.meta.env.DEV) {
+                      console.warn('[PROFILE] Bootstrap admin failed, but profile was created:', bootstrapError);
+                    }
+                  }
+                }
+              }
             }
           } catch (err) {
             console.error('Error in profile ensure:', err);
@@ -144,6 +240,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } else if (fetchedProfile) {
             profileData = fetchedProfile;
             setProfile(fetchedProfile);
+            // Bootstrap admin and reload profile if bootstrap was executed
+            const shouldBootstrap = authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+            if (shouldBootstrap) {
+              await maybeBootstrapAdmin(authSession.user.email);
+              // Reload profile after bootstrap to get updated role
+              await reloadProfile(authSession.user.id);
+            }
+          } else {
+            // Profile doesn't exist, create it (same logic as onAuthStateChange)
+            const userEmail = authSession.user.email?.toLowerCase() || '';
+            const defaultRole: 'admin' | 'institution' = userEmail === ADMIN_SEED_EMAIL ? 'admin' : 'institution';
+            
+            const insertPayload = {
+              id: authSession.user.id,
+              email: authSession.user.email,
+              full_name: (authSession.user.user_metadata as any)?.full_name || 'Usuário',
+              role: defaultRole,
+            } as any;
+
+            const { data: inserted, error: insertError } = await supabase
+              .from('profiles')
+              .insert(insertPayload)
+              .select('*')
+              .maybeSingle();
+
+            if (insertError) {
+              console.error('Error creating profile in initializeAuth:', insertError);
+              setProfile(null);
+            } else if (inserted) {
+              profileData = inserted;
+              setProfile(inserted);
+              // Bootstrap admin and reload profile if bootstrap was executed
+              const shouldBootstrap = authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+              if (shouldBootstrap) {
+                try {
+                  await maybeBootstrapAdmin(authSession.user.email);
+                  // Reload profile after bootstrap to get updated role
+                  await reloadProfile(authSession.user.id);
+                } catch (bootstrapError) {
+                  if (import.meta.env.DEV) {
+                    console.warn('[PROFILE] Bootstrap admin failed in initializeAuth:', bootstrapError);
+                  }
+                }
+              }
+            }
           }
         }
 
@@ -196,11 +337,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email,
             timestamp: new Date().toISOString()
           });
+          
+          // Log mais detalhes para debug
+          console.error("[AUTH]", "Error details:", error);
+        }
+
+        // Mensagens de erro mais específicas
+        let errorMessage = error.message;
+        if (error.status === 400) {
+          if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
+            errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.';
+          } else if (error.message.includes('Email rate limit')) {
+            errorMessage = 'Muitas tentativas de login. Aguarde alguns minutos.';
+          } else {
+            errorMessage = `Erro de autenticação: ${error.message}`;
+          }
         }
 
         toast({
           title: "Erro no login",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
         return { error };

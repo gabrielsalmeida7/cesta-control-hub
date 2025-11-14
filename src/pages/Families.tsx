@@ -4,44 +4,113 @@ import Footer from "@/components/Footer";
 import { Users, UserPlus, Search, Lock, Unlock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "@/hooks/use-toast";
-import { useFamilies, useUpdateFamily } from "@/hooks/useFamilies";
-import type { Tables } from "@/integrations/supabase/types";
+import { useFamilies, useUpdateFamily, useCreateFamily } from "@/hooks/useFamilies";
+import { useAuth } from "@/hooks/useAuth";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import FamilyInstitutionAssociation from "@/components/FamilyInstitutionAssociation";
+import FamilyInstitutionLink from "@/components/FamilyInstitutionLink";
+import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { formatDateTimeBrasilia } from "@/utils/dateFormat";
 
 type Family = Tables<'families'> & {
   blocked_by_institution?: { name: string } | null;
+  unblocked_by_user?: {
+    id: string;
+    email?: string;
+    full_name?: string;
+  } | null;
 };
 
 const Families = () => {
   const { data: families, isLoading } = useFamilies();
   const updateFamily = useUpdateFamily();
+  const createFamilyMutation = useCreateFamily();
+  const updateFamilyMutation = useUpdateFamily();
 
   // Dialog states
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isUnblockDialogOpen, setIsUnblockDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [unblockReason, setUnblockReason] = useState("");
+  
+  const { user } = useAuth();
+
+  // Função para formatar CPF
+  const formatCpf = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
+  // Forms
+  const createForm = useForm<TablesInsert<'families'>>({
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      phone: "",
+      cpf: "",
+      address: "",
+      members_count: 1,
+      is_blocked: false,
+    }
+  });
+
+  const editForm = useForm<TablesInsert<'families'>>({
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      phone: "",
+      cpf: "",
+      address: "",
+      members_count: 1,
+      is_blocked: false,
+    }
+  });
 
   // Filter families based on search term
-  const filteredFamilies = families?.filter(family =>
-    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredFamilies = families?.filter(family => {
+    const searchLower = searchTerm.toLowerCase();
+    const searchNumbers = searchTerm.replace(/\D/g, '');
+    return (
+      family.name.toLowerCase().includes(searchLower) ||
+      family.contact_person.toLowerCase().includes(searchLower) ||
+      (family.cpf && family.cpf.replace(/\D/g, '').includes(searchNumbers))
+    );
+  }) || [];
 
   // Function to unblock a family
   const handleUnblock = (family: Family) => {
     setSelectedFamily(family);
+    setUnblockReason("");
     setIsUnblockDialogOpen(true);
   };
 
   // Function to confirm family unblock
   const confirmUnblock = () => {
     if (!selectedFamily) return;
+    
+    // Validar justificativa obrigatória
+    if (!unblockReason.trim()) {
+      toast({
+        title: "Justificativa obrigatória",
+        description: "Por favor, informe o motivo do desbloqueio manual.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     updateFamily.mutate(
       { 
@@ -50,13 +119,17 @@ const Families = () => {
           is_blocked: false, 
           blocked_until: null,
           blocked_by_institution_id: null,
-          block_reason: null
+          block_reason: null,
+          unblock_reason: unblockReason.trim(),
+          unblocked_by_user_id: user?.id || null,
+          unblocked_at: new Date().toISOString()
         } 
       },
       {
         onSuccess: () => {
           setIsUnblockDialogOpen(false);
           setSelectedFamily(null);
+          setUnblockReason("");
           toast({
             title: "Família desbloqueada",
             description: `A família ${selectedFamily.name} foi desbloqueada com sucesso.`
@@ -80,8 +153,14 @@ const Families = () => {
 
   // Function to submit create family form
   const onSubmitCreate = (data: TablesInsert<'families'>) => {
+    // Limpar CPF (remover máscara) antes de salvar
+    const familyData = {
+      ...data,
+      cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
+    };
+    
     createFamilyMutation.mutate({
-      family: data,
+      family: familyData,
       institutionId: undefined // Admin não vincula automaticamente
     }, {
       onSuccess: () => {
@@ -94,10 +173,14 @@ const Families = () => {
   // Function to handle editing a family
   const handleEditFamily = (family: Family) => {
     setSelectedFamily(family);
+    // Formatar CPF com máscara para exibição no formulário
+    const formattedCpf = family.cpf ? formatCpf(family.cpf) : "";
     editForm.reset({
       name: family.name,
       contact_person: family.contact_person,
       phone: family.phone || "",
+      cpf: formattedCpf,
+      address: family.address || "",
       members_count: family.members_count || 1,
       is_blocked: family.is_blocked || false,
     });
@@ -108,9 +191,15 @@ const Families = () => {
   const onSubmitEdit = (data: TablesInsert<'families'>) => {
     if (!selectedFamily) return;
     
+    // Limpar CPF (remover máscara) antes de salvar
+    const familyData = {
+      ...data,
+      cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
+    };
+    
     updateFamilyMutation.mutate({
       id: selectedFamily.id,
-      updates: data
+      updates: familyData
     }, {
       onSuccess: () => {
         setIsEditDialogOpen(false);
@@ -240,7 +329,7 @@ const Families = () => {
                   <p>{selectedFamily.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-500">Pessoa de Contato</p>
+                  <p className="text-sm font-semibold text-gray-500">Pessoa de Contato(Titular da Família)</p>
                   <p>{selectedFamily.contact_person}</p>
                 </div>
               </div>
@@ -251,10 +340,24 @@ const Families = () => {
                   <p>{selectedFamily.phone || "Não informado"}</p>
                 </div>
                 <div>
+                  <p className="text-sm font-semibold text-gray-500">CPF</p>
+                  <p>{selectedFamily.cpf ? formatCpf(selectedFamily.cpf) : "Não informado"}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <p className="text-sm font-semibold text-gray-500">Membros</p>
                   <p>{selectedFamily.members_count || 1} pessoas</p>
                 </div>
               </div>
+              
+              {selectedFamily.address && (
+                <div>
+                  <p className="text-sm font-semibold text-gray-500">Endereço</p>
+                  <p>{selectedFamily.address}</p>
+                </div>
+              )}
               
               <div>
                 <p className="text-sm font-semibold text-gray-500">Status</p>
@@ -287,6 +390,37 @@ const Families = () => {
                 </>
               )}
 
+              {/* Auditoria de Desbloqueio */}
+              {(selectedFamily.unblock_reason || selectedFamily.unblocked_by_user_id || selectedFamily.unblocked_at) && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-800 mb-3">Auditoria de Desbloqueio Manual</h4>
+                  <div className="space-y-2 text-sm">
+                    {selectedFamily.unblocked_at && (
+                      <div>
+                        <p className="font-semibold text-gray-700">Data e Hora do Desbloqueio:</p>
+                        <p className="text-gray-600">{formatDateTimeBrasilia(selectedFamily.unblocked_at)}</p>
+                      </div>
+                    )}
+                    {selectedFamily.unblocked_by_user && (
+                      <div>
+                        <p className="font-semibold text-gray-700">Desbloqueado por:</p>
+                        <p className="text-gray-600">
+                          {selectedFamily.unblocked_by_user.full_name || 
+                           selectedFamily.unblocked_by_user.email || 
+                           'Usuário não identificado'}
+                        </p>
+                      </div>
+                    )}
+                    {selectedFamily.unblock_reason && (
+                      <div>
+                        <p className="font-semibold text-gray-700">Motivo do Desbloqueio:</p>
+                        <p className="text-gray-600">{selectedFamily.unblock_reason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Institution Association */}
               <div>
                 <p className="text-sm font-semibold text-gray-500 mb-3">Associações com Instituições</p>
@@ -309,34 +443,65 @@ const Families = () => {
       
       {/* Unblock Confirmation Dialog */}
       <Dialog open={isUnblockDialogOpen} onOpenChange={setIsUnblockDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Confirmar Desbloqueio</DialogTitle>
+            <DialogTitle>Confirmar Desbloqueio Manual</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
-            <div className="py-4">
-              <p>
-                Tem certeza que deseja desbloquear a família <strong>{selectedFamily.name}</strong>?
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Esta ação permitirá que a família receba cestas básicas novamente.
-              </p>
+            <div className="py-4 space-y-4">
+              <div>
+                <p>
+                  Tem certeza que deseja desbloquear a família <strong>{selectedFamily.name}</strong>?
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Esta ação permitirá que a família receba cestas básicas novamente.
+                </p>
+              </div>
+              
+              <div>
+                <label htmlFor="unblock-reason" className="text-sm font-medium text-gray-700 block mb-2">
+                  Justificativa do Desbloqueio <span className="text-red-500">*</span>
+                </label>
+                <Textarea
+                  id="unblock-reason"
+                  placeholder="Informe o motivo do desbloqueio manual desta família..."
+                  value={unblockReason}
+                  onChange={(e) => setUnblockReason(e.target.value)}
+                  rows={4}
+                  className="w-full"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Este campo é obrigatório para auditoria e rastreabilidade.
+                </p>
+              </div>
             </div>
           )}
           
           <DialogFooter>
             <Button 
               variant="outline" 
-              onClick={() => setIsUnblockDialogOpen(false)}
+              onClick={() => {
+                setIsUnblockDialogOpen(false);
+                setUnblockReason("");
+              }}
             >
               Cancelar
             </Button>
             <Button 
               className="bg-red-500 hover:bg-red-600" 
               onClick={confirmUnblock}
+              disabled={updateFamily.isPending || !unblockReason.trim()}
             >
-              Desbloquear
+              {updateFamily.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Desbloqueando...
+                </>
+              ) : (
+                "Desbloquear"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -354,7 +519,6 @@ const Families = () => {
               <FormField
                 control={createForm.control}
                 name="name"
-                rules={{ required: "Nome é obrigatório" }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nome da Família</FormLabel>
@@ -369,12 +533,36 @@ const Families = () => {
               <FormField
                 control={createForm.control}
                 name="contact_person"
-                rules={{ required: "Pessoa de contato é obrigatória" }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pessoa de Contato</FormLabel>
+                    <FormLabel>Pessoa de Contato(Titular da Família)</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF (opcional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formatted = formatCpf(e.target.value);
+                          // Salvar apenas números no banco
+                          const numbers = formatted.replace(/\D/g, '');
+                          field.onChange(numbers.length === 11 ? numbers : formatted);
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -397,11 +585,21 @@ const Families = () => {
               
               <FormField
                 control={createForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço (opcional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={createForm.control}
                 name="members_count"
-                rules={{ 
-                  required: "Número de membros é obrigatório",
-                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
-                }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de Membros</FormLabel>
@@ -458,7 +656,6 @@ const Families = () => {
               <FormField
                 control={editForm.control}
                 name="name"
-                rules={{ required: "Nome é obrigatório" }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nome da Família</FormLabel>
@@ -473,12 +670,36 @@ const Families = () => {
               <FormField
                 control={editForm.control}
                 name="contact_person"
-                rules={{ required: "Pessoa de contato é obrigatória" }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pessoa de Contato</FormLabel>
+                    <FormLabel>Pessoa de Contato(Titular da Família)</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF (opcional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formatted = formatCpf(e.target.value);
+                          // Salvar apenas números no banco
+                          const numbers = formatted.replace(/\D/g, '');
+                          field.onChange(numbers.length === 11 ? numbers : formatted);
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -501,11 +722,21 @@ const Families = () => {
               
               <FormField
                 control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço (opcional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
                 name="members_count"
-                rules={{ 
-                  required: "Número de membros é obrigatório",
-                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
-                }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de Membros</FormLabel>
