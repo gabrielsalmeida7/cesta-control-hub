@@ -12,9 +12,8 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
   const navigate = useNavigate();
-  const { signIn, signUp, user, profile, loading: authLoading } = useAuth();
+  const { signIn, user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   // Redirect if already logged in based on user role
@@ -46,14 +45,52 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const action = isSignup ? signUp : signIn;
-    const { error } = await action(email, password);
+    const { error } = await signIn(email, password);
     
     setLoading(false);
     
-    // For signup, the hook will show a toast to verify email
-    if (!error && !isSignup) {
-      // Let the auth state change handle the redirect
+    if (error) {
+      // Error handling is done in the signIn hook via toast
+    }
+  };
+
+  const handleForgotPassword = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast({ 
+        title: "Email necessário", 
+        description: "Por favor, informe seu email para receber o link de redefinição de senha.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { 
+        redirectTo 
+      });
+      
+      if (error) {
+        toast({ 
+          title: "Erro ao enviar email", 
+          description: error.message, 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Email enviado", 
+          description: "Verifique sua caixa de entrada. Um link para redefinir sua senha foi enviado para o email informado." 
+        });
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro ao processar sua solicitação. Tente novamente.";
+      toast({ 
+        title: "Erro inesperado", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -104,27 +141,7 @@ const Login = () => {
                   <a 
                     href="#" 
                     className="text-sm text-primary hover:underline"
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      const { supabase } = await import("@/integrations/supabase/client");
-                      const { useToast } = await import("@/hooks/use-toast");
-                      const { toast } = useToast();
-                      if (!email) {
-                        toast({ title: "Informe seu email", description: "Preencha o campo de email para receber o link de redefinição.", variant: "destructive" });
-                        return;
-                      }
-                      try {
-                        const redirectTo = `${window.location.origin}/reset-password`;
-                        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-                        if (error) {
-                          toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
-                        } else {
-                          toast({ title: "Email enviado", description: "Verifique sua caixa de entrada para redefinir a senha." });
-                        }
-                      } catch (err: any) {
-                        toast({ title: "Erro inesperado", description: err?.message || String(err), variant: "destructive" });
-                      }
-                    }}
+                    onClick={handleForgotPassword}
                   >
                     Esqueceu a senha?
                   </a>
@@ -144,26 +161,8 @@ const Login = () => {
                 className="w-full bg-primary hover:bg-primary/90" 
                 disabled={loading || authLoading}
               >
-                {loading ? (isSignup ? "Cadastrando..." : "Entrando...") : (isSignup ? "Cadastrar" : "Entrar")}
+                {loading ? "Entrando..." : "Entrar"}
               </Button>
-
-              <p className="text-center text-sm text-gray-600 mt-2">
-                {isSignup ? (
-                  <>
-                    Já tem uma conta?{' '}
-                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(false); }}>
-                      Entrar
-                    </a>
-                  </>
-                ) : (
-                  <>
-                    Não tem conta?{' '}
-                    <a href="#" className="text-primary hover:underline" onClick={(e) => { e.preventDefault(); setIsSignup(true); }}>
-                      Cadastre-se
-                    </a>
-                  </>
-                )}
-              </p>
             </form>
 
           </CardContent>

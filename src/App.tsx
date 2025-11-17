@@ -17,6 +17,7 @@ import InstitutionDashboard from "./pages/institution/InstitutionDashboard";
 import InstitutionFamilies from "./pages/institution/InstitutionFamilies";
 import InstitutionReports from "./pages/institution/InstitutionReports";
 import InstitutionDelivery from "./pages/institution/InstitutionDelivery";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => {
               <Sonner />
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route 
                   path="/" 
                   element={

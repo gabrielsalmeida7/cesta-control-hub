@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
-import { Users, UserPlus, Search, Lock, Unlock, Loader2 } from "lucide-react";
+import { Users, UserPlus, Search, Lock, Unlock, Loader2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -301,55 +301,88 @@ const Families = () => {
                       <TableHead>Telefone</TableHead>
                       <TableHead>Membros</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Última Entrega</TableHead>
                       <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedFamilies.length > 0 ? (
-                      paginatedFamilies.map((family) => (
-                      <TableRow key={family.id}>
-                        <TableCell className="font-medium">{family.name}</TableCell>
-                        <TableCell>{family.contact_person}</TableCell>
-                        <TableCell>{family.phone || "Não informado"}</TableCell>
-                        <TableCell>{family.members_count || 1}</TableCell>
-                        <TableCell>
-                          {!family.is_blocked ? (
-                            <Badge className="bg-green-500">Ativa</Badge>
-                          ) : (
-                            <Badge className="bg-red-500">
-                              <Lock className="h-3 w-3 mr-1" /> 
-                              Bloqueada
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleViewDetails(family)}
-                            >
-                              Detalhes
-                            </Button>
-                            {family.is_blocked && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleUnblock(family)}
-                                className="border-red-500 text-red-500 hover:bg-red-50"
-                                disabled={updateFamily.isPending}
-                              >
-                                <Unlock className="h-3 w-3 mr-1" /> 
-                                {updateFamily.isPending ? "..." : "Desbloquear"}
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      ))
+                      paginatedFamilies.map((family) => {
+                        // Calcular última entrega global (de qualquer instituição)
+                        const deliveries = (family as any).deliveries || [];
+                        const sortedDeliveries = deliveries
+                          .filter((d: any) => d.delivery_date)
+                          .sort((a: any, b: any) => {
+                            const dateA = new Date(a.delivery_date).getTime();
+                            const dateB = new Date(b.delivery_date).getTime();
+                            return dateB - dateA;
+                          });
+                        const lastDelivery = sortedDeliveries[0];
+                        const lastDeliveryInstitution = lastDelivery?.institution?.name || 'Instituição não identificada';
+                        
+                        return (
+                          <TableRow key={family.id}>
+                            <TableCell className="font-medium">{family.name}</TableCell>
+                            <TableCell>{family.contact_person}</TableCell>
+                            <TableCell>{family.phone || "Não informado"}</TableCell>
+                            <TableCell>{family.members_count || 1}</TableCell>
+                            <TableCell>
+                              {!family.is_blocked ? (
+                                <Badge className="bg-green-500">Ativa</Badge>
+                              ) : (
+                                <Badge className="bg-red-500">
+                                  <Lock className="h-3 w-3 mr-1" /> 
+                                  Bloqueada
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {lastDelivery ? (
+                                <div>
+                                  <p className="text-sm">{formatDateTimeBrasilia(lastDelivery.delivery_date)}</p>
+                                  <p className="text-xs text-gray-500">{lastDeliveryInstitution}</p>
+                                </div>
+                              ) : (
+                                <span className="text-gray-500">Nunca</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleViewDetails(family)}
+                                >
+                                  Detalhes
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleEditFamily(family)}
+                                >
+                                  <Edit className="h-3 w-3 mr-1" />
+                                  Editar
+                                </Button>
+                                {family.is_blocked && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleUnblock(family)}
+                                    className="border-red-500 text-red-500 hover:bg-red-50"
+                                    disabled={updateFamily.isPending}
+                                  >
+                                    <Unlock className="h-3 w-3 mr-1" /> 
+                                    {updateFamily.isPending ? "..." : "Desbloquear"}
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                           Nenhuma família encontrada
                         </TableCell>
                       </TableRow>

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useFamilies } from '@/hooks/useFamilies';
+import { useInstitutionFamilies } from '@/hooks/useFamilies';
 import { useCreateDelivery } from '@/hooks/useInstitutionDeliveries';
 import { useAuth } from '@/hooks/useAuth';
 import FraudAlertDialog from '@/components/FraudAlertDialog';
@@ -34,15 +34,12 @@ const InstitutionDelivery = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
   
-  const { data: families = [], isLoading } = useFamilies();
+  const { data: families = [], isLoading } = useInstitutionFamilies(profile?.institution_id);
   const createDeliveryMutation = useCreateDelivery();
 
-  // Filtrar famílias vinculadas à instituição (incluindo bloqueadas)
-  const availableFamilies = families.filter(family => {
-    return family.institution_families?.some((if_relation: any) => 
-      if_relation.institution_id === profile?.institution_id
-    );
-  });
+  // As famílias já vêm filtradas pela instituição do hook useInstitutionFamilies
+  // Incluindo bloqueadas (podem ser entregues com justificativa)
+  const availableFamilies = families || [];
 
   const filteredFamilies = availableFamilies.filter(family =>
     family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -85,7 +82,7 @@ const InstitutionDelivery = () => {
     }
 
     // Verificar se família está vinculada à instituição
-    // As famílias em availableFamilies já são filtradas e só incluem famílias vinculadas
+    // useInstitutionFamilies já retorna apenas famílias vinculadas, mas validamos por segurança
     const familyData = availableFamilies.find((f: any) => f.id === selectedFamily.id);
     if (!familyData) {
       toast({
@@ -251,9 +248,11 @@ const InstitutionDelivery = () => {
                   </div>
                 )}
                 
-                {filteredFamilies.length === 0 && searchTerm && (
+                {filteredFamilies.length === 0 && !isLoading && (
                   <p className="text-center text-gray-500 py-4">
-                    Nenhuma família encontrada
+                    {searchTerm 
+                      ? "Nenhuma família encontrada com o termo de busca"
+                      : "Nenhuma família cadastrada. Cadastre uma família primeiro na aba 'Famílias'."}
                   </p>
                 )}
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrentDateBrasilia } from '@/utils/dateFormat';
 
 export const useInstitutionDeliveries = (startDate?: string, endDate?: string) => {
   const { profile } = useAuth();
@@ -111,7 +112,7 @@ export const useCreateDelivery = () => {
           delivered_by_user_id: user?.id || null,
           notes: data.notes,
           blocking_justification: data.blocking_justification || null,
-          delivery_date: new Date().toISOString().split('T')[0],
+          delivery_date: getCurrentDateBrasilia(),
         });
 
       if (error) throw error;

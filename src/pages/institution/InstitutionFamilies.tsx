@@ -2,16 +2,16 @@
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
-import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution } from '@/hooks/useFamilies';
+import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution, useUpdateFamily } from '@/hooks/useFamilies';
 import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,7 @@ const InstitutionFamilies = () => {
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [familyToUnlink, setFamilyToUnlink] = useState<Family | null>(null);
@@ -45,10 +46,45 @@ const InstitutionFamilies = () => {
   
   const { profile } = useAuth();
   const { data: familiesData = [], isLoading: familiesLoading, error } = useInstitutionFamilies(profile?.institution_id);
-  const { data: deliveries = [] } = useDeliveries(profile?.institution_id);
+  const { data: deliveriesFromHook = [] } = useDeliveries(profile?.institution_id);
   const createFamilyMutation = useCreateFamily();
+  const updateFamilyMutation = useUpdateFamily();
   const disassociateMutation = useDisassociateFamilyFromInstitution();
   const { toast } = useToast();
+  
+  // Usar deliveries das famílias (que já vêm da query) como fonte primária
+  // Essas deliveries já incluem TODAS as entregas (de qualquer instituição) para cada família
+  const allDeliveries = useMemo(() => {
+    const deliveriesFromFamilies: any[] = [];
+    familiesData.forEach((family: any) => {
+      if (family.deliveries && Array.isArray(family.deliveries)) {
+        family.deliveries.forEach((delivery: any) => {
+          // Adicionar family_id se não estiver presente
+          if (!delivery.family_id) {
+            delivery.family_id = family.id;
+          }
+          deliveriesFromFamilies.push(delivery);
+        });
+      }
+    });
+    
+    // Usar apenas deliveries das famílias (que já incluem todas as entregas globais)
+    // Não precisamos filtrar por institution_id aqui - queremos mostrar a última entrega GLOBAL
+    // O hook useDeliveries filtra por institution_id, então não vamos usá-lo para a última entrega global
+    
+    if (import.meta.env.DEV) {
+      console.log('[InstitutionFamilies] All deliveries from families (global):', {
+        total: deliveriesFromFamilies.length,
+        byInstitution: deliveriesFromFamilies.reduce((acc, d) => {
+          const instId = d.institution_id || 'unknown';
+          acc[instId] = (acc[instId] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+    }
+    
+    return deliveriesFromFamilies;
+  }, [familiesData]);
 
   // Função para formatar CPF
   const formatCpf = (value: string): string => {
@@ -72,22 +108,87 @@ const InstitutionFamilies = () => {
     }
   });
 
+  // Form for editing family
+  const editForm = useForm<TablesInsert<'families'>>({
+    defaultValues: {
+      name: "",
+      contact_person: "",
+      phone: "",
+      cpf: "",
+      address: "",
+      members_count: 1,
+      is_blocked: false,
+    }
+  });
+
   // Map families data and enrich with last delivery info
   const families = useMemo(() => {
+    if (import.meta.env.DEV) {
+      console.log('[InstitutionFamilies] Mapping families:', {
+        familiesCount: familiesData.length,
+        deliveriesCount: allDeliveries.length,
+        institutionId: profile?.institution_id,
+        deliveries: allDeliveries.map(d => ({ id: d.id, family_id: d.family_id, institution_id: d.institution_id }))
+      });
+    }
+    
+    if (!allDeliveries || allDeliveries.length === 0) {
+      // Se não há entregas, retornar famílias sem última entrega
+      return familiesData.map((family) => ({
+        id: family.id,
+        family_name: family.name || family.contact_person || 'N/A',
+        main_cpf: family.cpf || '',
+        address: family.address || 'Não informado',
+        members_count: family.members_count || 0,
+        is_blocked: family.is_blocked || false,
+        blocked_until: family.blocked_until || undefined,
+        block_reason: family.block_reason || undefined,
+        blocked_by_institution: (family.blocked_by_institution as { name?: string } | null | undefined)?.name || undefined,
+        last_delivery_date: undefined,
+        last_delivery_institution: undefined,
+        name: family.name,
+        contact_person: family.contact_person,
+        phone: family.phone,
+        cpf: family.cpf,
+        ...family
+      }));
+    }
+
     return familiesData.map((family) => {
-      // Find last delivery for this family from THIS institution only
-      // useDeliveries already filters by institution_id, but let's ensure we're using the right data
-      const familyDeliveries = deliveries
+      // Find last delivery for this family GLOBALLY (de qualquer instituição)
+      // Similar ao comportamento do admin - mostrar última entrega global
+      const familyDeliveries = allDeliveries
         .filter((d) => {
-          // Ensure delivery is for this family AND from this institution
-          return d.family_id === family.id && 
-                 d.institution_id === profile?.institution_id &&
-                 d.institution?.id === profile?.institution_id;
+          // Verificar se a entrega é para esta família
+          // Comparar IDs como strings para evitar problemas de tipo
+          const deliveryFamilyId = String(d.family_id || '');
+          const familyId = String(family.id || '');
+          const matchesFamily = deliveryFamilyId === familyId;
+          
+          if (import.meta.env.DEV && matchesFamily) {
+            // A estrutura dos dados pode variar - verificar diferentes possibilidades
+            const deliveryId = d.id || (d as any).delivery_id;
+            const deliveryInstitutionId = d.institution_id || (d as any).institution_id;
+            const institutionName = d.institution?.name || (d as any).institution_name || 'N/A';
+            
+            console.log(`[InstitutionFamilies] Found delivery for family ${family.name} (${family.id}):`, {
+              delivery_id: deliveryId,
+              family_id: d.family_id || family.id,
+              institution_id: deliveryInstitutionId,
+              institution_name: institutionName,
+              delivery_date: d.delivery_date,
+              is_from_current_institution: String(deliveryInstitutionId || '') === String(profile?.institution_id || ''),
+              raw_delivery: d
+            });
+          }
+          
+          // Não filtrar por institution_id - queremos mostrar a última entrega GLOBAL
+          return matchesFamily;
         })
         .sort((a, b) => {
           const dateA = a.delivery_date ? new Date(a.delivery_date).getTime() : 0;
           const dateB = b.delivery_date ? new Date(b.delivery_date).getTime() : 0;
-          return dateB - dateA;
+          return dateB - dateA; // Mais recente primeiro
         });
       
       const lastDelivery = familyDeliveries[0];
@@ -95,8 +196,22 @@ const InstitutionFamilies = () => {
       const blockedByInstitution = family.blocked_by_institution as { name?: string } | null | undefined;
       
       // Get institution name from the delivery's institution relation
-      // This should always be the current institution since we filtered above
-      const lastDeliveryInstitution = lastDelivery?.institution as { id?: string; name?: string } | null | undefined;
+      // Se foi a própria instituição, mostrar "Esta instituição", senão mostrar o nome da instituição
+      const lastDeliveryInstitutionName = lastDelivery?.institution 
+        ? (lastDelivery.institution as { id?: string; name?: string } | null | undefined)?.name
+        : undefined;
+      
+      // Verificar se a entrega foi feita pela própria instituição
+      const isFromCurrentInstitution = lastDelivery && 
+        String(lastDelivery.institution_id || '') === String(profile?.institution_id || '');
+      
+      const lastDeliveryInstitution = lastDeliveryInstitutionName 
+        ? (isFromCurrentInstitution ? 'Esta instituição' : lastDeliveryInstitutionName)
+        : (lastDelivery ? 'Instituição não identificada' : undefined);
+      
+      if (import.meta.env.DEV && lastDelivery && !lastDelivery.institution) {
+        console.warn(`[InstitutionFamilies] Delivery ${lastDelivery.id} for family ${family.id} missing institution relation`);
+      }
       
       return {
         id: family.id,
@@ -109,7 +224,7 @@ const InstitutionFamilies = () => {
         block_reason: family.block_reason || undefined,
         blocked_by_institution: blockedByInstitution?.name || undefined,
         last_delivery_date: lastDelivery?.delivery_date || undefined,
-        last_delivery_institution: lastDeliveryInstitution?.name || undefined,
+        last_delivery_institution: lastDeliveryInstitution || undefined,
         name: family.name,
         contact_person: family.contact_person,
         phone: family.phone,
@@ -117,7 +232,7 @@ const InstitutionFamilies = () => {
         ...family
       };
     });
-  }, [familiesData, deliveries, profile?.institution_id]);
+  }, [familiesData, allDeliveries, profile?.institution_id]);
 
   const filteredFamilies = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
@@ -153,6 +268,42 @@ const InstitutionFamilies = () => {
   const handleViewDetails = (family: Family) => {
     setSelectedFamily(family);
     setIsDetailsOpen(true);
+  };
+
+  const handleEditFamily = (family: Family) => {
+    setSelectedFamily(family);
+    editForm.reset({
+      name: family.name || "",
+      contact_person: family.contact_person || "",
+      phone: family.phone || "",
+      cpf: family.cpf || "",
+      address: family.address || "",
+      members_count: family.members_count || 1,
+      is_blocked: family.is_blocked || false,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const onSubmitEdit = async (data: TablesInsert<'families'>) => {
+    if (!selectedFamily) return;
+
+    try {
+      // Limpar CPF (remover máscara) antes de salvar
+      const familyData = {
+        ...data,
+        cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
+      };
+      
+      await updateFamilyMutation.mutateAsync({
+        id: selectedFamily.id,
+        updates: familyData
+      });
+      setIsEditDialogOpen(false);
+      setSelectedFamily(null);
+      editForm.reset();
+    } catch (error) {
+      // Error toast is handled by the mutation
+    }
   };
 
   const handleCreateFamily = (cpf?: string) => {
@@ -369,10 +520,7 @@ const InstitutionFamilies = () => {
                       <TableCell>{getStatusBadge(family)}</TableCell>
                       <TableCell>
                         {family.last_delivery_date ? (
-                          <div>
-                            <p className="text-sm">{formatDateTimeBrasilia(family.last_delivery_date)}</p>
-                            <p className="text-xs text-gray-500">Esta instituição</p>
-                          </div>
+                          <span className="text-sm">{formatDateBrasilia(family.last_delivery_date)}</span>
                         ) : (
                           <span className="text-gray-500">Nunca</span>
                         )}
@@ -386,6 +534,14 @@ const InstitutionFamilies = () => {
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             Detalhes
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditFamily(family)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
                           </Button>
                           <Button 
                             variant="outline" 
@@ -688,6 +844,146 @@ const InstitutionFamilies = () => {
               Fechar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Family Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Família</DialogTitle>
+            <DialogDescription>
+              Atualize as informações da família. Os campos marcados como opcionais podem ser deixados em branco.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Família</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: Família Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="contact_person"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pessoa de Contato (Titular da Família)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: João Silva" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF (opcional)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const formatted = formatCpf(e.target.value);
+                          // Salvar apenas números no banco
+                          const numbers = formatted.replace(/\D/g, '');
+                          field.onChange(numbers.length === 11 ? numbers : formatted);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(11) 99999-9999" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço (opcional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="members_count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Membros</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        value={field.value || 1}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                        min="1"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={updateFamilyMutation.isPending}
+                >
+                  {updateFamilyMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar Alterações"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

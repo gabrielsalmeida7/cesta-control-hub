@@ -266,13 +266,17 @@ const InstitutionReports = () => {
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             <Badge variant="secondary" className="text-xs">
+                              <Package className="h-3 w-3 mr-1" />
                               Cesta Básica
                             </Badge>
-                            {delivery.notes && (
-                              <Badge variant="outline" className="text-xs">
-                                + Itens
-                              </Badge>
-                            )}
+                            {(() => {
+                              const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
+                              return additionalItems.map((item, index) => (
+                                <Badge key={index} variant="outline" className="text-xs" title={`${item.quantity} ${item.unit}`}>
+                                  {item.name}
+                                </Badge>
+                              ));
+                            })()}
                           </div>
                         </TableCell>
                         <TableCell>

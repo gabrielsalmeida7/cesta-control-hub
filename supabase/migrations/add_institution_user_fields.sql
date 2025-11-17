@@ -65,12 +65,13 @@ BEGIN
   END IF;
   
   -- Criar ou atualizar perfil vinculando à instituição
+  -- IMPORTANTE: Sempre definir role como 'institution' e institution_id, mesmo se o perfil já existir
   INSERT INTO public.profiles (id, email, full_name, role, institution_id)
   VALUES (p_user_id, v_user_email, p_responsible_name, 'institution', p_institution_id)
   ON CONFLICT (id) 
   DO UPDATE SET
     full_name = p_responsible_name,
-    role = 'institution',
+    role = 'institution', -- SEMPRE definir como institution, mesmo se estava como admin antes
     institution_id = p_institution_id,
     updated_at = now();
   

@@ -110,99 +110,100 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   await reloadProfile(session.user!.id);
                 }
               } else {
-              // Ensure profile exists
-              // Determine default role based on email
-              const userEmail = session.user!.email?.toLowerCase() || '';
-              const defaultRole: 'admin' | 'institution' = userEmail === ADMIN_SEED_EMAIL ? 'admin' : 'institution';
+              // Profile doesn't exist - wait a bit and check again (in case it's being created by link_institution_user)
+              // This prevents race conditions where useAuth tries to create profile before link_institution_user finishes
+              await new Promise(resolve => setTimeout(resolve, 1000));
               
+              // Check again if profile was created in the meantime
+              const { data: retryProfileData, error: retryError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user!.id)
+                .maybeSingle();
+              
+              if (retryProfileData) {
+                // Profile was created, use it
+                setProfile(retryProfileData);
+                if (import.meta.env.DEV) {
+                  console.log('[PROFILE] Profile found after retry:', {
+                    role: retryProfileData.role,
+                    institution_id: retryProfileData.institution_id,
+                    email: retryProfileData.email
+                  });
+                }
+                return;
+              }
+              
+              // If still no profile, only create one if it's the admin seed email
+              // For institution users, the profile should be created by link_institution_user
+              // If it doesn't exist, something went wrong and we shouldn't create a profile without institution_id
+              const userEmail = session.user!.email?.toLowerCase() || '';
+              const isAdminSeed = userEmail === ADMIN_SEED_EMAIL;
+              
+              if (!isAdminSeed) {
+                // For non-admin users, if profile doesn't exist, it means link_institution_user wasn't called
+                // or failed. Don't create a profile without institution_id as it violates constraints.
+                if (import.meta.env.DEV) {
+                  console.warn('[PROFILE] Profile not found for institution user. Profile should be created via link_institution_user. Email:', userEmail);
+                }
+                toast({
+                  title: "Perfil não encontrado",
+                  description: "Seu perfil de usuário não foi encontrado. Por favor, entre em contato com o administrador.",
+                  variant: "destructive",
+                });
+                setProfile(null);
+                return;
+              }
+              
+              // Only create profile for admin seed email
               const insertPayload = {
                 id: session.user!.id,
                 email: session.user!.email,
-                full_name: (session.user!.user_metadata as any)?.full_name || 'Usuário',
-                role: defaultRole,
-              } as any;
+                full_name: (session.user!.user_metadata as any)?.full_name || 'Administrador',
+                role: 'admin' as const,
+              };
 
-              // Retry logic for profile creation (max 2 retries)
-              let retryCount = 0;
-              const maxRetries = 2;
-              let inserted = null;
-              let insertError = null;
-
-              while (retryCount <= maxRetries && !inserted) {
-                const { data, error } = await supabase
-                  .from('profiles')
-                  .insert(insertPayload)
-                  .select('*')
-                  .maybeSingle();
-
-                if (error) {
-                  insertError = error;
-                  if (import.meta.env.DEV) {
-                    console.error(`[PROFILE] Error creating profile (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
-                      error: error.message,
-                      code: error.code,
-                      timestamp: new Date().toISOString()
-                    });
-                  }
-                  
-                  // If it's a duplicate key error, try to fetch existing profile instead
-                  if (error.code === '23505' && retryCount < maxRetries) {
-                    if (import.meta.env.DEV) {
-                      console.log('[PROFILE] Profile might already exist, attempting to fetch...');
-                    }
-                    const { data: existingProfile } = await supabase
-                      .from('profiles')
-                      .select('*')
-                      .eq('id', session.user!.id)
-                      .maybeSingle();
-                    
-                    if (existingProfile) {
-                      inserted = existingProfile;
-                      insertError = null;
-                      break;
-                    }
-                  }
-                  
-                  retryCount++;
-                  if (retryCount <= maxRetries) {
-                    // Wait a bit before retrying (exponential backoff)
-                    await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
-                  }
-                } else {
-                  inserted = data;
-                  insertError = null;
-                }
-              }
+              const { data: inserted, error: insertError } = await supabase
+                .from('profiles')
+                .insert(insertPayload)
+                .select('*')
+                .maybeSingle();
 
               if (insertError) {
-                const errorMessage = insertError.message || 'Erro desconhecido ao criar perfil';
+                // If it's a duplicate, try to fetch existing profile
+                if (insertError.code === '23505') {
+                  const { data: existingProfile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user!.id)
+                    .maybeSingle();
+                  
+                  if (existingProfile) {
+                    setProfile(existingProfile);
+                    if (import.meta.env.DEV) {
+                      console.log('[PROFILE] Profile found after duplicate error:', existingProfile);
+                    }
+                    return;
+                  }
+                }
+                
                 if (import.meta.env.DEV) {
-                  console.error('[PROFILE] Failed to create profile after retries:', {
-                    error: errorMessage,
+                  console.error('[PROFILE] Error creating admin profile:', {
+                    error: insertError.message,
                     code: insertError.code,
                     timestamp: new Date().toISOString()
                   });
                 }
                 toast({
                   title: "Erro ao criar perfil",
-                  description: errorMessage,
+                  description: insertError.message || 'Erro desconhecido ao criar perfil',
                   variant: "destructive",
                 });
                 setProfile(null);
               } else if (inserted) {
                 setProfile(inserted);
-                // Try to bootstrap admin, but don't fail if it doesn't work
-                const shouldBootstrap = session.user!.email?.toLowerCase() === ADMIN_SEED_EMAIL;
-                if (shouldBootstrap) {
-                  try {
-                    await maybeBootstrapAdmin(session.user!.email);
-                    // Reload profile after bootstrap to get updated role
-                    await reloadProfile(session.user!.id);
-                  } catch (bootstrapError) {
-                    if (import.meta.env.DEV) {
-                      console.warn('[PROFILE] Bootstrap admin failed, but profile was created:', bootstrapError);
-                    }
-                  }
+                if (import.meta.env.DEV) {
+                  console.log('[PROFILE] Admin profile created:', inserted);
                 }
               }
             }

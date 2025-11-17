@@ -19,6 +19,7 @@ import { useInstitutions } from "@/hooks/useInstitutions";
 import { useInstitutionFamilies } from "@/hooks/useFamilies";
 import { useAuth } from "@/hooks/useAuth";
 import FraudAlertDialog from '@/components/FraudAlertDialog';
+import { getCurrentDateBrasilia } from '@/utils/dateFormat';
 import type { Tables } from "@/integrations/supabase/types";
 
 // Types from Supabase
@@ -205,7 +206,7 @@ const DeliveryManagement = () => {
     const deliveryData = {
       family_id: selectedFamily.id,
       institution_id: selectedInstitutionId,
-      delivery_date: new Date().toISOString().split('T')[0],
+      delivery_date: getCurrentDateBrasilia(),
       blocking_period_days: blockPeriod,
       notes: data.otherItems || null,
       blocking_justification: justification || null,

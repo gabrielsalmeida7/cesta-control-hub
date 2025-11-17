@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseAdmin } from '@/integrations/supabase/admin';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 type Institution = Tables<'institutions'>;
@@ -17,10 +18,12 @@ type InstitutionWithUser = InstitutionInsert & {
 };
 
 export const useInstitutions = () => {
+  const { profile } = useAuth();
+  
   return useQuery({
-    queryKey: ['institutions'],
+    queryKey: ['institutions', profile?.id], // Incluir user ID para separar cache por usuário
     queryFn: async () => {
-      console.log('🏢 Fetching institutions...');
+      console.log('🏢 Fetching institutions...', { userId: profile?.id, role: profile?.role });
       
       const { data, error } = await supabase
         .from('institutions')
@@ -36,7 +39,8 @@ export const useInstitutions = () => {
       return data as Institution[];
     },
     retry: 1,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    enabled: !!profile && profile.role === 'admin' // Só executar se for admin
   });
 };
 
@@ -173,8 +177,10 @@ export const useCreateInstitution = () => {
       return institution;
     },
     onSuccess: () => {
+      // Invalidar todas as queries de instituições (para todos os usuários)
       queryClient.invalidateQueries({ queryKey: ['institutions'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }); // Atualizar estatísticas
       toast({
         title: "Sucesso",
         description: "Instituição e usuário criados com sucesso!",
@@ -249,26 +255,92 @@ export const useDeleteInstitution = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Verificar se há entregas associadas (ON DELETE RESTRICT)
+      const { data: deliveries, error: deliveriesError } = await supabase
+        .from('deliveries')
+        .select('id')
+        .eq('institution_id', id)
+        .limit(1);
+      
+      if (deliveriesError) {
+        throw new Error('Erro ao verificar entregas: ' + deliveriesError.message);
+      }
+      
+      if (deliveries && deliveries.length > 0) {
+        throw new Error('Não é possível excluir a instituição. Existem entregas registradas associadas a ela. Remova as entregas primeiro ou entre em contato com o administrador.');
+      }
+      
+      // Buscar o usuário associado à instituição
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('institution_id', id)
+        .maybeSingle();
+      
+      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw new Error('Erro ao buscar usuário associado: ' + profileError.message);
+      }
+      
+      // Se houver usuário associado, deletá-lo via Admin API
+      if (profile && profile.id && supabaseAdmin) {
+        console.log('[DELETE_INSTITUTION] Deleting associated user:', { user_id: profile.id, email: profile.email });
+        
+        const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
+        
+        if (deleteUserError) {
+          console.error('[DELETE_INSTITUTION] Error deleting user:', deleteUserError);
+          // Continuar mesmo se não conseguir deletar o usuário (pode não existir mais)
+          // Mas avisar o usuário
+          throw new Error('Erro ao excluir usuário associado: ' + deleteUserError.message + '. A instituição não foi excluída.');
+        }
+        
+        console.log('[DELETE_INSTITUTION] User deleted successfully');
+      } else if (profile && profile.id && !supabaseAdmin) {
+        throw new Error('Configuração necessária: VITE_SUPABASE_SERVICE_ROLE_KEY não está configurada. Não é possível excluir o usuário associado.');
+      }
+      
+      // Deletar a instituição (as associações institution_families serão deletadas automaticamente por CASCADE)
       const { error } = await supabase
         .from('institutions')
         .delete()
         .eq('id', id);
       
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({
         title: "Sucesso",
-        description: "Instituição excluída com sucesso!",
+        description: "Instituição e usuário associado excluídos com sucesso!",
       });
     },
-    onError: (error) => {
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir instituição: " + error.message,
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      const errorMessage = error.message || 'Erro desconhecido';
+      
+      // Tratar erros específicos
+      if (errorMessage.includes('entregas registradas')) {
+        toast({
+          title: "Não é possível excluir",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else if (errorMessage.includes('VITE_SUPABASE_SERVICE_ROLE_KEY')) {
+        toast({
+          title: "Configuração Necessária",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao excluir instituição: " + errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 };

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type {
   Tables,
   TablesInsert,
@@ -12,10 +13,12 @@ type FamilyInsert = TablesInsert<"families">;
 type FamilyUpdate = TablesUpdate<"families">;
 
 export const useFamilies = () => {
+  const { profile } = useAuth();
+  
   return useQuery({
-    queryKey: ["families"],
+    queryKey: ["families", profile?.id], // Incluir user ID para separar cache por usuário
     queryFn: async () => {
-      console.log('👨‍👩‍👧‍👦 Fetching families...');
+      console.log('👨‍👩‍👧‍👦 Fetching families...', { userId: profile?.id, role: profile?.role });
       
       const { data, error } = await supabase
         .from("families")
@@ -70,7 +73,8 @@ export const useFamilies = () => {
       return data;
     },
     retry: 1,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    enabled: !!profile && profile.role === 'admin' // Só executar se for admin
   });
 };
 
@@ -116,7 +120,12 @@ export const useInstitutionFamilies = (institutionId?: string) => {
             institution_id,
             institution:institution_id(id, name)
           ),
-          deliveries(delivery_date, blocking_period_days, notes)
+          deliveries(
+            delivery_date, 
+            blocking_period_days, 
+            notes,
+            institution:institution_id(id, name)
+          )
         `)
         .in('id', familyIds)
         .order('name');
@@ -203,8 +212,10 @@ export const useCreateFamily = () => {
       return createdFamily;
     },
     onSuccess: (data, variables) => {
+      // Invalidar todas as queries de famílias (para todos os usuários)
       queryClient.invalidateQueries({ queryKey: ["families"] });
       queryClient.invalidateQueries({ queryKey: ["institution-families"] });
+      queryClient.invalidateQueries({ queryKey: ["institutions"] }); // Também invalidar instituições para atualizar contagem
       
       if (variables.institutionId) {
         toast({

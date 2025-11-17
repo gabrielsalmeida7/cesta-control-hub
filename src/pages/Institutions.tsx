@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
-import { Building, Edit, Info, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building, Edit, Info, Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -340,6 +340,14 @@ const Institutions = () => {
                       >
                         <Info className="mr-2 h-4 w-4" /> Detalhes
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(institution)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -648,13 +656,21 @@ const Institutions = () => {
           </DialogHeader>
           
           {selectedInstitution && (
-            <div className="py-4">
+            <div className="py-4 space-y-2">
               <p>
                 Tem certeza que deseja excluir a instituição <strong>{selectedInstitution.name}</strong>?
               </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Esta ação não pode ser desfeita.
-              </p>
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>⚠️ Esta ação irá:</p>
+                <ul className="list-disc list-inside ml-2 space-y-1">
+                  <li>Excluir permanentemente a instituição</li>
+                  <li>Excluir o usuário de login associado</li>
+                  <li>Remover todas as associações com famílias</li>
+                </ul>
+                <p className="text-orange-600 font-medium mt-2">
+                  ⚠️ Não é possível excluir se houver entregas registradas.
+                </p>
+              </div>
             </div>
           )}
           
