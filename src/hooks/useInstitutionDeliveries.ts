@@ -24,6 +24,16 @@ export const useInstitutionDeliveries = (startDate?: string, endDate?: string) =
               id,
               name,
               contact_person
+            ),
+            stock_movements:stock_movements(
+              id,
+              product_id,
+              quantity,
+              product:products(
+                id,
+                name,
+                unit
+              )
             )
         `)
         .eq('institution_id', profile.institution_id)
@@ -103,7 +113,7 @@ export const useCreateDelivery = () => {
       }
 
       // Se validação passou, inserir entrega
-      const { error } = await supabase
+      const { data: delivery, error } = await supabase
         .from('deliveries')
         .insert({
           family_id: data.family_id,
@@ -113,9 +123,12 @@ export const useCreateDelivery = () => {
           notes: data.notes,
           blocking_justification: data.blocking_justification || null,
           delivery_date: getCurrentDateBrasilia(),
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+      return delivery;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });

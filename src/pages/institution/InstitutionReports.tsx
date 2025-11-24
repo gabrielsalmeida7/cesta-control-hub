@@ -265,15 +265,33 @@ const InstitutionReports = () => {
                         <TableCell>{delivery.family?.contact_person || 'N/A'}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            <Badge variant="secondary" className="text-xs">
-                              <Package className="h-3 w-3 mr-1" />
-                              Cesta Básica
-                            </Badge>
                             {(() => {
-                              const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
-                              return additionalItems.map((item, index) => (
-                                <Badge key={index} variant="outline" className="text-xs" title={`${item.quantity} ${item.unit}`}>
-                                  {item.name}
+                              // Buscar itens das movimentações de estoque vinculadas à entrega
+                              const deliveryItems = (delivery as any).stock_movements || [];
+                              
+                              if (deliveryItems.length === 0) {
+                                // Fallback: tentar parsear do notes (para entregas antigas)
+                                const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
+                                return (
+                                  <>
+                                    <Badge variant="secondary" className="text-xs">
+                                      <Package className="h-3 w-3 mr-1" />
+                                      Cesta Básica
+                                    </Badge>
+                                    {additionalItems.map((item, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs" title={`${item.quantity} ${item.unit}`}>
+                                        {item.name}
+                                      </Badge>
+                                    ))}
+                                  </>
+                                );
+                              }
+                              
+                              // Exibir itens das movimentações de estoque
+                              return deliveryItems.map((movement: any, index: number) => (
+                                <Badge key={index} variant="outline" className="text-xs" title={`${movement.quantity} ${movement.product?.unit || 'unidade'}`}>
+                                  {movement.product?.name || 'Produto'}
+                                  <span className="ml-1 text-gray-500">({movement.quantity} {movement.product?.unit || 'unidade'})</span>
                                 </Badge>
                               ));
                             })()}
@@ -377,30 +395,54 @@ const InstitutionReports = () => {
                 <div className="p-4 bg-green-50 rounded-lg">
                   <h4 className="font-medium text-green-800 mb-3">Itens Entregues</h4>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-sm">
-                        <Package className="h-3 w-3 mr-1" />
-                        Cesta Básica
-                      </Badge>
-                      <span className="text-sm text-gray-600">1 unidade</span>
-                    </div>
-                    {additionalItems.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-green-200">
-                        <p className="text-sm font-medium text-green-800 mb-2">Itens Adicionais:</p>
-                        <div className="space-y-2">
-                          {additionalItems.map((item, index) => (
-                            <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
-                              <Badge variant="outline" className="text-xs">
-                                {item.name}
+                    {(() => {
+                      // Buscar itens das movimentações de estoque vinculadas à entrega
+                      const deliveryItems = (selectedDelivery as any).stock_movements || [];
+                      
+                      if (deliveryItems.length === 0) {
+                        // Fallback: tentar parsear do notes (para entregas antigas)
+                        return (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-sm">
+                                <Package className="h-3 w-3 mr-1" />
+                                Cesta Básica
                               </Badge>
-                              <span className="text-sm text-gray-600">
-                                {item.quantity} {item.unit}
-                              </span>
+                              <span className="text-sm text-gray-600">1 unidade</span>
                             </div>
-                          ))}
+                            {additionalItems.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-green-200">
+                                <p className="text-sm font-medium text-green-800 mb-2">Itens Adicionais:</p>
+                                <div className="space-y-2">
+                                  {additionalItems.map((item, index) => (
+                                    <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                                      <Badge variant="outline" className="text-xs">
+                                        {item.name}
+                                      </Badge>
+                                      <span className="text-sm text-gray-600">
+                                        {item.quantity} {item.unit}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      }
+                      
+                      // Exibir itens das movimentações de estoque
+                      return deliveryItems.map((movement: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                          <Badge variant="outline" className="text-xs">
+                            {movement.product?.name || 'Produto'}
+                          </Badge>
+                          <span className="text-sm text-gray-600">
+                            {movement.quantity} {movement.product?.unit || 'unidade'}
+                          </span>
                         </div>
-                      </div>
-                    )}
+                      ));
+                    })()}
                   </div>
                 </div>
 

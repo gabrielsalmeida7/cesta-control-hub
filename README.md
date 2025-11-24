@@ -59,6 +59,33 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (PostgreSQL, Auth, Storage)
+- React Query (TanStack Query)
+
+## Funcionalidades Principais
+
+### Sistema de Gestão de Cestas Básicas
+
+- **Gestão de Instituições**: Cadastro e gerenciamento de instituições de caridade
+- **Gestão de Famílias**: Cadastro de famílias assistidas com CPF, endereço e informações de contato
+- **Registro de Entregas**: Sistema de registro de entregas com bloqueio automático e validações
+- **Relatórios e Dashboard**: Visualização de estatísticas, gráficos e alertas
+- **Sistema de Fornecedores e Estoque**: Gestão completa de fornecedores, produtos, estoque e movimentações
+  - Cadastro de fornecedores (PF/PJ)
+  - Cadastro de produtos
+  - Controle de estoque por instituição
+  - Registro de entradas e saídas
+  - Integração com entregas (saída automática de estoque)
+  - Geração de recibos em PDF
+
+### Controle de Acesso
+
+- **Admin**: Acesso total ao sistema, visualização de todas as instituições e famílias
+- **Instituição**: Acesso restrito aos próprios dados, pode gerenciar suas famílias e entregas
+
+### Documentação Adicional
+
+Para mais detalhes sobre o sistema de Fornecedores, consulte [docs/SUPPLIERS_GUIDE.md](docs/SUPPLIERS_GUIDE.md).
 
 ## How can I deploy this project?
 

@@ -17,6 +17,7 @@ import InstitutionDashboard from "./pages/institution/InstitutionDashboard";
 import InstitutionFamilies from "./pages/institution/InstitutionFamilies";
 import InstitutionReports from "./pages/institution/InstitutionReports";
 import InstitutionDelivery from "./pages/institution/InstitutionDelivery";
+import InstitutionSuppliers from "./pages/institution/InstitutionSuppliers";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
@@ -107,6 +108,22 @@ const App = () => {
                   element={
                     <ProtectedRoute allowedRoles={['institution']}>
                       <InstitutionDelivery />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/institution/suppliers" 
+                  element={
+                    <ProtectedRoute allowedRoles={['institution', 'admin']}>
+                      <InstitutionSuppliers />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/suppliers" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <InstitutionSuppliers />
                     </ProtectedRoute>
                   } 
                 />

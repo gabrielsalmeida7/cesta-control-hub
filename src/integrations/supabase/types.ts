@@ -25,6 +25,7 @@ export type Database = {
           id: string
           institution_id: string
           notes: string | null
+          receipt_id: string | null
         }
         Insert: {
           blocking_justification?: string | null
@@ -36,6 +37,7 @@ export type Database = {
           id?: string
           institution_id: string
           notes?: string | null
+          receipt_id?: string | null
         }
         Update: {
           blocking_justification?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           id?: string
           institution_id?: string
           notes?: string | null
+          receipt_id?: string | null
         }
         Relationships: [
           {
@@ -61,6 +64,13 @@ export type Database = {
             columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
         ]
@@ -227,6 +237,235 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "profiles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          id: string
+          name: string
+          document: string | null
+          supplier_type: "PF" | "PJ"
+          contact_name: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          address: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          document?: string | null
+          supplier_type: "PF" | "PJ"
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          address?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          document?: string | null
+          supplier_type?: "PF" | "PJ"
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          address?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          id: string
+          name: string
+          unit: string
+          description: string | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          unit: string
+          description?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          unit?: string
+          description?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      inventory: {
+        Row: {
+          id: string
+          institution_id: string
+          product_id: string
+          quantity: number
+          last_movement_date: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          institution_id: string
+          product_id: string
+          quantity?: number
+          last_movement_date?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          institution_id?: string
+          product_id?: string
+          quantity?: number
+          last_movement_date?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          id: string
+          institution_id: string
+          product_id: string
+          movement_type: "ENTRADA" | "SAIDA"
+          quantity: number
+          supplier_id: string | null
+          delivery_id: string | null
+          movement_date: string
+          notes: string | null
+          created_by_user_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          institution_id: string
+          product_id: string
+          movement_type: "ENTRADA" | "SAIDA"
+          quantity: number
+          supplier_id?: string | null
+          delivery_id?: string | null
+          movement_date?: string
+          notes?: string | null
+          created_by_user_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          institution_id?: string
+          product_id?: string
+          movement_type?: "ENTRADA" | "SAIDA"
+          quantity?: number
+          supplier_id?: string | null
+          delivery_id?: string | null
+          movement_date?: string
+          notes?: string | null
+          created_by_user_id?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receipts: {
+        Row: {
+          id: string
+          receipt_type: "STOCK_ENTRY" | "STOCK_EXIT" | "DELIVERY"
+          institution_id: string
+          reference_id: string
+          file_path: string | null
+          file_url: string | null
+          generated_at: string | null
+          generated_by_user_id: string | null
+        }
+        Insert: {
+          id?: string
+          receipt_type: "STOCK_ENTRY" | "STOCK_EXIT" | "DELIVERY"
+          institution_id: string
+          reference_id: string
+          file_path?: string | null
+          file_url?: string | null
+          generated_at?: string | null
+          generated_by_user_id?: string | null
+        }
+        Update: {
+          id?: string
+          receipt_type?: "STOCK_ENTRY" | "STOCK_EXIT" | "DELIVERY"
+          institution_id?: string
+          reference_id?: string
+          file_path?: string | null
+          file_url?: string | null
+          generated_at?: string | null
+          generated_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_institution_id_fkey"
             columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"

@@ -6,7 +6,8 @@ import {
   Home, 
   Users, 
   BarChart3, 
-  Package 
+  Package,
+  Truck
 } from "lucide-react";
 
 const InstitutionNavigationButtons = () => {
@@ -35,6 +36,11 @@ const InstitutionNavigationButtons = () => {
       label: "Relatórios",
       path: "/institution/reports",
       icon: BarChart3,
+    },
+    {
+      label: "Fornecedores",
+      path: "/institution/suppliers",
+      icon: Truck,
     }
   ];
 
