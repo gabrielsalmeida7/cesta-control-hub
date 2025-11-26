@@ -256,7 +256,7 @@ const InstitutionDelivery = () => {
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
                     {filteredFamilies.map((family) => {
                       const isBlocked = family.is_blocked && family.blocked_until && new Date(family.blocked_until) > new Date();
                       return (
