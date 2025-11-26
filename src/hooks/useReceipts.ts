@@ -8,8 +8,7 @@ import type {
 } from "@/integrations/supabase/types";
 import { 
   generateStockMovementReceipt, 
-  generateDeliveryReceipt,
-  uploadReceiptToStorage 
+  generateDeliveryReceipt
 } from "@/utils/receiptGenerator";
 
 type Receipt = Tables<"receipts">;
@@ -75,13 +74,13 @@ export const useGenerateReceipt = () => {
     mutationFn: async ({
       receiptType,
       referenceId,
-      filePath,
-      fileUrl,
+      filePath = null,
+      fileUrl = null,
     }: {
       receiptType: "STOCK_ENTRY" | "STOCK_EXIT" | "DELIVERY";
       referenceId: string;
-      filePath: string;
-      fileUrl: string;
+      filePath?: string | null; // Opcional - não salva mais arquivos no storage
+      fileUrl?: string | null; // Opcional - não salva mais URLs
     }) => {
       if (!profile?.institution_id) {
         throw new Error("Instituição não encontrada");
@@ -91,8 +90,8 @@ export const useGenerateReceipt = () => {
         receipt_type: receiptType,
         institution_id: profile.institution_id,
         reference_id: referenceId,
-        file_path: filePath,
-        file_url: fileUrl,
+        file_path: filePath || null, // Null - não salva mais arquivos
+        file_url: fileUrl || null, // Null - não salva mais URLs
         generated_by_user_id: user?.id || null,
       };
 
@@ -126,20 +125,19 @@ export const useDownloadReceipt = () => {
   const { toast } = useToast();
 
   return {
-    download: async (fileUrl: string) => {
+    download: async (receiptId: string, receiptType: "STOCK_ENTRY" | "STOCK_EXIT" | "DELIVERY", referenceId: string) => {
       try {
-        // Criar link temporário para download
-        const link = document.createElement("a");
-        link.href = fileUrl;
-        link.download = `recibo-${Date.now()}.pdf`;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Como não salvamos mais PDFs, precisamos gerar novamente
+        // Isso requer buscar os dados e gerar o PDF novamente
+        toast({
+          title: "Aviso",
+          description: "Recibos não são mais armazenados. Use o botão 'Gerar Recibo' para criar um novo PDF.",
+          variant: "default",
+        });
       } catch (error: any) {
         toast({
           title: "Erro",
-          description: "Erro ao baixar recibo: " + error.message,
+          description: "Erro ao processar solicitação: " + error.message,
           variant: "destructive",
         });
       }
@@ -164,6 +162,93 @@ const fetchMovementForReceipt = async (movementId: string): Promise<StockMovemen
 
   if (error) throw error;
   return data as StockMovement;
+};
+
+/**
+ * Gera ID de transação no formato 001/2025 baseado em entregas do ano
+ * @param deliveryId - ID da entrega atual
+ * @param deliveryDate - Data da entrega
+ * @returns ID de transação no formato "001/2025"
+ */
+const generateReceiptTransactionId = async (
+  deliveryId: string,
+  deliveryDate: string
+): Promise<string> => {
+  try {
+    // Obter ano atual da data da entrega
+    const deliveryYear = new Date(deliveryDate).getFullYear();
+    const yearStart = new Date(deliveryYear, 0, 1).toISOString();
+    const yearEnd = new Date(deliveryYear, 11, 31, 23, 59, 59).toISOString();
+
+    // Buscar todas as entregas do ano atual, ordenadas por data e depois por id
+    const { data: deliveries, error } = await supabase
+      .from("deliveries")
+      .select("id, delivery_date, created_at")
+      .gte("delivery_date", yearStart)
+      .lte("delivery_date", yearEnd)
+      .order("delivery_date", { ascending: true });
+
+    if (error) {
+      console.warn("Erro ao buscar entregas para gerar ID de transação:", error);
+      // Fallback: usar apenas o ano
+      return `001/${deliveryYear}`;
+    }
+
+    if (!deliveries || deliveries.length === 0) {
+      return `001/${deliveryYear}`;
+    }
+
+    // Ordenar localmente: primeiro por data, depois por created_at, depois por id
+    const sortedDeliveries = [...deliveries].sort((a, b) => {
+      const dateA = new Date(a.delivery_date || 0).getTime();
+      const dateB = new Date(b.delivery_date || 0).getTime();
+      
+      if (dateA !== dateB) {
+        return dateA - dateB;
+      }
+      
+      // Se mesma data, ordenar por created_at
+      const createdA = new Date(a.created_at || 0).getTime();
+      const createdB = new Date(b.created_at || 0).getTime();
+      if (createdA !== createdB) {
+        return createdA - createdB;
+      }
+      
+      // Se mesmo created_at, ordenar por id
+      return a.id.localeCompare(b.id);
+    });
+
+    // Encontrar posição desta entrega na lista ordenada
+    const currentDeliveryIndex = sortedDeliveries.findIndex((d) => d.id === deliveryId);
+
+    if (currentDeliveryIndex === -1) {
+      // Se não encontrou, contar todas as entregas antes desta data/hora
+      const deliveryDateTime = new Date(deliveryDate).getTime();
+      const deliveriesBefore = sortedDeliveries.filter((d) => {
+        const dDateTime = new Date(d.delivery_date || 0).getTime();
+        if (dDateTime < deliveryDateTime) return true;
+        if (dDateTime === deliveryDateTime && d.id !== deliveryId) {
+          // Mesma data, verificar created_at
+          const dCreated = new Date(d.created_at || 0).getTime();
+          const currentCreated = new Date().getTime(); // Aproximação
+          if (dCreated < currentCreated) return true;
+          if (dCreated === currentCreated && d.id < deliveryId) return true;
+        }
+        return false;
+      });
+      const sequenceNumber = deliveriesBefore.length + 1;
+      return `${String(sequenceNumber).padStart(3, "0")}/${deliveryYear}`;
+    }
+
+    // Sequência baseada na posição (1-indexed)
+    const sequenceNumber = currentDeliveryIndex + 1;
+    return `${String(sequenceNumber).padStart(3, "0")}/${deliveryYear}`;
+  } catch (error) {
+    console.warn("Erro ao gerar ID de transação:", error);
+    // Fallback: usar ano atual
+    const currentYear = new Date().getFullYear();
+    return `001/${currentYear}`;
+  }
 };
 
 /**
@@ -212,6 +297,7 @@ const fetchDeliveryForReceipt = async (deliveryId: string): Promise<{
 
 /**
  * Hook para gerar recibo de movimentação individual
+ * Gera PDF e abre diretamente no navegador, sem salvar no storage
  */
 export const useGenerateMovementReceipt = () => {
   const { profile } = useAuth();
@@ -238,23 +324,24 @@ export const useGenerateMovementReceipt = () => {
         movement.institution.name
       );
 
-      // Nome do arquivo
-      const timestamp = Date.now();
-      const fileName = `recibo-${movement.movement_type.toLowerCase()}-${timestamp}.pdf`;
+      // Criar URL temporária do Blob para abrir no navegador
+      const pdfUrl = URL.createObjectURL(pdfBlob);
 
-      // Upload para storage
-      const fileUrl = await uploadReceiptToStorage(pdfBlob, fileName);
-
-      // Salvar referência na tabela receipts
+      // Salvar referência na tabela receipts (sem file_path e file_url)
       const receiptType = movement.movement_type === "ENTRADA" ? "STOCK_ENTRY" : "STOCK_EXIT";
-      await generateReceipt.mutateAsync({
-        receiptType,
-        referenceId: movementId,
-        filePath: `receipts/${fileName}`,
-        fileUrl,
-      });
+      try {
+        await generateReceipt.mutateAsync({
+          receiptType,
+          referenceId: movementId,
+          filePath: null, // Não salva mais arquivo
+          fileUrl: null, // Não salva mais URL
+        });
+      } catch (error) {
+        // Não falhar se não conseguir salvar referência - o importante é gerar o PDF
+        console.warn("Não foi possível salvar referência do recibo:", error);
+      }
 
-      return { fileUrl, fileName };
+      return { pdfUrl, pdfBlob };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
@@ -264,7 +351,12 @@ export const useGenerateMovementReceipt = () => {
         description: "Recibo gerado com sucesso!",
       });
       // Abrir PDF em nova aba
-      window.open(data.fileUrl, "_blank");
+      window.open(data.pdfUrl, "_blank");
+      
+      // Limpar URL temporária após um tempo (para liberar memória)
+      setTimeout(() => {
+        URL.revokeObjectURL(data.pdfUrl);
+      }, 1000);
     },
     onError: (error: any) => {
       toast({
@@ -278,6 +370,7 @@ export const useGenerateMovementReceipt = () => {
 
 /**
  * Hook para gerar recibo de entrega
+ * Gera PDF e abre diretamente no navegador, sem salvar no storage
  */
 export const useGenerateDeliveryReceipt = () => {
   const { profile, user } = useAuth();
@@ -302,40 +395,49 @@ export const useGenerateDeliveryReceipt = () => {
         throw new Error("Nenhum item encontrado para esta entrega");
       }
 
+      // Gerar ID de transação (001/2025)
+      const transactionId = await generateReceiptTransactionId(
+        deliveryId,
+        delivery.delivery_date || new Date().toISOString()
+      );
+
       // Gerar PDF
       const pdfBlob = await generateDeliveryReceipt(
         delivery,
         items,
-        delivery.institution.name
+        delivery.institution.name,
+        transactionId
       );
 
-      // Nome do arquivo
-      const timestamp = Date.now();
-      const fileName = `recibo-entrega-${timestamp}.pdf`;
+      // Criar URL temporária do Blob para abrir no navegador
+      const pdfUrl = URL.createObjectURL(pdfBlob);
 
-      // Upload para storage
-      const fileUrl = await uploadReceiptToStorage(pdfBlob, fileName);
+      // Salvar referência na tabela receipts (sem file_path e file_url)
+      let receipt = null;
+      try {
+        receipt = await generateReceipt.mutateAsync({
+          receiptType: "DELIVERY",
+          referenceId: deliveryId,
+          filePath: null, // Não salva mais arquivo
+          fileUrl: null, // Não salva mais URL
+        });
 
-      // Salvar referência na tabela receipts
-      const receipt = await generateReceipt.mutateAsync({
-        receiptType: "DELIVERY",
-        referenceId: deliveryId,
-        filePath: `receipts/${fileName}`,
-        fileUrl,
-      });
+        // Atualizar campo receipt_id na tabela deliveries
+        const { error: updateError } = await supabase
+          .from("deliveries")
+          .update({ receipt_id: receipt.id })
+          .eq("id", deliveryId);
 
-      // Atualizar campo receipt_id na tabela deliveries
-      const { error: updateError } = await supabase
-        .from("deliveries")
-        .update({ receipt_id: receipt.id })
-        .eq("id", deliveryId);
-
-      if (updateError) {
-        console.error("Erro ao atualizar receipt_id na entrega:", updateError);
-        // Não falhar a operação se apenas a atualização falhar
+        if (updateError) {
+          console.error("Erro ao atualizar receipt_id na entrega:", updateError);
+          // Não falhar a operação se apenas a atualização falhar
+        }
+      } catch (error) {
+        // Não falhar se não conseguir salvar referência - o importante é gerar o PDF
+        console.warn("Não foi possível salvar referência do recibo:", error);
       }
 
-      return { fileUrl, fileName };
+      return { pdfUrl, pdfBlob, receipt };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
@@ -346,7 +448,12 @@ export const useGenerateDeliveryReceipt = () => {
         description: "Recibo de entrega gerado com sucesso!",
       });
       // Abrir PDF em nova aba
-      window.open(data.fileUrl, "_blank");
+      window.open(data.pdfUrl, "_blank");
+      
+      // Limpar URL temporária após um tempo (para liberar memória)
+      setTimeout(() => {
+        URL.revokeObjectURL(data.pdfUrl);
+      }, 1000);
     },
     onError: (error: any) => {
       toast({

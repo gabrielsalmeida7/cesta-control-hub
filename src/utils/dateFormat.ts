@@ -41,6 +41,50 @@ export const getCurrentDateBrasilia = (): string => {
 };
 
 /**
+ * Obtém a data/hora atual do computador em formato ISO para salvar no banco
+ * @returns String no formato YYYY-MM-DDTHH:mm:ss-03:00 (horário atual do computador em Brasília)
+ */
+export const getCurrentDateTimeISO = (): string => {
+  const now = new Date();
+  
+  // Obter componentes da data/hora no timezone de Brasília
+  const year = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric' });
+  const month = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', month: '2-digit' });
+  const day = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', day: '2-digit' });
+  const hour = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false });
+  const minute = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', minute: '2-digit' });
+  const second = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', second: '2-digit' });
+  
+  // Garantir que todos os valores tenham 2 dígitos (padStart já garante, mas vamos garantir)
+  const paddedMonth = month.padStart(2, '0');
+  const paddedDay = day.padStart(2, '0');
+  const paddedHour = hour.padStart(2, '0');
+  const paddedMinute = minute.padStart(2, '0');
+  const paddedSecond = second.padStart(2, '0');
+  
+  // Retornar no formato ISO com hora atual em Brasília
+  return `${year}-${paddedMonth}-${paddedDay}T${paddedHour}:${paddedMinute}:${paddedSecond}-03:00`;
+};
+
+/**
+ * Obtém a data/hora atual do computador formatada em Brasília
+ * @returns String formatada no padrão DD/MM/YYYY HH:mm (horário atual do computador)
+ */
+export const getCurrentDateTimeBrasilia = (): string => {
+  const now = new Date();
+  
+  return now.toLocaleString('pt-BR', { 
+    timeZone: 'America/Sao_Paulo', // UTC-3 (BRT - Brasília Time)
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false // Formato 24 horas
+  });
+};
+
+/**
  * Formata apenas a data com fuso horário de Brasília
  * @param dateString - String de data no formato ISO ou Date object
  * @returns String formatada no padrão DD/MM/YYYY

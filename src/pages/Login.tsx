@@ -111,7 +111,7 @@ const Login = () => {
         <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
           <CardHeader className="space-y-1 text-center">
             <img 
-              src="/lovable-uploads/CestaJusta.PNG" 
+              src="/CestaJustaLogo.svg" 
               alt="Logo" 
               className="w-[330px] h-[130px] mx-auto mb-0"
             />

@@ -50,7 +50,7 @@ const Header = () => {
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center space-x-4">
             <img 
-              src="/lovable-uploads/CestaJusta.PNG" 
+              src="/CestaJustaLogo.svg" 
               alt="Logo" 
               className="h-12 w-auto"
             />

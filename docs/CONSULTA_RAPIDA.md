@@ -577,3 +577,5 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Última Atualização:** Janeiro 2025  
 **Versão do Documento:** 1.0.0
 
+
+

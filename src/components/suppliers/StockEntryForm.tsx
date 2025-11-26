@@ -9,7 +9,6 @@ import { useForm } from 'react-hook-form';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useProducts } from '@/hooks/useProducts';
 import { useCreateStockMovement } from '@/hooks/useInventory';
-import { useGenerateReceipt } from '@/hooks/useReceipts';
 import { useAuth } from '@/hooks/useAuth';
 import { getCurrentDateBrasilia } from '@/utils/dateFormat';
 import { Loader2 } from 'lucide-react';
@@ -26,7 +25,6 @@ const StockEntryForm = ({ open, onOpenChange, institutionId }: StockEntryFormPro
   const { data: suppliers = [] } = useSuppliers();
   const { data: products = [] } = useProducts();
   const createMovement = useCreateStockMovement();
-  const generateReceipt = useGenerateReceipt();
   const { toast } = useToast();
 
   const form = useForm({

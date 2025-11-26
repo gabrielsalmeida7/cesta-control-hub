@@ -158,18 +158,92 @@ export const generateStockMovementReceipt = async (
 };
 
 /**
+ * Carrega a logo SVG e converte para base64 para usar no PDF
+ */
+const loadLogoAsBase64 = async (): Promise<string | null> => {
+  try {
+    const response = await fetch('/CestaJustaLogo.svg');
+    if (!response.ok) return null;
+    
+    const svgText = await response.text();
+    
+    // Converter SVG para imagem usando canvas
+    return new Promise((resolve) => {
+      const img = new Image();
+      const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      img.onload = () => {
+        try {
+          // Criar canvas para converter SVG em imagem
+          // Usar dimensões do viewBox do SVG (1054x410) para melhor qualidade
+          const canvas = document.createElement('canvas');
+          // Usar dimensões maiores para melhor qualidade no PDF
+          const scale = 2; // Aumentar resolução para melhor qualidade
+          canvas.width = 1054 * scale;
+          canvas.height = 410 * scale;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Desenhar SVG no canvas com escala
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const base64 = canvas.toDataURL('image/png');
+            URL.revokeObjectURL(url);
+            resolve(base64);
+          } else {
+            URL.revokeObjectURL(url);
+            resolve(null);
+          }
+        } catch (error) {
+          console.warn('Erro ao converter SVG para canvas:', error);
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      
+      img.src = url;
+    });
+  } catch (error) {
+    console.warn('Erro ao carregar logo SVG:', error);
+    return null;
+  }
+};
+
+/**
  * Gera PDF de recibo de entrega para família
  */
 export const generateDeliveryReceipt = async (
   delivery: Delivery,
   items: ReceiptItem[],
-  institutionName: string
+  institutionName: string,
+  transactionId?: string
 ): Promise<Blob> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   let yPosition = margin;
+
+  // Carregar e adicionar logo
+  const logoBase64 = await loadLogoAsBase64();
+  if (logoBase64) {
+    try {
+      // Adicionar logo no topo centralizado
+      // SVG tem proporção 1054:410 (aproximadamente 2.57:1)
+      const logoHeight = 30; // Altura em mm
+      const logoWidth = (logoHeight * 1054 / 410); // Proporção correta do SVG
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(logoBase64, 'PNG', logoX, yPosition, logoWidth, logoHeight);
+      yPosition += logoHeight + 5; // Espaço após logo
+    } catch (error) {
+      console.warn('Erro ao adicionar logo ao PDF:', error);
+    }
+  }
 
   // Título
   doc.setFontSize(18);
@@ -183,9 +257,20 @@ export const generateDeliveryReceipt = async (
   doc.text(`Instituição: ${institutionName}`, margin, yPosition);
   yPosition += 8;
   
+  // Usar data/hora salva no banco (momento da entrega)
   const formattedDate = formatDateTimeBrasilia(delivery.delivery_date || new Date().toISOString());
   doc.text(`Data: ${formattedDate}`, margin, yPosition);
-  yPosition += 15;
+  yPosition += 8;
+
+  // ID de Transação (se fornecido)
+  if (transactionId) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`ID de Transação: ${transactionId}`, margin, yPosition);
+    doc.setFont("helvetica", "normal");
+    yPosition += 8;
+  }
+  
+  yPosition += 7; // Espaço adicional
 
   // Dados do beneficiário
   doc.setFontSize(11);
@@ -313,12 +398,12 @@ export const generateReceiptPDF = async (
  * 
  * @param pdfBlob - Blob do PDF
  * @param fileName - Nome do arquivo
- * @returns URL pública do arquivo
+ * @returns Objeto com filePath e fileUrl (URL pública se bucket público, ou null se privado)
  */
 export const uploadReceiptToStorage = async (
   pdfBlob: Blob,
   fileName: string
-): Promise<string> => {
+): Promise<{ filePath: string; fileUrl: string | null }> => {
   const filePath = `receipts/${fileName}`;
 
   const { data, error } = await supabase.storage
@@ -330,12 +415,69 @@ export const uploadReceiptToStorage = async (
 
   if (error) throw error;
 
-  // Obter URL pública
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("receipts").getPublicUrl(filePath);
+  // Tentar obter URL pública (funciona se o bucket for público)
+  // Se o bucket for privado, fileUrl será null e usaremos URLs assinadas
+  let fileUrl: string | null = null;
+  try {
+    const { data: urlData } = supabase.storage
+      .from("receipts")
+      .getPublicUrl(filePath);
+    fileUrl = urlData?.publicUrl || null;
+  } catch (e) {
+    // Se falhar, bucket provavelmente é privado - usaremos URLs assinadas depois
+    fileUrl = null;
+  }
 
-  return publicUrl;
+  return { filePath, fileUrl };
+};
+
+/**
+ * Gera URL assinada (temporária) para download do recibo
+ * URL expira em 1 hora e requer autenticação
+ * Usado apenas quando o bucket é privado
+ * 
+ * @param filePath - Caminho do arquivo no storage
+ * @param expiresIn - Tempo de expiração em segundos (padrão: 3600 = 1 hora)
+ * @returns URL assinada temporária
+ */
+export const getSignedReceiptUrl = async (
+  filePath: string,
+  expiresIn: number = 3600 // 1 hora em segundos
+): Promise<string> => {
+  const { data, error } = await supabase.storage
+    .from("receipts")
+    .createSignedUrl(filePath, expiresIn);
+
+  if (error) {
+    throw new Error(`Erro ao gerar URL assinada: ${error.message}`);
+  }
+
+  if (!data?.signedUrl) {
+    throw new Error("URL assinada não foi gerada");
+  }
+
+  return data.signedUrl;
+};
+
+/**
+ * Obtém URL para acesso ao recibo (pública ou assinada)
+ * Tenta usar URL pública primeiro, se não disponível usa URL assinada
+ * 
+ * @param filePath - Caminho do arquivo no storage
+ * @param fileUrl - URL pública (se disponível)
+ * @returns URL para acesso ao arquivo
+ */
+export const getReceiptUrl = async (
+  filePath: string,
+  fileUrl: string | null
+): Promise<string> => {
+  // Se temos URL pública (bucket público), usar ela
+  if (fileUrl) {
+    return fileUrl;
+  }
+  
+  // Caso contrário, gerar URL assinada (bucket privado)
+  return await getSignedReceiptUrl(filePath);
 };
 
 /**
@@ -343,7 +485,7 @@ export const uploadReceiptToStorage = async (
  * 
  * @param receiptData - Dados do recibo
  * @param referenceId - ID de referência (movement_id ou delivery_id)
- * @returns Dados do recibo salvo
+ * @returns Dados do recibo salvo (filePath e URL)
  */
 export const generateAndSaveReceipt = async (
   receiptData: ReceiptData,
@@ -357,10 +499,13 @@ export const generateAndSaveReceipt = async (
   const fileName = `recibo-${receiptData.type.toLowerCase()}-${timestamp}.pdf`;
 
   // Upload para storage
-  const fileUrl = await uploadReceiptToStorage(pdfBlob, fileName);
+  const { filePath, fileUrl } = await uploadReceiptToStorage(pdfBlob, fileName);
+
+  // Obter URL (pública ou assinada)
+  const finalUrl = await getReceiptUrl(filePath, fileUrl);
 
   return {
-    filePath: `receipts/${fileName}`,
-    fileUrl,
+    filePath,
+    fileUrl: finalUrl,
   };
 };
