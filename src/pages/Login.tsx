@@ -3,6 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -12,9 +20,22 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const navigate = useNavigate();
   const { signIn, user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+
+  // Verificar se já aceitou a política (localStorage)
+  useEffect(() => {
+    const hasAcceptedPolicy = localStorage.getItem('policy_accepted');
+    if (hasAcceptedPolicy === 'true') {
+      setAcceptedPolicy(true);
+    } else {
+      // Mostrar modal na primeira vez
+      setShowPolicyModal(true);
+    }
+  }, []);
 
   // Redirect if already logged in based on user role
   useEffect(() => {
@@ -43,6 +64,18 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Verificar se aceitou a política
+    if (!acceptedPolicy) {
+      toast({
+        title: "Política de Privacidade",
+        description: "Você precisa aceitar a Política de Privacidade para fazer login.",
+        variant: "destructive"
+      });
+      setShowPolicyModal(true);
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await signIn(email, password);
@@ -52,6 +85,16 @@ const Login = () => {
     if (error) {
       // Error handling is done in the signIn hook via toast
     }
+  };
+
+  const handleAcceptPolicy = () => {
+    setAcceptedPolicy(true);
+    localStorage.setItem('policy_accepted', 'true');
+    setShowPolicyModal(false);
+    toast({
+      title: "Política Aceita",
+      description: "Você pode agora fazer login no sistema.",
+    });
   };
 
   const handleForgotPassword = async (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -96,6 +139,65 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-blue-600 relative">
+      {/* Modal de Política de Privacidade */}
+      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Política de Privacidade e Proteção de Dados</DialogTitle>
+            <DialogDescription>
+              Para utilizar o sistema, você precisa ler e aceitar nossa Política de Privacidade, 
+              em conformidade com a LGPD (Lei nº 13.709/2018).
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-md">
+              <p className="text-sm text-blue-900 font-medium mb-2">
+                Nossa política explica:
+              </p>
+              <ul className="text-sm text-blue-800 space-y-1 list-disc pl-5">
+                <li>Quais dados coletamos</li>
+                <li>Como protegemos suas informações</li>
+                <li>Seus direitos como titular de dados</li>
+                <li>Como exercer seus direitos</li>
+              </ul>
+            </div>
+
+            <div className="flex items-start space-x-2 pt-2">
+              <Checkbox 
+                id="accept-policy" 
+                checked={acceptedPolicy}
+                onCheckedChange={(checked) => setAcceptedPolicy(checked as boolean)}
+              />
+              <Label htmlFor="accept-policy" className="text-sm leading-relaxed cursor-pointer">
+                Li e aceito a{" "}
+                <a 
+                  href="/politica-privacidade" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline hover:text-blue-800"
+                >
+                  Política de Privacidade
+                </a>
+                {" "}do sistema.
+              </Label>
+            </div>
+
+            <Button 
+              onClick={handleAcceptPolicy}
+              disabled={!acceptedPolicy}
+              className="w-full"
+            >
+              Aceitar e Continuar
+            </Button>
+
+            <p className="text-xs text-gray-500 text-center">
+              Você pode revisar a política a qualquer momento.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Marca d'água da imagem */}
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
@@ -159,12 +261,36 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90" 
-                disabled={loading || authLoading}
+                disabled={loading || authLoading || !acceptedPolicy}
               >
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 
+            {/* Links LGPD */}
+            <div className="mt-6 pt-4 border-t space-y-2">
+              <p className="text-xs text-center text-gray-500 mb-2">
+                Informações sobre Proteção de Dados:
+              </p>
+              <div className="flex flex-col gap-2">
+                <a 
+                  href="/politica-privacidade" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center"
+                >
+                  📄 Política de Privacidade
+                </a>
+                <a 
+                  href="/portal-titular" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center"
+                >
+                  👤 Portal do Titular (Exercer Direitos LGPD)
+                </a>
+              </div>
+            </div>
           </CardContent>
           
           <CardFooter className="flex justify-center">

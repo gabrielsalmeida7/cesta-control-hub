@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import NavigationButtons from "@/components/NavigationButtons";
 import Footer from "@/components/Footer";
+import ConsentManagement from "@/components/ConsentManagement";
 import { Users, UserPlus, Search, Lock, Unlock, Loader2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,12 @@ const Families = () => {
   const [unblockReason, setUnblockReason] = useState("");
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Estados para consentimento LGPD
+  const [createConsentGiven, setCreateConsentGiven] = useState(false);
+  const [createTermSigned, setCreateTermSigned] = useState(false);
+  const [editConsentGiven, setEditConsentGiven] = useState(false);
+  const [editTermSigned, setEditTermSigned] = useState(false);
   
   const { user } = useAuth();
 
@@ -750,17 +757,36 @@ const Families = () => {
                 )}
               />
               
+              <ConsentManagement
+                familyName={createForm.watch('name') || ''}
+                familyCpf={createForm.watch('cpf')}
+                contactPerson={createForm.watch('contact_person') || ''}
+                phone={createForm.watch('phone')}
+                address={createForm.watch('address')}
+                institutionName="Sistema Cesta Justa"
+                consentGiven={createConsentGiven}
+                termSigned={createTermSigned}
+                onConsentChange={setCreateConsentGiven}
+                onTermSignedChange={setCreateTermSigned}
+                mode="create"
+              />
+              
               <DialogFooter>
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsCreateDialogOpen(false)}
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setCreateConsentGiven(false);
+                    setCreateTermSigned(false);
+                  }}
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={createFamilyMutation.isPending}
+                  disabled={createFamilyMutation.isPending || !createConsentGiven}
+                  title={!createConsentGiven ? "É necessário consentimento para cadastrar" : ""}
                 >
                   {createFamilyMutation.isPending ? (
                     <>
@@ -899,6 +925,21 @@ const Families = () => {
                   />
                 </div>
               )}
+              
+              <ConsentManagement
+                familyName={editForm.watch('name') || ''}
+                familyCpf={editForm.watch('cpf')}
+                contactPerson={editForm.watch('contact_person') || ''}
+                phone={editForm.watch('phone')}
+                address={editForm.watch('address')}
+                institutionName="Sistema Cesta Justa"
+                consentGiven={editConsentGiven}
+                termSigned={editTermSigned}
+                onConsentChange={setEditConsentGiven}
+                onTermSignedChange={setEditTermSigned}
+                familyId={selectedFamily?.id}
+                mode="edit"
+              />
               
               <DialogFooter>
                 <Button 

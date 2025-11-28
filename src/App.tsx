@@ -19,6 +19,8 @@ import InstitutionReports from "./pages/institution/InstitutionReports";
 import InstitutionDelivery from "./pages/institution/InstitutionDelivery";
 import InstitutionSuppliers from "./pages/institution/InstitutionSuppliers";
 import ResetPassword from "./pages/ResetPassword";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TitularPortal from "./pages/TitularPortal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App = () => {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/politica-privacidade" element={<PrivacyPolicy />} />
+                <Route path="/portal-titular" element={<TitularPortal />} />
                 <Route 
                   path="/" 
                   element={

@@ -81,8 +81,13 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   }
 
   // After loading, check if user is authenticated
+  // Don't render anything if not authenticated - will redirect in useEffect
   if (!user || !session) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   // If allowedRoles is specified, we need profile to check permissions
@@ -97,7 +102,11 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
 
   // Check role permissions
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return <>{children}</>;

@@ -57,8 +57,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .maybeSingle();
 
       if (error) {
-        if (import.meta.env.DEV) {
-          console.error('[AUTH] Error reloading profile:', error);
+        // Ignorar erro 403 (Forbidden) quando não há sessão válida - é esperado
+        if (error.code !== 'PGRST301' && error.status !== 403) {
+          if (import.meta.env.DEV) {
+            console.error('[AUTH] Error reloading profile:', error);
+          }
         }
         return null;
       }
@@ -98,7 +101,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .maybeSingle();
 
               if (error) {
-                console.error('Error fetching profile:', error);
+                // Ignorar erro 403 (Forbidden) quando não há sessão válida - é esperado
+                if (error.code !== 'PGRST301' && error.status !== 403) {
+                  console.error('Error fetching profile:', error);
+                }
                 setProfile(null);
               } else if (profileData) {
                 setProfile(profileData);
@@ -236,7 +242,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .maybeSingle();
 
           if (error) {
-            console.error('Error fetching profile:', error);
+            // Ignorar erro 403 (Forbidden) quando não há sessão válida - é esperado
+            if (error.code !== 'PGRST301' && error.status !== 403) {
+              console.error('Error fetching profile:', error);
+            }
             setProfile(null);
           } else if (fetchedProfile) {
             profileData = fetchedProfile;
