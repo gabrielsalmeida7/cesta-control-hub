@@ -35,9 +35,9 @@ const InstitutionDashboard = () => {
           {/* Cards de estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <DashboardCard
-              title="Famílias Atendidas"
+              title="Famílias Cadastradas"
               value={isLoading ? "..." : ((stats as InstitutionStats)?.associatedFamilies || 0).toString()}
-              description="Total de famílias atendidas"
+              description="Total de famílias Cadastradas"
               icon={<Users className="h-6 w-6" />}
             />
             
@@ -49,16 +49,16 @@ const InstitutionDashboard = () => {
             />
             
             <DashboardCard
-              title="Famílias Bloqueadas"
+              title="Famílias Atendidas"
               value={isLoading ? "..." : ((stats as InstitutionStats)?.blockedByInstitution || 0).toString()}
               description="Bloqueadas por esta instituição"
               icon={<AlertTriangle className="h-6 w-6" />}
             />
 
             <DashboardCard
-              title="Total de Entregas"
-              value={isLoading ? "..." : ((stats as InstitutionStats)?.institutionDeliveries || 0).toString()}
-              description="Entregas realizadas"
+              title="Total de Entregas no Ano"
+              value={isLoading ? "..." : ((stats as InstitutionStats)?.institutionDeliveriesThisYear || 0).toString()}
+              description="Entregas realizadas no ano"
               icon={<Calendar className="h-6 w-6" />}
             />
           </div>

@@ -13,6 +13,7 @@ export interface AdminStats {
 export interface InstitutionStats {
   associatedFamilies: number;
   institutionDeliveries: number;
+  institutionDeliveriesThisYear: number;
   blockedByInstitution: number;
   recentDeliveries: number;
 }
@@ -97,9 +98,22 @@ export const useDashboardStats = () => {
             .gte('delivery_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
           console.log('📝 Recent deliveries result:', recentResult);
 
+          console.log('📝 Testing deliveries this year query...');
+          const currentYear = new Date().getFullYear();
+          const yearStart = new Date(currentYear, 0, 1).toISOString(); // 1 de janeiro
+          const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59).toISOString(); // 31 de dezembro
+          const yearDeliveriesResult = await supabase
+            .from('deliveries')
+            .select('*', { count: 'exact', head: true })
+            .eq('institution_id', profile.institution_id)
+            .gte('delivery_date', yearStart)
+            .lte('delivery_date', yearEnd);
+          console.log('📝 Deliveries this year result:', yearDeliveriesResult);
+
           const stats: InstitutionStats = {
             associatedFamilies: famResult.count || 0,
             institutionDeliveries: delResult.count || 0,
+            institutionDeliveriesThisYear: yearDeliveriesResult.count || 0,
             blockedByInstitution: blockResult.count || 0,
             recentDeliveries: recentResult.data?.length || 0,
           };

@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit } from 'lucide-react';
+import ConsentManagement from '@/components/ConsentManagement';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,8 @@ import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInsti
 import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useConsentManagement } from '@/hooks/useConsentManagement';
+import { supabase } from '@/integrations/supabase/client';
 import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { formatDateTimeBrasilia, formatDateBrasilia } from '@/utils/dateFormat';
@@ -44,6 +47,11 @@ const InstitutionFamilies = () => {
   const [familyToUnlink, setFamilyToUnlink] = useState<Family | null>(null);
   const [prefilledCpf, setPrefilledCpf] = useState<string | undefined>(undefined);
   
+  // Estados para consentimento LGPD
+  const [editConsentGiven, setEditConsentGiven] = useState(false);
+  const [editTermSigned, setEditTermSigned] = useState(false);
+  const [institutionName, setInstitutionName] = useState<string>('');
+  
   const { profile } = useAuth();
   const { data: familiesData = [], isLoading: familiesLoading, error } = useInstitutionFamilies(profile?.institution_id);
   const { data: deliveriesFromHook = [] } = useDeliveries(profile?.institution_id);
@@ -51,6 +59,7 @@ const InstitutionFamilies = () => {
   const updateFamilyMutation = useUpdateFamily();
   const disassociateMutation = useDisassociateFamilyFromInstitution();
   const { toast } = useToast();
+  const { generateTerm, downloadTerm, isGenerating } = useConsentManagement();
   
   // Usar deliveries das famílias (que já vêm da query) como fonte primária
   // Essas deliveries já incluem TODAS as entregas (de qualquer instituição) para cada família
@@ -93,6 +102,71 @@ const InstitutionFamilies = () => {
     if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
     if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
     return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+  };
+
+  // Função para buscar nome da instituição
+  const getInstitutionName = async (institutionId: string): Promise<string> => {
+    try {
+      const { data, error } = await supabase
+        .from('institutions')
+        .select('name')
+        .eq('id', institutionId)
+        .single();
+      
+      if (error) {
+        console.error('Erro ao buscar nome da instituição:', error);
+        return 'Instituição';
+      }
+      
+      return data?.name || 'Instituição';
+    } catch (error) {
+      console.error('Erro ao buscar nome da instituição:', error);
+      return 'Instituição';
+    }
+  };
+
+  // Função para gerar e imprimir termo de consentimento
+  const handlePrintConsentTerm = async (family: Family) => {
+    if (!profile?.institution_id) {
+      toast({
+        title: "Erro",
+        description: "Instituição não identificada",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Buscar nome da instituição
+      const institutionName = await getInstitutionName(profile.institution_id);
+
+      // Gerar termo de consentimento
+      const result = await generateTerm({
+        familyName: family.name || 'Família',
+        familyCpf: family.cpf || undefined,
+        contactPerson: family.contact_person || 'Titular',
+        phone: family.phone || undefined,
+        address: family.address || undefined,
+        institutionName: institutionName
+      });
+
+      if (result) {
+        // Baixar PDF
+        downloadTerm(result.blob, family.name || 'Familia', result.termId);
+        
+        toast({
+          title: "Termo Gerado",
+          description: "Termo de consentimento gerado e baixado com sucesso!",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao gerar termo de consentimento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar termo de consentimento. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Form for creating new family
@@ -270,17 +344,26 @@ const InstitutionFamilies = () => {
     setIsDetailsOpen(true);
   };
 
-  const handleEditFamily = (family: Family) => {
+  const handleEditFamily = async (family: Family) => {
     setSelectedFamily(family);
+    // Formatar CPF com máscara para exibição no formulário
+    const formattedCpf = family.cpf ? formatCpf(family.cpf) : "";
     editForm.reset({
       name: family.name || "",
       contact_person: family.contact_person || "",
       phone: family.phone || "",
-      cpf: family.cpf || "",
+      cpf: formattedCpf,
       address: family.address || "",
       members_count: family.members_count || 1,
       is_blocked: family.is_blocked || false,
     });
+    
+    // Buscar nome da instituição
+    if (profile?.institution_id) {
+      const name = await getInstitutionName(profile.institution_id);
+      setInstitutionName(name);
+    }
+    
     setIsEditDialogOpen(true);
   };
 
@@ -542,6 +625,20 @@ const InstitutionFamilies = () => {
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Editar
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handlePrintConsentTerm(family)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                            disabled={isGenerating}
+                          >
+                            {isGenerating ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <FileText className="h-4 w-4 mr-1" />
+                            )}
+                            Termo LGPD
                           </Button>
                           <Button 
                             variant="outline" 
@@ -848,9 +945,15 @@ const InstitutionFamilies = () => {
       </Dialog>
 
       {/* Edit Family Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditConsentGiven(false);
+          setEditTermSigned(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Editar Família</DialogTitle>
             <DialogDescription>
               Atualize as informações da família. Os campos marcados como opcionais podem ser deixados em branco.
@@ -858,113 +961,134 @@ const InstitutionFamilies = () => {
           </DialogHeader>
           
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome da Família</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: Família Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="flex flex-col flex-1 min-h-0">
+              <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome da Família</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: Família Silva" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="contact_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pessoa de Contato (Titular da Família)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: João Silva" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="cpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF (opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="000.000.000-00"
+                          maxLength={14}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            const formatted = formatCpf(e.target.value);
+                            // Salvar apenas números no banco
+                            const numbers = formatted.replace(/\D/g, '');
+                            field.onChange(numbers.length === 11 ? numbers : formatted);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="(11) 99999-9999" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço (opcional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="members_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número de Membros</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          value={field.value || 1}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                          min="1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <ConsentManagement
+                  familyName={editForm.watch('name') || ''}
+                  familyCpf={editForm.watch('cpf')}
+                  contactPerson={editForm.watch('contact_person') || ''}
+                  phone={editForm.watch('phone')}
+                  address={editForm.watch('address')}
+                  institutionName={institutionName || 'Instituição'}
+                  consentGiven={editConsentGiven}
+                  termSigned={editTermSigned}
+                  onConsentChange={setEditConsentGiven}
+                  onTermSignedChange={setEditTermSigned}
+                  familyId={selectedFamily?.id}
+                  mode="edit"
+                />
+              </div>
               
-              <FormField
-                control={editForm.control}
-                name="contact_person"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pessoa de Contato (Titular da Família)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: João Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="cpf"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CPF (opcional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        placeholder="000.000.000-00"
-                        maxLength={14}
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const formatted = formatCpf(e.target.value);
-                          // Salvar apenas números no banco
-                          const numbers = formatted.replace(/\D/g, '');
-                          field.onChange(numbers.length === 11 ? numbers : formatted);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="(11) 99999-9999" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço (opcional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="members_count"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de Membros</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value || 1}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
-                        min="1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
+              <DialogFooter className="px-6 pb-6 pt-4 border-t flex-shrink-0">
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsEditDialogOpen(false)}
+                  onClick={() => {
+                    setIsEditDialogOpen(false);
+                    setEditConsentGiven(false);
+                    setEditTermSigned(false);
+                  }}
                 >
                   Cancelar
                 </Button>

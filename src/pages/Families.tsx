@@ -434,13 +434,13 @@ const Families = () => {
       
       {/* Family Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Detalhes da Família</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
-            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-500">Nome da Família</p>
@@ -575,7 +575,7 @@ const Families = () => {
             </div>
           )}
           
-          <DialogFooter className="px-6 pb-6 pt-4 border-t">
+          <DialogFooter className="px-6 pb-6 pt-4 border-t flex-shrink-0">
             <Button onClick={() => setIsDetailsOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
@@ -805,143 +805,145 @@ const Families = () => {
 
       {/* Edit Family Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Editar Família</DialogTitle>
           </DialogHeader>
           
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome da Família</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: Família Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="contact_person"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pessoa de Contato(Titular da Família)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: João Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="cpf"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CPF (opcional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        placeholder="000.000.000-00"
-                        maxLength={14}
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const formatted = formatCpf(e.target.value);
-                          // Salvar apenas números no banco
-                          const numbers = formatted.replace(/\D/g, '');
-                          field.onChange(numbers.length === 11 ? numbers : formatted);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="(11) 99999-9999" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço (opcional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="members_count"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de Membros</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value || 1}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
-                        min="1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="flex flex-col flex-1 min-h-0">
+              <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome da Família</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: Família Silva" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="contact_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pessoa de Contato(Titular da Família)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Ex: João Silva" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="cpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF (opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="000.000.000-00"
+                          maxLength={14}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            const formatted = formatCpf(e.target.value);
+                            // Salvar apenas números no banco
+                            const numbers = formatted.replace(/\D/g, '');
+                            field.onChange(numbers.length === 11 ? numbers : formatted);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="(11) 99999-9999" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endereço (opcional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="members_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número de Membros</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          value={field.value || 1}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                          min="1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Institution Association Section */}
-              {selectedFamily && (
-                <div className="pt-4 border-t">
-                  <FamilyInstitutionLink 
-                    family={selectedFamily}
-                    onAssociationChange={() => {
-                      // Refresh family data after association
-                      // React Query will handle invalidation
-                    }}
-                  />
-                </div>
-              )}
+                {/* Institution Association Section */}
+                {selectedFamily && (
+                  <div className="pt-4 border-t">
+                    <FamilyInstitutionLink 
+                      family={selectedFamily}
+                      onAssociationChange={() => {
+                        // Refresh family data after association
+                        // React Query will handle invalidation
+                      }}
+                    />
+                  </div>
+                )}
+                
+                <ConsentManagement
+                  familyName={editForm.watch('name') || ''}
+                  familyCpf={editForm.watch('cpf')}
+                  contactPerson={editForm.watch('contact_person') || ''}
+                  phone={editForm.watch('phone')}
+                  address={editForm.watch('address')}
+                  institutionName="Sistema Cesta Justa"
+                  consentGiven={editConsentGiven}
+                  termSigned={editTermSigned}
+                  onConsentChange={setEditConsentGiven}
+                  onTermSignedChange={setEditTermSigned}
+                  familyId={selectedFamily?.id}
+                  mode="edit"
+                />
+              </div>
               
-              <ConsentManagement
-                familyName={editForm.watch('name') || ''}
-                familyCpf={editForm.watch('cpf')}
-                contactPerson={editForm.watch('contact_person') || ''}
-                phone={editForm.watch('phone')}
-                address={editForm.watch('address')}
-                institutionName="Sistema Cesta Justa"
-                consentGiven={editConsentGiven}
-                termSigned={editTermSigned}
-                onConsentChange={setEditConsentGiven}
-                onTermSignedChange={setEditTermSigned}
-                familyId={selectedFamily?.id}
-                mode="edit"
-              />
-              
-              <DialogFooter>
+              <DialogFooter className="px-6 pb-6 pt-4 border-t flex-shrink-0">
                 <Button 
                   type="button" 
                   variant="outline" 
