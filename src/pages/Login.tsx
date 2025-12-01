@@ -211,18 +211,18 @@ const Login = () => {
       
       <div className="flex-1 flex items-center justify-center p-4 z-10">
         <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
-          <CardHeader className="space-y-1 text-center">
+          <CardHeader className="space-y-1 text-center px-4 pt-6 pb-4">
             <img 
               src="/CestaJustaLogo.svg" 
               alt="Logo" 
-              className="w-[330px] h-[130px] mx-auto mb-0"
+              className="w-full max-w-[280px] sm:max-w-[330px] h-auto mx-auto mb-2"
             />
-            <CardTitle className="text-2xl font-bold tracking-tight">
+            <CardTitle className="text-lg sm:text-2xl font-bold tracking-tight">
               Sistema de Controle de Alimentos
             </CardTitle>
           </CardHeader>
           
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -293,8 +293,8 @@ const Login = () => {
             </div>
           </CardContent>
           
-          <CardFooter className="flex justify-center">
-            <div className="text-center text-sm text-muted-foreground">
+          <CardFooter className="flex justify-center px-4 pb-4">
+            <div className="text-center text-xs sm:text-sm text-muted-foreground">
               © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de Alimentos - Prefeitura Municipal de Araguari
             </div>
           </CardFooter>

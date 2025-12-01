@@ -47,19 +47,19 @@ const Index = () => {
       <Header />
       <NavigationButtons />
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+      <main className="max-w-7xl mx-auto py-4 md:py-6 px-4 sm:px-6 lg:px-8">
+        <div className="py-4 sm:py-6">
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
               Dashboard - Administrador
             </h2>
-            <p className="text-gray-600">
+            <p className="text-sm md:text-base text-gray-600">
               Bem-vindo(a), {profile.full_name}! Aqui você pode acompanhar as principais métricas do sistema.
             </p>
           </div>
 
           {/* Cards de estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
             {statsLoading ? (
               <>
                 <Skeleton className="h-[120px] w-full" />
@@ -101,12 +101,14 @@ const Index = () => {
           </div>
 
           {/* Gráfico de entregas */}
-          <div className="mb-8">
+          <div className="mb-6 md:mb-8">
             <DeliveriesChart />
           </div>
 
           {/* Tabela de entregas recentes */}
-          <RecentDeliveriesTable />
+          <div className="mb-4 md:mb-0">
+            <RecentDeliveriesTable />
+          </div>
         </div>
       </main>
     </div>

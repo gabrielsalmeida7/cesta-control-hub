@@ -21,19 +21,19 @@ const InstitutionDashboard = () => {
       <Header />
       <InstitutionNavigationButtons />
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+      <main className="max-w-7xl mx-auto py-4 md:py-6 px-4 sm:px-6 lg:px-8">
+        <div className="py-4 sm:py-6">
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
               Dashboard - Instituição
             </h2>
-            <p className="text-gray-600">
+            <p className="text-sm md:text-base text-gray-600">
               Bem-vindo(a), {profile.full_name}! Acompanhe as atividades da sua instituição.
             </p>
           </div>
 
           {/* Cards de estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
             <DashboardCard
               title="Famílias Cadastradas"
               value={isLoading ? "..." : ((stats as InstitutionStats)?.associatedFamilies || 0).toString()}
@@ -64,12 +64,12 @@ const InstitutionDashboard = () => {
           </div>
 
           {/* Informações da Instituição */}
-          <Card className="mb-6">
+          <Card className="mb-4 md:mb-6">
             <CardHeader>
-              <CardTitle>Informações da Instituição</CardTitle>
+              <CardTitle className="text-lg md:text-xl">Informações da Instituição</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Responsável</p>
                   <p className="font-medium">{profile.full_name}</p>
@@ -85,10 +85,10 @@ const InstitutionDashboard = () => {
           {/* Ações Rápidas */}
           <Card>
             <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
+              <CardTitle className="text-lg md:text-xl">Ações Rápidas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 <div className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
                   <Package className="h-8 w-8 text-primary mb-2" />
                   <h3 className="font-medium">Registrar Entrega</h3>

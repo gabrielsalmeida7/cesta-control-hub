@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
@@ -1288,18 +1287,18 @@ const InstitutionFamilies = () => {
                       <FormField
                         control={createForm.control}
                         name="other_institution_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome da Instituição (opcional)</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Nome da instituição onde também está cadastrada" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                      )}
-                    />
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome da Instituição (opcional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Nome da instituição onde também está cadastrada" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  
                   
                   <FormField
                     control={createForm.control}

@@ -254,11 +254,11 @@ const Institutions = () => {
       <Header />
       <NavigationButtons />
       
-      <main className="pt-20 pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
-        <div className="mb-8">
+      <main className="pt-4 md:pt-20 pb-6 md:pb-8 px-4 md:px-8 max-w-[1400px] mx-auto flex-grow">
+        <div className="mb-6 md:mb-8">
           {/* Page title and add new institution button */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">Instituições</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 md:mb-6">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">Instituições</h2>
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
                 <label className="text-sm text-gray-600 whitespace-nowrap">Mostrar:</label>
