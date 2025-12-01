@@ -6,11 +6,14 @@ import ConsentManagement from '@/components/ConsentManagement';
 import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution, useUpdateFamily } from '@/hooks/useFamilies';
 import { useDeliveries } from '@/hooks/useDeliveries';
@@ -48,6 +51,8 @@ const InstitutionFamilies = () => {
   const [prefilledCpf, setPrefilledCpf] = useState<string | undefined>(undefined);
   
   // Estados para consentimento LGPD
+  const [createConsentGiven, setCreateConsentGiven] = useState(false);
+  const [createTermSigned, setCreateTermSigned] = useState(false);
   const [editConsentGiven, setEditConsentGiven] = useState(false);
   const [editTermSigned, setEditTermSigned] = useState(false);
   const [institutionName, setInstitutionName] = useState<string>('');
@@ -179,6 +184,34 @@ const InstitutionFamilies = () => {
       address: "",
       members_count: 1,
       is_blocked: false,
+      mother_name: "",
+      birth_date: "",
+      id_document: "",
+      occupation: "",
+      work_situation: "",
+      children_count: 0,
+      has_disability: false,
+      address_reference: "",
+      registered_in_other_institution: false,
+      other_institution_name: "",
+      receives_government_aid: false,
+      receives_bolsa_familia: false,
+      receives_auxilio_gas: false,
+      receives_bpc: false,
+      receives_other_aid: false,
+      other_aid_description: "",
+      has_chronic_disease: false,
+      chronic_disease_description: "",
+      housing_type: "",
+      construction_type: "",
+      has_water_supply: false,
+      has_electricity: false,
+      has_garbage_collection: false,
+      food_insecurity: false,
+      unemployment: false,
+      poor_health: false,
+      substance_abuse: false,
+      other_vulnerabilities: "",
     }
   });
 
@@ -192,6 +225,34 @@ const InstitutionFamilies = () => {
       address: "",
       members_count: 1,
       is_blocked: false,
+      mother_name: "",
+      birth_date: "",
+      id_document: "",
+      occupation: "",
+      work_situation: "",
+      children_count: 0,
+      has_disability: false,
+      address_reference: "",
+      registered_in_other_institution: false,
+      other_institution_name: "",
+      receives_government_aid: false,
+      receives_bolsa_familia: false,
+      receives_auxilio_gas: false,
+      receives_bpc: false,
+      receives_other_aid: false,
+      other_aid_description: "",
+      has_chronic_disease: false,
+      chronic_disease_description: "",
+      housing_type: "",
+      construction_type: "",
+      has_water_supply: false,
+      has_electricity: false,
+      has_garbage_collection: false,
+      food_insecurity: false,
+      unemployment: false,
+      poor_health: false,
+      substance_abuse: false,
+      other_vulnerabilities: "",
     }
   });
 
@@ -348,6 +409,12 @@ const InstitutionFamilies = () => {
     setSelectedFamily(family);
     // Formatar CPF com máscara para exibição no formulário
     const formattedCpf = family.cpf ? formatCpf(family.cpf) : "";
+    // Formatar data de nascimento se existir
+    const formattedBirthDate = family.birth_date 
+      ? (typeof family.birth_date === 'string' 
+          ? family.birth_date.split('T')[0] 
+          : new Date(family.birth_date).toISOString().split('T')[0])
+      : "";
     editForm.reset({
       name: family.name || "",
       contact_person: family.contact_person || "",
@@ -356,6 +423,34 @@ const InstitutionFamilies = () => {
       address: family.address || "",
       members_count: family.members_count || 1,
       is_blocked: family.is_blocked || false,
+      mother_name: family.mother_name || "",
+      birth_date: formattedBirthDate,
+      id_document: family.id_document || "",
+      occupation: family.occupation || "",
+      work_situation: family.work_situation || "",
+      children_count: family.children_count || 0,
+      has_disability: family.has_disability || false,
+      address_reference: family.address_reference || "",
+      registered_in_other_institution: family.registered_in_other_institution || false,
+      other_institution_name: family.other_institution_name || "",
+      receives_government_aid: family.receives_government_aid || false,
+      receives_bolsa_familia: family.receives_bolsa_familia || false,
+      receives_auxilio_gas: family.receives_auxilio_gas || false,
+      receives_bpc: family.receives_bpc || false,
+      receives_other_aid: family.receives_other_aid || false,
+      other_aid_description: family.other_aid_description || "",
+      has_chronic_disease: family.has_chronic_disease || false,
+      chronic_disease_description: family.chronic_disease_description || "",
+      housing_type: family.housing_type || "",
+      construction_type: family.construction_type || "",
+      has_water_supply: family.has_water_supply || false,
+      has_electricity: family.has_electricity || false,
+      has_garbage_collection: family.has_garbage_collection || false,
+      food_insecurity: family.food_insecurity || false,
+      unemployment: family.unemployment || false,
+      poor_health: family.poor_health || false,
+      substance_abuse: family.substance_abuse || false,
+      other_vulnerabilities: family.other_vulnerabilities || "",
     });
     
     // Buscar nome da instituição
@@ -675,13 +770,13 @@ const InstitutionFamilies = () => {
 
       {/* Dialog de detalhes */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-4">
+        <DialogContent className="sm:max-w-[600px] h-[90vh] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Detalhes da Família: {selectedFamily?.name}</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
-            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Nome da Família</p>
@@ -709,6 +804,155 @@ const InstitutionFamilies = () => {
                 <div>
                   <p className="text-sm text-gray-600">Endereço</p>
                   <p className="font-medium">{selectedFamily.address}</p>
+                </div>
+              )}
+              
+              {selectedFamily.address_reference && (
+                <div>
+                  <p className="text-sm text-gray-600">Ponto de Referência</p>
+                  <p className="font-medium">{selectedFamily.address_reference}</p>
+                </div>
+              )}
+
+              {/* Dados Adicionais do Responsável */}
+              {(selectedFamily.mother_name || selectedFamily.birth_date || selectedFamily.id_document || selectedFamily.occupation || selectedFamily.work_situation) && (
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Dados Adicionais do Responsável</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedFamily.mother_name && (
+                      <div>
+                        <p className="text-sm text-gray-600">Nome da Mãe</p>
+                        <p className="font-medium">{selectedFamily.mother_name}</p>
+                      </div>
+                    )}
+                    {selectedFamily.birth_date && (
+                      <div>
+                        <p className="text-sm text-gray-600">Data de Nascimento</p>
+                        <p className="font-medium">{new Date(selectedFamily.birth_date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    )}
+                    {selectedFamily.id_document && (
+                      <div>
+                        <p className="text-sm text-gray-600">ID / RG</p>
+                        <p className="font-medium">{selectedFamily.id_document}</p>
+                      </div>
+                    )}
+                    {selectedFamily.occupation && (
+                      <div>
+                        <p className="text-sm text-gray-600">Profissão/Ocupação</p>
+                        <p className="font-medium">{selectedFamily.occupation}</p>
+                      </div>
+                    )}
+                    {selectedFamily.work_situation && (
+                      <div>
+                        <p className="text-sm text-gray-600">Situação de Trabalho</p>
+                        <p className="font-medium">{selectedFamily.work_situation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Composição Familiar */}
+              <div className="pt-4 border-t">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Composição Familiar</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Número de Membros</p>
+                    <p className="font-medium">{selectedFamily.members_count || 'N/A'}</p>
+                  </div>
+                  {selectedFamily.children_count !== undefined && selectedFamily.children_count !== null && (
+                    <div>
+                      <p className="text-sm text-gray-600">Quantos Filhos</p>
+                      <p className="font-medium">{selectedFamily.children_count}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-gray-600">Possui Deficiência na Família</p>
+                    <p className="font-medium">{selectedFamily.has_disability ? "Sim" : "Não"}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Situação Social */}
+              {(selectedFamily.registered_in_other_institution || selectedFamily.receives_government_aid || selectedFamily.has_chronic_disease) && (
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Situação Social</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedFamily.registered_in_other_institution && (
+                      <div>
+                        <p className="text-sm text-gray-600">Cadastro em outra instituição</p>
+                        <p className="font-medium">{selectedFamily.other_institution_name || "Sim"}</p>
+                      </div>
+                    )}
+                    {selectedFamily.receives_government_aid && (
+                      <div>
+                        <p className="text-sm text-gray-600">Auxílios do governo</p>
+                        <div className="space-y-1">
+                          {selectedFamily.receives_bolsa_familia && <p className="text-sm">• Bolsa Família</p>}
+                          {selectedFamily.receives_auxilio_gas && <p className="text-sm">• Auxílio Gás</p>}
+                          {selectedFamily.receives_bpc && <p className="text-sm">• BPC</p>}
+                          {selectedFamily.receives_other_aid && (
+                            <p className="text-sm">• Outros: {selectedFamily.other_aid_description || "Sim"}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {selectedFamily.has_chronic_disease && (
+                      <div>
+                        <p className="text-sm text-gray-600">Deficiência/Doença crônica</p>
+                        <p className="font-medium">{selectedFamily.chronic_disease_description || "Sim"}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Condições de Moradia */}
+              {(selectedFamily.housing_type || selectedFamily.construction_type || selectedFamily.has_water_supply || selectedFamily.has_electricity || selectedFamily.has_garbage_collection) && (
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Condições de Moradia</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedFamily.housing_type && (
+                      <div>
+                        <p className="text-sm text-gray-600">Tipo de Moradia</p>
+                        <p className="font-medium">{selectedFamily.housing_type}</p>
+                      </div>
+                    )}
+                    {selectedFamily.construction_type && (
+                      <div>
+                        <p className="text-sm text-gray-600">Tipo de Construção</p>
+                        <p className="font-medium">{selectedFamily.construction_type}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-gray-600">Serviços Públicos</p>
+                      <div className="space-y-1">
+                        <p className="text-sm">{selectedFamily.has_water_supply ? "✓" : "✗"} Água</p>
+                        <p className="text-sm">{selectedFamily.has_electricity ? "✓" : "✗"} Energia</p>
+                        <p className="text-sm">{selectedFamily.has_garbage_collection ? "✓" : "✗"} Coleta de lixo</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Vulnerabilidades */}
+              {(selectedFamily.food_insecurity || selectedFamily.unemployment || selectedFamily.poor_health || selectedFamily.substance_abuse || selectedFamily.other_vulnerabilities) && (
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Vulnerabilidades Identificadas</h4>
+                  <div className="space-y-2">
+                    {selectedFamily.food_insecurity && <p className="text-sm">• Insegurança alimentar</p>}
+                    {selectedFamily.unemployment && <p className="text-sm">• Desemprego</p>}
+                    {selectedFamily.poor_health && <p className="text-sm">• Saúde precária</p>}
+                    {selectedFamily.substance_abuse && <p className="text-sm">• Dependência química</p>}
+                    {selectedFamily.other_vulnerabilities && (
+                      <div>
+                        <p className="text-sm text-gray-600">Outras:</p>
+                        <p className="text-sm">{selectedFamily.other_vulnerabilities}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               
@@ -774,127 +1018,649 @@ const InstitutionFamilies = () => {
 
       {/* Create Family Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[700px] h-[95vh] max-h-[95vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Cadastrar Nova Família</DialogTitle>
           </DialogHeader>
           
           <Form {...createForm}>
-            <form onSubmit={createForm.handleSubmit(onSubmitCreate)} className="space-y-4">
-              <FormField
-                control={createForm.control}
-                name="name"
-                rules={{ required: "Nome é obrigatório" }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome da Família</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: Família Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={createForm.control}
-                name="contact_person"
-                rules={{ required: "Pessoa de contato é obrigatória" }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pessoa de Contato</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: João Silva" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={createForm.control}
-                name="cpf"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CPF (opcional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        placeholder="000.000.000-00"
-                        maxLength={14}
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const formatted = formatCpf(e.target.value);
-                          // Salvar apenas números no banco
-                          const numbers = formatted.replace(/\D/g, '');
-                          field.onChange(numbers.length === 11 ? numbers : formatted);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={createForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="(11) 99999-9999" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={createForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço (opcional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Rua, número, bairro, cidade..." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={createForm.control}
-                name="members_count"
-                rules={{ 
-                  required: "Número de membros é obrigatório",
-                  min: { value: 1, message: "Deve ter pelo menos 1 membro" }
-                }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de Membros</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value || 1}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
-                        min="1"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form onSubmit={createForm.handleSubmit(onSubmitCreate)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="px-6 space-y-6 overflow-y-auto flex-1 min-h-0 pb-4">
+                {/* Seção 1: Dados da Família */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Dados da Família</h3>
+                    <FormField
+                      control={createForm.control}
+                      name="name"
+                      rules={{ required: "Nome é obrigatório" }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Família</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: Família Silva" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="contact_person"
+                      rules={{ required: "Pessoa de contato é obrigatória" }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pessoa de Contato</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: João Silva" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="cpf"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CPF (opcional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="000.000.000-00"
+                              maxLength={14}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                const formatted = formatCpf(e.target.value);
+                                const numbers = formatted.replace(/\D/g, '');
+                                field.onChange(numbers.length === 11 ? numbers : formatted);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="phone"
+                      rules={{ required: "Telefone é obrigatório" }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="(11) 99999-9999" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Endereço (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Rua, número, bairro, cidade..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="address_reference"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ponto de Referência (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: Próximo ao mercado, em frente à escola..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Nota:</strong> A família será automaticamente vinculada à sua instituição após o cadastro.
-                </p>
+                {/* Seção 2: Dados do Responsável */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Dados do Responsável</h3>
+                  <FormField
+                    control={createForm.control}
+                    name="mother_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Mãe (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Nome completo da mãe" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="birth_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data de Nascimento (opcional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              value={field.value ? (typeof field.value === 'string' ? field.value.split('T')[0] : new Date(field.value).toISOString().split('T')[0]) : ""}
+                              max={new Date().toISOString().split('T')[0]}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="id_document"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID / RG (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Número do documento de identidade" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="occupation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Profissão/Ocupação (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: Pedreiro, Vendedor, etc." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="work_situation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Situação de Trabalho (opcional)</FormLabel>
+                          <Select value={field.value || ""} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a situação" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Empregado">Empregado</SelectItem>
+                              <SelectItem value="Desempregado">Desempregado</SelectItem>
+                              <SelectItem value="Autônomo">Autônomo</SelectItem>
+                              <SelectItem value="Aposentado">Aposentado</SelectItem>
+                              <SelectItem value="Outros">Outros</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+
+                {/* Seção 3: Composição Familiar */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Composição Familiar</h3>
+                  <FormField
+                    control={createForm.control}
+                    name="children_count"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantos Filhos (opcional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              {...field} 
+                              value={field.value || 0}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                              min="0"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="has_disability"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Possui deficiência na família
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                </div>
+
+                {/* Seção 4: Situação Social */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Situação Social</h3>
+                  <FormField
+                    control={createForm.control}
+                    name="registered_in_other_institution"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Possui cadastro em outra instituição?
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {createForm.watch('registered_in_other_institution') && (
+                      <FormField
+                        control={createForm.control}
+                        name="other_institution_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome da Instituição (opcional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Nome da instituição onde também está cadastrada" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                      )}
+                    />
+                    )}
+                  />
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="receives_government_aid"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Recebe algum auxílio do governo?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {createForm.watch('receives_government_aid') && (
+                    <div className="space-y-3 pl-4 border-l-2">
+                      <FormField
+                        control={createForm.control}
+                        name="receives_bolsa_familia"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Bolsa Família</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="receives_auxilio_gas"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Auxílio Gás</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="receives_bpc"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">BPC</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="receives_other_aid"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Outros</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {createForm.watch('receives_other_aid') && (
+                        <FormField
+                          control={createForm.control}
+                          name="other_aid_description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição de outros auxílios (opcional)</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Descreva outros auxílios recebidos" rows={2} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  )}
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="has_chronic_disease"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Possui membro com deficiência ou doença crônica?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {createForm.watch('has_chronic_disease') && (
+                    <FormField
+                      control={createForm.control}
+                      name="chronic_disease_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qual deficiência/doença? (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Descreva a deficiência ou doença crônica" rows={2} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Seção 5: Condições de Moradia */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Condições de Moradia</h3>
+                  <FormField
+                    control={createForm.control}
+                    name="housing_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Moradia (opcional)</FormLabel>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo de moradia" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Própria">Própria</SelectItem>
+                          <SelectItem value="Alugada">Alugada</SelectItem>
+                          <SelectItem value="Cedida">Cedida</SelectItem>
+                          <SelectItem value="Ocupação/Área de risco">Ocupação/Área de risco</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={createForm.control}
+                  name="construction_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Construção (opcional)</FormLabel>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo de construção" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Alvenaria">Alvenaria</SelectItem>
+                          <SelectItem value="Madeira">Madeira</SelectItem>
+                          <SelectItem value="Mista">Mista</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="space-y-3">
+                  <FormField
+                    control={createForm.control}
+                    name="has_water_supply"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">Possui abastecimento de água</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="has_electricity"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">Possui energia elétrica</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="has_garbage_collection"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">Possui coleta de lixo</FormLabel>
+                      </FormItem>
+                    )}
+                    />
+                  </div>
+                </div>
+
+                {/* Seção 6: Vulnerabilidades */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Vulnerabilidades</h3>
+                  <div className="space-y-3">
+                    <FormField
+                      control={createForm.control}
+                      name="food_insecurity"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Insegurança alimentar</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="unemployment"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Desemprego</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="poor_health"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Saúde precária</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="substance_abuse"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Dependência química na família</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <FormField
+                      control={createForm.control}
+                      name="other_vulnerabilities"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Outras vulnerabilidades (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Descreva outras vulnerabilidades identificadas" rows={2} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+
+                {/* Seção 7: Instituições */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Instituições</h3>
+                  <div className="text-sm text-gray-600">
+                    <p>As instituições podem ser associadas após a criação da família.</p>
+                  </div>
+                </div>
+
+                {/* Seção 8: Consentimento LGPD */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Consentimento LGPD</h3>
+                  <ConsentManagement
+                    familyName={createForm.watch('name') || ''}
+                    familyCpf={createForm.watch('cpf')}
+                    contactPerson={createForm.watch('contact_person') || ''}
+                    phone={createForm.watch('phone')}
+                    address={createForm.watch('address')}
+                    institutionName={profile?.institution?.name || 'Instituição'}
+                    consentGiven={createConsentGiven}
+                    termSigned={createTermSigned}
+                    onConsentChange={setCreateConsentGiven}
+                    onTermSignedChange={setCreateTermSigned}
+                    mode="create"
+                  />
+                  
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Nota:</strong> A família será automaticamente vinculada à sua instituição após o cadastro.
+                    </p>
+                  </div>
+                </div>
               </div>
               
-              <DialogFooter>
+              <DialogFooter className="px-6 pb-6 pt-4 border-t flex-shrink-0">
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -1046,23 +1812,541 @@ const InstitutionFamilies = () => {
                 
                 <FormField
                   control={editForm.control}
-                  name="members_count"
+                  name="address_reference"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Número de Membros</FormLabel>
+                      <FormLabel>Ponto de Referência (opcional)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
-                          value={field.value || 1}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
-                          min="1"
-                        />
+                        <Input {...field} placeholder="Ex: Próximo ao mercado, em frente à escola..." />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* Seção: Dados Adicionais do Responsável */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Dados Adicionais do Responsável</h3>
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="mother_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome da Mãe (opcional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Nome completo da mãe" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="birth_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data de Nascimento (opcional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            value={field.value ? (typeof field.value === 'string' ? field.value.split('T')[0] : new Date(field.value).toISOString().split('T')[0]) : ""}
+                            max={new Date().toISOString().split('T')[0]}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="id_document"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ID / RG (opcional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Número do documento de identidade" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="occupation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Profissão/Ocupação (opcional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Ex: Pedreiro, Vendedor, etc." />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="work_situation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Situação de Trabalho (opcional)</FormLabel>
+                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a situação" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Empregado">Empregado</SelectItem>
+                            <SelectItem value="Desempregado">Desempregado</SelectItem>
+                            <SelectItem value="Autônomo">Autônomo</SelectItem>
+                            <SelectItem value="Aposentado">Aposentado</SelectItem>
+                            <SelectItem value="Outros">Outros</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Seção: Composição Familiar */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Composição Familiar</h3>
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="members_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número de Membros</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || 1}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} 
+                            min="1"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="children_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantos Filhos (opcional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                            min="0"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="has_disability"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Possui deficiência na família
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Seção: Situação Social */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Situação Social</h3>
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="registered_in_other_institution"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Possui cadastro em outra instituição?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {editForm.watch('registered_in_other_institution') && (
+                    <FormField
+                      control={editForm.control}
+                      name="other_institution_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome da Instituição (opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Nome da instituição onde também está cadastrada" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="receives_government_aid"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Recebe algum auxílio do governo?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {editForm.watch('receives_government_aid') && (
+                    <div className="space-y-3 pl-4 border-l-2">
+                      <FormField
+                        control={editForm.control}
+                        name="receives_bolsa_familia"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Bolsa Família</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="receives_auxilio_gas"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Auxílio Gás</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="receives_bpc"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">BPC</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="receives_other_aid"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">Outros</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {editForm.watch('receives_other_aid') && (
+                        <FormField
+                          control={editForm.control}
+                          name="other_aid_description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição de outros auxílios (opcional)</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Descreva outros auxílios recebidos" rows={2} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  )}
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="has_chronic_disease"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value || false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Possui membro com deficiência ou doença crônica?
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {editForm.watch('has_chronic_disease') && (
+                    <FormField
+                      control={editForm.control}
+                      name="chronic_disease_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qual deficiência/doença? (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Descreva a deficiência ou doença crônica" rows={2} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+
+                {/* Seção: Condições de Moradia */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Condições de Moradia</h3>
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="housing_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de Moradia (opcional)</FormLabel>
+                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo de moradia" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Própria">Própria</SelectItem>
+                            <SelectItem value="Alugada">Alugada</SelectItem>
+                            <SelectItem value="Cedida">Cedida</SelectItem>
+                            <SelectItem value="Ocupação/Área de risco">Ocupação/Área de risco</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="construction_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de Construção (opcional)</FormLabel>
+                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo de construção" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Alvenaria">Alvenaria</SelectItem>
+                            <SelectItem value="Madeira">Madeira</SelectItem>
+                            <SelectItem value="Mista">Mista</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="space-y-3">
+                    <FormField
+                      control={editForm.control}
+                      name="has_water_supply"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Possui abastecimento de água</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="has_electricity"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Possui energia elétrica</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="has_garbage_collection"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Possui coleta de lixo</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Seção: Vulnerabilidades */}
+                <div className="pt-4 border-t">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Necessidades e Vulnerabilidades Identificadas</h3>
+                  
+                  <div className="space-y-3">
+                    <FormField
+                      control={editForm.control}
+                      name="food_insecurity"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Insegurança alimentar</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="unemployment"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Desemprego</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="poor_health"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Saúde precária</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="substance_abuse"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">Dependência química na família</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="other_vulnerabilities"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Outras vulnerabilidades (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Descreva outras vulnerabilidades identificadas" rows={2} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 
                 <ConsentManagement
                   familyName={editForm.watch('name') || ''}
