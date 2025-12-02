@@ -5,12 +5,15 @@ import InstitutionNavigationButtons from '@/components/InstitutionNavigationButt
 import DashboardCard from '@/components/DashboardCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardStats, type InstitutionStats } from '@/hooks/useDashboardStats';
+import { useInstitutionData } from '@/hooks/useInstitutions';
 import { Users, Package, AlertTriangle, Calendar, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const InstitutionDashboard = () => {
   const { profile } = useAuth();
   const { data: stats, isLoading } = useDashboardStats();
+  const { data: institutionData, isLoading: isLoadingInstitution } = useInstitutionData();
 
   if (!profile) {
     return null;
@@ -69,16 +72,41 @@ const InstitutionDashboard = () => {
               <CardTitle className="text-lg md:text-xl">Informações da Instituição</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Responsável</p>
-                  <p className="font-medium">{profile.full_name}</p>
+              {isLoadingInstitution ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">E-mail</p>
-                  <p className="font-medium">{profile.email}</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Nome da Instituição</p>
+                    <p className="font-medium">{institutionData?.name || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Responsável</p>
+                    <p className="font-medium">{profile.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">E-mail</p>
+                    <p className="font-medium">{profile.email}</p>
+                  </div>
+                  {institutionData?.address && (
+                    <div>
+                      <p className="text-sm text-gray-600">Endereço</p>
+                      <p className="font-medium">{institutionData.address}</p>
+                    </div>
+                  )}
+                  {institutionData?.phone && (
+                    <div>
+                      <p className="text-sm text-gray-600">Telefone</p>
+                      <p className="font-medium">{institutionData.phone}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

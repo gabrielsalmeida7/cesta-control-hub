@@ -222,6 +222,7 @@ export const useUpdateInstitution = () => {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: InstitutionUpdate }) => {
+      // Atualizar a instituição
       const { data, error } = await supabase
         .from('institutions')
         .update(updates)
@@ -230,10 +231,43 @@ export const useUpdateInstitution = () => {
         .single();
       
       if (error) throw error;
+
+      // Se responsible_name foi atualizado, sincronizar com profiles.full_name
+      if (updates.responsible_name !== undefined) {
+        // Buscar o profile associado à instituição
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('institution_id', id)
+          .maybeSingle();
+
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('[UPDATE_INSTITUTION] Error fetching profile:', profileError);
+          // Não falhar a atualização se não conseguir atualizar o profile
+          // mas logar o erro
+        } else if (profile && profile.id) {
+          // Atualizar full_name no profile
+          const { error: updateProfileError } = await supabase
+            .from('profiles')
+            .update({ full_name: updates.responsible_name })
+            .eq('id', profile.id);
+
+          if (updateProfileError) {
+            console.error('[UPDATE_INSTITUTION] Error updating profile full_name:', updateProfileError);
+            // Não falhar a atualização se não conseguir atualizar o profile
+            // mas logar o erro
+          } else {
+            console.log('[UPDATE_INSTITUTION] Profile full_name synchronized successfully');
+          }
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles'] }); // Invalidar profiles também
+      queryClient.invalidateQueries({ queryKey: ['institution-data'] }); // Invalidar dados da instituição
       toast({
         title: "Sucesso",
         description: "Instituição atualizada com sucesso!",
@@ -246,6 +280,36 @@ export const useUpdateInstitution = () => {
         variant: "destructive",
       });
     },
+  });
+};
+
+// Hook para buscar dados completos da instituição usando institution_id do profile
+export const useInstitutionData = () => {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ['institution-data', profile?.institution_id],
+    queryFn: async () => {
+      if (!profile?.institution_id) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('institutions')
+        .select('*')
+        .eq('id', profile.institution_id)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching institution data:', error);
+        throw error;
+      }
+
+      return data as Institution;
+    },
+    enabled: !!profile?.institution_id && profile.role === 'institution',
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 };
 
