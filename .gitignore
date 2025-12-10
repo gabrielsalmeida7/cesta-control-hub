@@ -56,3 +56,21 @@ Thumbs.db
 # yarn.lock
 # pnpm-lock.yaml
 # bun.lockb
+
+# Documentação Interna (não deve estar em repositório público)
+docs/
+context.md
+CURRENT_STATUS.md
+ENV_SETUP.md
+FIX_LOGIN_NOW.txt
+Roles-RDN-Fluxos.txt
+VERCEL_DEPLOY.md
+
+# Migrations e Banco de Dados (podem conter informações sensíveis)
+supabase/migrations/
+
+# Ferramentas de Desenvolvimento
+.cursor/
+
+# Pasta duplicada/estrutura antiga
+cestas/
