@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { startOfMonth } from 'date-fns';
 
 export interface AdminStats {
   totalInstitutions: number;
@@ -95,7 +96,7 @@ export const useDashboardStats = () => {
             .from('deliveries')
             .select('*')
             .eq('institution_id', profile.institution_id)
-            .gte('delivery_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+            .gte('delivery_date', startOfMonth(new Date()).toISOString());
           console.log('📝 Recent deliveries result:', recentResult);
 
           console.log('📝 Testing deliveries this year query...');
