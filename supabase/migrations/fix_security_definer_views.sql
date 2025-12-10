@@ -211,3 +211,4 @@ COMMENT ON VIEW public.families_eligible_for_deletion IS
 --   AND c.relname IN ('families_with_cpf', 'consent_audit', 'audit_critical_actions', 
 --                     'audit_data_access', 'audit_by_user', 'families_eligible_for_deletion');
 
+

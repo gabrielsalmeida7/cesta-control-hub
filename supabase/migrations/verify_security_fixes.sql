@@ -209,3 +209,4 @@ ORDER BY tablename, indexname;
 --
 -- Se algum item estiver marcado com ⚠️ ou ❌, execute as migrations novamente ou corrija manualmente.
 
+

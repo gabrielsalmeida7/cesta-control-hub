@@ -20,6 +20,21 @@ export const useFamilies = () => {
     queryFn: async () => {
       console.log('👨‍👩‍👧‍👦 Fetching families...', { userId: profile?.id, role: profile?.role });
       
+      // Desbloquear automaticamente famílias expiradas antes de buscar
+      try {
+        const { data: unblockedCount, error: unblockError } = await supabase
+          .rpc('auto_unblock_expired_families');
+        
+        if (unblockError) {
+          console.warn('⚠️ Error auto-unblocking families:', unblockError);
+        } else if (unblockedCount && unblockedCount > 0) {
+          console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+        }
+      } catch (error) {
+        // Se a função não existir ainda (migração não executada), apenas logar warning
+        console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
+      }
+      
       const { data, error } = await supabase
         .from("families")
         .select(
@@ -85,6 +100,21 @@ export const useInstitutionFamilies = (institutionId?: string) => {
       if (!institutionId) {
         console.log('❌ No institutionId provided');
         return [];
+      }
+
+      // Desbloquear automaticamente famílias expiradas antes de buscar
+      try {
+        const { data: unblockedCount, error: unblockError } = await supabase
+          .rpc('auto_unblock_expired_families');
+        
+        if (unblockError) {
+          console.warn('⚠️ Error auto-unblocking families:', unblockError);
+        } else if (unblockedCount && unblockedCount > 0) {
+          console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+        }
+      } catch (error) {
+        // Se a função não existir ainda (migração não executada), apenas logar warning
+        console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
       }
 
       console.log('🔍 Fetching families for institution:', institutionId);
@@ -266,6 +296,11 @@ export const useUpdateFamily = () => {
       id: string;
       updates: FamilyUpdate;
     }) => {
+      // Log para debug em desenvolvimento
+      if (import.meta.env.DEV) {
+        console.log('[useUpdateFamily] Atualizando família:', { id, updates });
+      }
+
       const { data, error } = await supabase
         .from("families")
         .update(updates)
@@ -273,7 +308,18 @@ export const useUpdateFamily = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Log detalhado do erro em desenvolvimento
+        if (import.meta.env.DEV) {
+          console.error('[useUpdateFamily] Erro do Supabase:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -284,10 +330,18 @@ export const useUpdateFamily = () => {
         description: "Família atualizada com sucesso!"
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      // Mensagem de erro mais detalhada
+      let errorMessage = "Erro ao atualizar família";
+      if (error?.message) {
+        errorMessage += ": " + error.message;
+      } else if (error?.details) {
+        errorMessage += ": " + error.details;
+      }
+      
       toast({
         title: "Erro",
-        description: "Erro ao atualizar família: " + error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -407,27 +461,76 @@ export const useDisassociateFamilyFromInstitution = () => {
       familyId: string;
       institutionId: string;
     }) => {
-      const { error } = await supabase
+      if (import.meta.env.DEV) {
+        console.log('[useDisassociateFamilyFromInstitution] Iniciando desvinculação:', {
+          familyId,
+          institutionId
+        });
+      }
+
+      // Verificar se o vínculo existe antes de deletar
+      const { data: existingLink, error: checkError } = await supabase
+        .from("institution_families")
+        .select("family_id, institution_id")
+        .eq("family_id", familyId)
+        .eq("institution_id", institutionId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('[useDisassociateFamilyFromInstitution] Erro ao verificar vínculo:', checkError);
+        throw checkError;
+      }
+
+      if (!existingLink) {
+        const errorMsg = "Vínculo não encontrado entre a família e a instituição";
+        console.warn('[useDisassociateFamilyFromInstitution]', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[useDisassociateFamilyFromInstitution] Vínculo encontrado, deletando:', existingLink);
+      }
+
+      // Deletar o vínculo
+      const { data, error } = await supabase
         .from("institution_families")
         .delete()
         .eq("family_id", familyId)
-        .eq("institution_id", institutionId);
+        .eq("institution_id", institutionId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useDisassociateFamilyFromInstitution] Erro ao deletar:', error);
+        throw error;
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[useDisassociateFamilyFromInstitution] Desvinculação bem-sucedida:', data);
+      }
+
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      if (import.meta.env.DEV) {
+        console.log('[useDisassociateFamilyFromInstitution] onSuccess chamado:', { data, variables });
+      }
+
+      // Invalidar queries para atualizar a lista
       queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["institution-families", variables.institutionId] });
       queryClient.invalidateQueries({ queryKey: ["institution-families"] });
       queryClient.invalidateQueries({ queryKey: ["institutions"] });
+      
       toast({
         title: "Sucesso",
         description: "Família desvinculada da instituição com sucesso!"
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('[useDisassociateFamilyFromInstitution] Erro na mutation:', error);
       toast({
         title: "Erro",
-        description: "Erro ao desassociar família: " + error.message,
+        description: "Erro ao desassociar família: " + (error?.message || "Erro desconhecido"),
         variant: "destructive"
       });
     }

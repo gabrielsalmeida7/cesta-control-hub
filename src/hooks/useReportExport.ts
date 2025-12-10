@@ -182,6 +182,9 @@ export const useReportExport = () => {
         csvContent += values.join(',') + '\n';
       });
 
+      // Adicionar BOM UTF-8 para compatibilidade com Excel
+      csvContent = '\uFEFF' + csvContent;
+
       // Criar e baixar arquivo
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');

@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConsentManagement } from '@/hooks/useConsentManagement';
 import { supabase } from '@/integrations/supabase/client';
 import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { formatDateTimeBrasilia, formatDateBrasilia } from '@/utils/dateFormat';
 
 type Family = Tables<'families'> & {
@@ -215,7 +215,7 @@ const InstitutionFamilies = () => {
   });
 
   // Form for editing family
-  const editForm = useForm<TablesInsert<'families'>>({
+  const editForm = useForm<TablesUpdate<'families'>>({
     defaultValues: {
       name: "",
       contact_person: "",
@@ -461,25 +461,138 @@ const InstitutionFamilies = () => {
     setIsEditDialogOpen(true);
   };
 
-  const onSubmitEdit = async (data: TablesInsert<'families'>) => {
+  const onSubmitEdit = async (data: TablesUpdate<'families'>) => {
     if (!selectedFamily) return;
 
     try {
+      // Criar objeto com apenas os campos que devem ser atualizados
+      // Remover campos de sistema que não podem ser atualizados
+      const familyData: any = {};
+      
+      // Campos obrigatórios - garantir que não sejam strings vazias (viola constraint)
+      if (data.name !== undefined && data.name !== null) {
+        const trimmedName = typeof data.name === 'string' ? data.name.trim() : data.name;
+        if (trimmedName && trimmedName.length > 0) {
+          familyData.name = trimmedName;
+        }
+      }
+      
+      if (data.contact_person !== undefined && data.contact_person !== null) {
+        const trimmedContact = typeof data.contact_person === 'string' ? data.contact_person.trim() : data.contact_person;
+        if (trimmedContact && trimmedContact.length > 0) {
+          familyData.contact_person = trimmedContact;
+        }
+      }
+      
+      // members_count deve ser > 0 (viola constraint se <= 0)
+      if (data.members_count !== undefined && data.members_count !== null) {
+        const membersCount = Number(data.members_count);
+        if (membersCount > 0) {
+          familyData.members_count = membersCount;
+        }
+      }
+      
       // Limpar CPF (remover máscara) antes de salvar
-      const familyData = {
-        ...data,
-        cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
-      };
+      if (data.cpf !== undefined) {
+        if (data.cpf && typeof data.cpf === 'string') {
+          const cleanedCpf = data.cpf.replace(/\D/g, '');
+          familyData.cpf = cleanedCpf || null;
+        } else {
+          familyData.cpf = data.cpf || null;
+        }
+      }
+      
+      // Campos opcionais de texto - converter strings vazias para null
+      const optionalTextFields = [
+        'phone', 'address', 'mother_name', 'id_document', 'occupation', 
+        'work_situation', 'address_reference', 'other_institution_name',
+        'other_aid_description', 'chronic_disease_description', 
+        'housing_type', 'construction_type', 'other_vulnerabilities', 'block_reason'
+      ];
+      
+      optionalTextFields.forEach(field => {
+        if (data[field as keyof typeof data] !== undefined) {
+          const value = data[field as keyof typeof data];
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            familyData[field] = trimmed || null;
+          } else {
+            familyData[field] = value;
+          }
+        }
+      });
+      
+      // Campos booleanos
+      const booleanFields = [
+        'is_blocked', 'has_disability', 'registered_in_other_institution',
+        'receives_government_aid', 'receives_bolsa_familia', 'receives_auxilio_gas',
+        'receives_bpc', 'receives_other_aid', 'has_chronic_disease',
+        'has_water_supply', 'has_electricity', 'has_garbage_collection',
+        'food_insecurity', 'unemployment', 'poor_health', 'substance_abuse'
+      ];
+      
+      booleanFields.forEach(field => {
+        if (data[field as keyof typeof data] !== undefined) {
+          familyData[field] = data[field as keyof typeof data];
+        }
+      });
+      
+      // Campos numéricos
+      if (data.children_count !== undefined && data.children_count !== null) {
+        const childrenCount = Number(data.children_count);
+        if (childrenCount >= 0) {
+          familyData.children_count = childrenCount;
+        }
+      }
+      
+      // Data de nascimento - converter string vazia para null
+      if (data.birth_date !== undefined) {
+        if (data.birth_date && typeof data.birth_date === 'string' && data.birth_date.trim()) {
+          familyData.birth_date = data.birth_date.trim();
+        } else {
+          familyData.birth_date = null;
+        }
+      }
+      
+      // Lógica de bloqueio: se is_blocked é true, blocked_until deve estar presente
+      if (data.is_blocked !== undefined) {
+        familyData.is_blocked = data.is_blocked;
+        if (data.is_blocked === true) {
+          // Se bloqueando, garantir que blocked_until esteja presente
+          if (data.blocked_until !== undefined) {
+            familyData.blocked_until = data.blocked_until;
+          } else if (selectedFamily.blocked_until) {
+            // Manter o blocked_until existente se não foi alterado
+            familyData.blocked_until = selectedFamily.blocked_until;
+          }
+        } else if (data.is_blocked === false) {
+          // Se desbloqueando, não enviar blocked_until (será null automaticamente)
+          // Não incluir no objeto para não sobrescrever
+        }
+      } else if (data.blocked_until !== undefined) {
+        familyData.blocked_until = data.blocked_until;
+      }
+      
+      // Log para debug (apenas em desenvolvimento)
+      if (import.meta.env.DEV) {
+        console.log('[onSubmitEdit] Dados a serem enviados:', familyData);
+        console.log('[onSubmitEdit] ID da família:', selectedFamily.id);
+      }
       
       await updateFamilyMutation.mutateAsync({
         id: selectedFamily.id,
-        updates: familyData
+        updates: familyData as TablesUpdate<'families'>
       });
       setIsEditDialogOpen(false);
       setSelectedFamily(null);
       editForm.reset();
-    } catch (error) {
+    } catch (error: any) {
       // Error toast is handled by the mutation
+      if (import.meta.env.DEV) {
+        console.error('[onSubmitEdit] Erro ao atualizar família:', error);
+        console.error('[onSubmitEdit] Mensagem de erro:', error?.message);
+        console.error('[onSubmitEdit] Detalhes do erro:', error?.details);
+      }
     }
   };
 
@@ -542,17 +655,47 @@ const InstitutionFamilies = () => {
   };
 
   const handleConfirmUnlink = async () => {
-    if (!familyToUnlink || !profile?.institution_id) return;
+    if (!familyToUnlink || !profile?.institution_id) {
+      console.warn('[handleConfirmUnlink] Dados insuficientes:', { 
+        familyToUnlink, 
+        institutionId: profile?.institution_id 
+      });
+      return;
+    }
 
     try {
-      await disassociateMutation.mutateAsync({
+      if (import.meta.env.DEV) {
+        console.log('[handleConfirmUnlink] Desvinculando família:', {
+          familyId: familyToUnlink.id,
+          institutionId: profile.institution_id,
+          familyName: familyToUnlink.name || familyToUnlink.contact_person
+        });
+      }
+
+      const result = await disassociateMutation.mutateAsync({
         familyId: familyToUnlink.id,
         institutionId: profile.institution_id
       });
+      
+      if (import.meta.env.DEV) {
+        console.log('[handleConfirmUnlink] Desvinculação concluída com sucesso:', result);
+      }
+      
+      // Fechar dialog e limpar estado apenas após sucesso
       setIsUnlinkDialogOpen(false);
       setFamilyToUnlink(null);
-    } catch (error) {
-      // Error toast is handled by the mutation
+    } catch (error: any) {
+      // Error toast é tratado pela mutation, mas adicionar log detalhado para debug
+      console.error('[handleConfirmUnlink] Erro ao desvincular:', {
+        error,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        familyId: familyToUnlink?.id,
+        institutionId: profile?.institution_id
+      });
+      // Não fechar o dialog em caso de erro para o usuário poder tentar novamente
     }
   };
 
@@ -2399,6 +2542,9 @@ const InstitutionFamilies = () => {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Confirmar Desvinculação</DialogTitle>
+            <DialogDescription>
+              Esta ação removerá o vínculo entre a família e sua instituição.
+            </DialogDescription>
           </DialogHeader>
           
           {familyToUnlink && (
