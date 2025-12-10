@@ -1,100 +1,146 @@
-# Welcome to your Lovable project
+# 🛒 CestaJusta - Sistema de Gestão de Cestas Básicas
 
-## Project info
+Sistema web completo para gestão e coordenação de distribuição de cestas básicas em instituições de caridade. O CestaJusta resolve o problema crítico de duplicação de benefícios, permitindo que múltiplas instituições coordenem suas ações e garantam uma distribuição mais eficiente e justa dos recursos disponíveis.
 
-**URL**: https://lovable.dev/projects/224e6028-1a06-4a49-a55a-fff1f0150988
+## 🎯 Problema que Resolve
 
-## How can I edit this code?
+Quando múltiplas instituições de caridade operam na mesma região sem coordenação, ocorrem problemas como:
+- **Duplicação de benefícios**: A mesma família recebe cestas de várias instituições simultaneamente
+- **Desperdício de recursos**: Recursos limitados sendo distribuídos de forma ineficiente
+- **Falta de transparência**: Histórico fragmentado e dificuldade em gerar relatórios consolidados
+- **Distribuição desigual**: Dificuldade em identificar e priorizar famílias mais vulneráveis
 
-There are several ways of editing your application.
+O CestaJusta centraliza o controle e coordena a distribuição, garantindo que os recursos alcancem o maior número possível de famílias necessitadas.
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/224e6028-1a06-4a49-a55a-fff1f0150988) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Supabase (PostgreSQL, Auth, Storage)
-- React Query (TanStack Query)
-
-## Funcionalidades Principais
+## ✨ Funcionalidades Principais
 
 ### Sistema de Gestão de Cestas Básicas
 
-- **Gestão de Instituições**: Cadastro e gerenciamento de instituições de caridade
-- **Gestão de Famílias**: Cadastro de famílias assistidas com CPF, endereço e informações de contato
-- **Registro de Entregas**: Sistema de registro de entregas com bloqueio automático e validações
-- **Relatórios e Dashboard**: Visualização de estatísticas, gráficos e alertas
-- **Sistema de Fornecedores e Estoque**: Gestão completa de fornecedores, produtos, estoque e movimentações
-  - Cadastro de fornecedores (PF/PJ)
-  - Cadastro de produtos
+- **Gestão de Instituições**: Cadastro e gerenciamento completo de instituições de caridade parceiras
+- **Gestão de Famílias**: Cadastro detalhado de famílias assistidas com CPF, endereço, informações de contato e perfil socioeconômico
+- **Registro de Entregas**: Sistema inteligente de registro com bloqueio automático para prevenir duplicação
+- **Relatórios e Dashboard**: Visualização de estatísticas, gráficos, métricas e alertas em tempo real
+- **Sistema de Fornecedores e Estoque**: Gestão completa do ciclo de suprimentos
+  - Cadastro de fornecedores (Pessoa Física ou Jurídica)
+  - Cadastro de produtos e categorias
   - Controle de estoque por instituição
   - Registro de entradas e saídas
-  - Integração com entregas (saída automática de estoque)
+  - Integração automática com entregas (saída de estoque)
   - Geração de recibos em PDF
 
-### Controle de Acesso
+### Controle de Acesso e Segurança
 
-- **Admin**: Acesso total ao sistema, visualização de todas as instituições e famílias
-- **Instituição**: Acesso restrito aos próprios dados, pode gerenciar suas famílias e entregas
+- **Perfil Administrador**: Acesso total ao sistema, visualização de todas as instituições e famílias, capacidade de desbloquear famílias manualmente
+- **Perfil Instituição**: Acesso restrito aos próprios dados, gestão de suas famílias vinculadas e registro de entregas
+- **Sistema de Bloqueio Automático**: Previne que famílias recebam múltiplas cestas no mesmo período
+- **Conformidade LGPD**: Sistema preparado para conformidade com a Lei Geral de Proteção de Dados
 
-### Documentação Adicional
+## 🛠️ Tecnologias Utilizadas
 
-Para mais detalhes sobre o sistema de Fornecedores, consulte [docs/SUPPLIERS_GUIDE.md](docs/SUPPLIERS_GUIDE.md).
+Este projeto foi construído com as seguintes tecnologias:
 
-## How can I deploy this project?
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI**: shadcn/ui + Tailwind CSS
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **Estado**: React Query (TanStack Query)
+- **Roteamento**: React Router DOM
+- **Formulários**: React Hook Form + Zod
+- **Gráficos**: Recharts
+- **PDF**: jsPDF
 
-Simply open [Lovable](https://lovable.dev/projects/224e6028-1a06-4a49-a55a-fff1f0150988) and click on Share -> Publish.
+## 🚀 Instalação e Configuração
 
-## Can I connect a custom domain to my Lovable project?
+### Pré-requisitos
 
-Yes, you can!
+- Node.js 18+ instalado ([instalar com nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- npm ou yarn
+- Conta no Supabase (para configuração do backend)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Passos para Instalação
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+1. **Clone o repositório**
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd cestas
+```
+
+2. **Instale as dependências**
+```bash
+npm install
+# ou
+yarn install
+```
+
+3. **Configure as variáveis de ambiente**
+
+Crie um arquivo `.env.local` na raiz do projeto com as seguintes variáveis:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+```
+
+**Onde encontrar essas informações:**
+- Acesse o [Dashboard do Supabase](https://app.supabase.com)
+- Vá em Settings > API
+- Copie a URL do projeto e a chave `anon` `public`
+
+4. **Inicie o servidor de desenvolvimento**
+```bash
+npm run dev
+# ou
+yarn dev
+```
+
+5. **Acesse a aplicação**
+
+Abra seu navegador em `http://localhost:5173` (ou a porta indicada no terminal)
+
+## 📁 Estrutura do Projeto
+
+```
+cestas/
+├── src/
+│   ├── components/      # Componentes React reutilizáveis
+│   │   ├── ui/         # Componentes de UI (shadcn/ui)
+│   │   ├── admin/      # Componentes específicos do admin
+│   │   └── suppliers/  # Componentes de fornecedores
+│   ├── pages/          # Páginas principais da aplicação
+│   ├── hooks/          # Custom hooks (React Query, etc)
+│   ├── integrations/   # Integrações (Supabase)
+│   ├── lib/            # Utilitários e helpers
+│   └── utils/          # Funções utilitárias
+├── public/             # Arquivos estáticos
+├── supabase/          # Configurações e migrations do Supabase
+└── package.json       # Dependências do projeto
+```
+
+## 🧪 Scripts Disponíveis
+
+```bash
+# Desenvolvimento
+npm run dev          # Inicia servidor de desenvolvimento
+
+# Build
+npm run build        # Cria build de produção
+npm run build:dev    # Cria build de desenvolvimento
+
+# Qualidade de código
+npm run lint         # Executa o linter
+
+# Preview
+npm run preview      # Preview do build de produção
+```
+
+## 📝 Licença
+
+Este projeto é privado e confidencial.
+
+## 🤝 Contribuindo
+
+Este é um projeto privado. Para contribuições ou dúvidas, entre em contato com a equipe de desenvolvimento.
+
+---
+
+**Desenvolvido com ❤️ para ajudar instituições de caridade a fazerem a diferença**
