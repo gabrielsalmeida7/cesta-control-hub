@@ -219,9 +219,65 @@ export const useCreateInstitution = () => {
 export const useUpdateInstitution = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { reloadProfile, profile: currentProfile, user: currentUser } = useAuth();
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: InstitutionUpdate }) => {
+      // Se email foi atualizado, validar disponibilidade antes de atualizar
+      if (updates.email !== undefined) {
+        // Buscar o email atual da instituição para comparar
+        const { data: currentInstitution, error: fetchCurrentError } = await supabase
+          .from('institutions')
+          .select('email')
+          .eq('id', id)
+          .single();
+
+        if (fetchCurrentError) {
+          console.error('[UPDATE_INSTITUTION] Error fetching current institution:', fetchCurrentError);
+          throw new Error('Erro ao buscar dados da instituição: ' + fetchCurrentError.message);
+        }
+
+        // Se o email não mudou, não precisa validar
+        const emailChanged = currentInstitution?.email !== updates.email;
+
+        if (emailChanged) {
+          // Verificar se o email já está em uso por outra instituição
+          const { data: existingInstitution, error: checkError } = await supabase
+            .from('institutions')
+            .select('id')
+            .eq('email', updates.email)
+            .neq('id', id) // Excluir a própria instituição
+            .maybeSingle();
+
+          if (checkError) {
+            console.error('[UPDATE_INSTITUTION] Error checking email availability:', checkError);
+            throw new Error('Erro ao verificar disponibilidade do email: ' + checkError.message);
+          }
+
+          if (existingInstitution) {
+            throw new Error('Este email já está cadastrado em outra instituição. Por favor, use outro email.');
+          }
+
+          // Validar email usando a função RPC (verifica auth.users e profiles também)
+          const { error: validateError } = await supabase
+            .rpc('validate_institution_user_creation', { p_email: updates.email });
+
+          if (validateError) {
+            // Se a validação falhou, verificar se é porque o email pertence ao próprio usuário da instituição
+            const { data: currentProfile } = await supabase
+              .from('profiles')
+              .select('email')
+              .eq('institution_id', id)
+              .maybeSingle();
+
+            // Se o email validado não for o email atual do profile, então é duplicado
+            if (!currentProfile || currentProfile.email !== updates.email) {
+              throw new Error(validateError.message || 'Email já está em uso');
+            }
+          }
+        }
+      }
+
       // Atualizar a instituição
       const { data, error } = await supabase
         .from('institutions')
@@ -232,21 +288,20 @@ export const useUpdateInstitution = () => {
       
       if (error) throw error;
 
-      // Se responsible_name foi atualizado, sincronizar com profiles.full_name
-      if (updates.responsible_name !== undefined) {
-        // Buscar o profile associado à instituição
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('institution_id', id)
-          .maybeSingle();
+      // Buscar o profile associado à instituição (será usado para sincronização)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('institution_id', id)
+        .maybeSingle();
 
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error('[UPDATE_INSTITUTION] Error fetching profile:', profileError);
-          // Não falhar a atualização se não conseguir atualizar o profile
-          // mas logar o erro
-        } else if (profile && profile.id) {
-          // Atualizar full_name no profile
+      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('[UPDATE_INSTITUTION] Error fetching profile:', profileError);
+        // Não falhar a atualização se não conseguir buscar o profile
+        // mas logar o erro
+      } else if (profile && profile.id) {
+        // Se responsible_name foi atualizado, sincronizar com profiles.full_name
+        if (updates.responsible_name !== undefined) {
           const { error: updateProfileError } = await supabase
             .from('profiles')
             .update({ full_name: updates.responsible_name })
@@ -260,14 +315,127 @@ export const useUpdateInstitution = () => {
             console.log('[UPDATE_INSTITUTION] Profile full_name synchronized successfully');
           }
         }
+
+        // Se email foi atualizado, sincronizar com profiles.email e auth.users.email
+        if (updates.email !== undefined) {
+          // Buscar o email atual do profile para verificar se precisa sincronizar
+          const { data: currentProfileData } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', profile.id)
+            .single();
+
+          // Sincronizar apenas se o email realmente mudou
+          const profileEmailChanged = !currentProfileData || currentProfileData.email !== updates.email;
+
+          if (profileEmailChanged) {
+            // Atualizar profiles.email
+            const { error: updateProfileEmailError } = await supabase
+              .from('profiles')
+              .update({ email: updates.email })
+              .eq('id', profile.id);
+
+            if (updateProfileEmailError) {
+              console.error('[UPDATE_INSTITUTION] Error updating profile email:', updateProfileEmailError);
+              // Não falhar a atualização se não conseguir atualizar o profile
+              // mas logar o erro
+            } else {
+              console.log('[UPDATE_INSTITUTION] Profile email synchronized successfully');
+            }
+
+            // Atualizar auth.users.email usando Admin API
+            if (!supabaseAdmin) {
+              console.warn('[UPDATE_INSTITUTION] supabaseAdmin not available, cannot update auth.users.email. Email de login não será atualizado.');
+              // Não falhar a atualização, mas avisar que o email de login não foi atualizado
+            } else {
+              const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
+                profile.id,
+                { email: updates.email }
+              );
+
+              if (updateAuthEmailError) {
+                console.error('[UPDATE_INSTITUTION] Error updating auth.users.email:', updateAuthEmailError);
+                // Não falhar a atualização se não conseguir atualizar o auth.users.email
+                // mas logar o erro - o usuário precisará usar o email antigo para login
+                console.warn('[UPDATE_INSTITUTION] Email da instituição foi atualizado, mas o email de login pode não ter sido atualizado. Verifique os logs ou entre em contato com o administrador.');
+              } else {
+                console.log('[UPDATE_INSTITUTION] Auth users email synchronized successfully');
+              }
+            }
+
+            // Verificar se o usuário atual pertence à instituição que foi atualizada
+            // Buscar o profile associado à instituição para comparar com o usuário atual
+            const { data: institutionProfile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('institution_id', id)
+              .maybeSingle();
+
+            // Se o profile da instituição corresponde ao usuário atual, recarregar o profile
+            if (institutionProfile && currentUser && institutionProfile.id === currentUser.id) {
+              console.log('[UPDATE_INSTITUTION] Current user profile matches updated institution, reloading profile...', {
+                profileId: institutionProfile.id,
+                userId: currentUser.id,
+                institutionId: id,
+                newEmail: updates.email
+              });
+              // Aguardar um pouco para garantir que todas as atualizações foram commitadas
+              await new Promise(resolve => setTimeout(resolve, 100));
+              await reloadProfile();
+              console.log('[UPDATE_INSTITUTION] Profile reloaded successfully');
+            } else {
+              console.log('[UPDATE_INSTITUTION] Profile reload skipped:', {
+                institutionProfileId: institutionProfile?.id,
+                currentUserId: currentUser?.id,
+                matches: institutionProfile?.id === currentUser?.id,
+                hasInstitutionProfile: !!institutionProfile,
+                hasCurrentUser: !!currentUser
+              });
+            }
+          } else {
+            console.log('[UPDATE_INSTITUTION] Email não mudou, pulando sincronização');
+          }
+        }
       }
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data, variables) => {
+      // Invalidar queries primeiro
       queryClient.invalidateQueries({ queryKey: ['institutions'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] }); // Invalidar profiles também
       queryClient.invalidateQueries({ queryKey: ['institution-data'] }); // Invalidar dados da instituição
+      
+      // Se o email foi atualizado, garantir que o profile seja recarregado
+      if (variables.updates.email !== undefined && currentUser) {
+        // Buscar o profile associado à instituição atualizada
+        const { data: institutionProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('institution_id', variables.id)
+          .maybeSingle();
+
+        // Se o profile da instituição corresponde ao usuário atual, recarregar
+        if (institutionProfile && currentUser && institutionProfile.id === currentUser.id) {
+          console.log('[UPDATE_INSTITUTION] onSuccess: Reloading profile for current user', {
+            profileId: institutionProfile.id,
+            userId: currentUser.id,
+            institutionId: variables.id,
+            newEmail: variables.updates.email
+          });
+          // Aguardar um pouco para garantir que todas as atualizações foram commitadas
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await reloadProfile();
+          console.log('[UPDATE_INSTITUTION] onSuccess: Profile reloaded successfully');
+        } else {
+          console.log('[UPDATE_INSTITUTION] onSuccess: Profile reload skipped', {
+            institutionProfileId: institutionProfile?.id,
+            currentUserId: currentUser?.id,
+            matches: institutionProfile?.id === currentUser?.id
+          });
+        }
+      }
+      
       toast({
         title: "Sucesso",
         description: "Instituição atualizada com sucesso!",

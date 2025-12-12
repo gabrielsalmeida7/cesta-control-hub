@@ -88,7 +88,10 @@ const ConsentManagement = ({
             <Checkbox
               id="digital-consent"
               checked={consentGiven}
-              onCheckedChange={(checked) => onConsentChange(checked as boolean)}
+              onCheckedChange={(checked) => {
+                const value = checked === true;
+                onConsentChange(value);
+              }}
               disabled={disabled}
             />
             <label
@@ -166,7 +169,10 @@ const ConsentManagement = ({
                 <Checkbox
                   id="term-signed"
                   checked={termSigned}
-                  onCheckedChange={(checked) => onTermSignedChange(checked as boolean)}
+                  onCheckedChange={(checked) => {
+                    const value = checked === true;
+                    onTermSignedChange(value);
+                  }}
                   disabled={disabled}
                 />
                 <label

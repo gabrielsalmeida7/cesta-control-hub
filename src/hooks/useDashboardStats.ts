@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { startOfMonth } from 'date-fns';
+import { startOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 export interface AdminStats {
   totalInstitutions: number;
@@ -100,9 +100,9 @@ export const useDashboardStats = () => {
           console.log('📝 Recent deliveries result:', recentResult);
 
           console.log('📝 Testing deliveries this year query...');
-          const currentYear = new Date().getFullYear();
-          const yearStart = new Date(currentYear, 0, 1).toISOString(); // 1 de janeiro
-          const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59).toISOString(); // 31 de dezembro
+          const now = new Date();
+          const yearStart = startOfYear(now).toISOString(); // 1 de janeiro
+          const yearEnd = endOfYear(now).toISOString(); // 31 de dezembro
           const yearDeliveriesResult = await supabase
             .from('deliveries')
             .select('*', { count: 'exact', head: true })

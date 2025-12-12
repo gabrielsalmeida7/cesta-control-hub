@@ -452,6 +452,10 @@ const InstitutionFamilies = () => {
       other_vulnerabilities: family.other_vulnerabilities || "",
     });
     
+    // Inicializar estados de consentimento LGPD
+    setEditConsentGiven(family.consent_given_at !== null && family.consent_given_at !== undefined);
+    setEditTermSigned(family.consent_term_signed === true);
+    
     // Buscar nome da instituição
     if (profile?.institution_id) {
       const name = await getInstitutionName(profile.institution_id);
@@ -573,10 +577,33 @@ const InstitutionFamilies = () => {
         familyData.blocked_until = data.blocked_until;
       }
       
+      // Campos de consentimento LGPD
+      // Se consentimento foi marcado, definir consent_given_at como timestamp atual
+      // Se foi desmarcado, definir como null
+      if (editConsentGiven) {
+        // Se já tinha consentimento e não foi alterado, manter a data original
+        // Se foi alterado (marcado agora), atualizar para data atual
+        const hadConsentBefore = selectedFamily.consent_given_at !== null && selectedFamily.consent_given_at !== undefined;
+        if (hadConsentBefore) {
+          // Manter data original se já tinha consentimento
+          familyData.consent_given_at = selectedFamily.consent_given_at;
+        } else {
+          // Criar nova data se está dando consentimento agora
+          familyData.consent_given_at = new Date().toISOString();
+        }
+      } else {
+        // Se foi desmarcado, remover o consentimento
+        familyData.consent_given_at = null;
+      }
+      
+      // Salvar estado de assinatura do termo
+      familyData.consent_term_signed = editTermSigned || false;
+      
       // Log para debug (apenas em desenvolvimento)
       if (import.meta.env.DEV) {
         console.log('[onSubmitEdit] Dados a serem enviados:', familyData);
         console.log('[onSubmitEdit] ID da família:', selectedFamily.id);
+        console.log('[onSubmitEdit] Consentimento:', { editConsentGiven, editTermSigned });
       }
       
       await updateFamilyMutation.mutateAsync({
@@ -585,6 +612,8 @@ const InstitutionFamilies = () => {
       });
       setIsEditDialogOpen(false);
       setSelectedFamily(null);
+      setEditConsentGiven(false);
+      setEditTermSigned(false);
       editForm.reset();
     } catch (error: any) {
       // Error toast is handled by the mutation

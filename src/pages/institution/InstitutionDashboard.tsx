@@ -91,7 +91,7 @@ const InstitutionDashboard = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">E-mail</p>
-                    <p className="font-medium">{profile.email}</p>
+                    <p className="font-medium">{institutionData?.email || profile.email || 'Não informado'}</p>
                   </div>
                   {institutionData?.address && (
                     <div>

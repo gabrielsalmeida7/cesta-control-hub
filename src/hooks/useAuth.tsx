@@ -20,6 +20,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  reloadProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -488,6 +489,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Public function to reload profile from database
+  const reloadProfilePublic = async () => {
+    if (user?.id) {
+      if (import.meta.env.DEV) {
+        console.log('[AUTH] reloadProfilePublic called for user:', user.id);
+      }
+      const reloadedProfile = await reloadProfile(user.id);
+      if (import.meta.env.DEV) {
+        console.log('[AUTH] reloadProfilePublic completed:', {
+          success: !!reloadedProfile,
+          email: reloadedProfile?.email
+        });
+      }
+    } else {
+      if (import.meta.env.DEV) {
+        console.warn('[AUTH] reloadProfilePublic called but no user.id available');
+      }
+    }
+  };
+
   const value = {
     user,
     session,
@@ -496,6 +517,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signIn,
     signUp,
     signOut,
+    reloadProfile: reloadProfilePublic,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
