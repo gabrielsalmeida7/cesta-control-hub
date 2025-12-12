@@ -26,6 +26,7 @@ build
 .env.test.local
 .env.production.local
 .env*.local
+# .env.example é mantido como template (não contém valores reais)
 
 # Vercel
 .vercel
@@ -55,7 +56,7 @@ Thumbs.db
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
-# bun.lockb
+bun.lockb
 
 # Documentação Interna (não deve estar em repositório público)
 docs/
@@ -71,6 +72,7 @@ supabase/migrations/
 
 # Ferramentas de Desenvolvimento
 .cursor/
+.cursorrules
 
 # Pasta duplicada/estrutura antiga
 cestas/
