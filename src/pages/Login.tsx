@@ -138,7 +138,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-blue-600 relative">
+    <div className="min-h-screen flex flex-col md:flex-row">
       {/* Modal de Política de Privacidade */}
       <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
         <DialogContent className="max-w-md">
@@ -198,42 +198,61 @@ const Login = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Marca d'água da imagem */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
-        //style={{ 
-          //backgroundImage: "url('/lovable-uploads/1cb439f6-d870-455d-a7a7-2ab401d03c6b.png')",
-          //backgroundSize: "contain",
-          //backgroundRepeat: "no-repeat",
-          //backgroundPosition: "center" 
-        //}}
-      />
-      
-      <div className="flex-1 flex items-center justify-center p-4 z-10">
-        <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
-          <CardHeader className="space-y-1 text-center px-4 pt-6 pb-4">
+      {/* Seção Esquerda - Imagem de Fundo com Texto */}
+      <div className="hidden md:flex md:w-1/2 relative bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/CestaJustaLogin.png')"
+        }}
+      >
+        {/* Overlay escuro para legibilidade */}
+        <div className="absolute inset-0 bg-black/50"></div>
+        
+        {/* Conteúdo sobreposto */}
+        <div className="relative z-10 flex flex-col justify-center items-start p-8 md:p-12 text-white">
+          <div className="mb-6">
+            <div className="mb-4">
+              <img 
+                src="/CestaLogin.svg" 
+                alt="Logo Cesta Justa" 
+                className="w-auto h-12"
+              />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Cesta Justa</h1>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4">Sistema de Controle de Alimentos</h2>
+            <p className="text-lg md:text-xl text-white/90 max-w-md">
+              Gestão responsável e transparente para garantir acesso digno à alimentação.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Seção Direita - Formulário de Login */}
+      <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-gray-50">
+        <Card className="w-full max-w-md bg-white shadow-xl rounded-lg">
+          <CardHeader className="space-y-1 text-center px-6 pt-8 pb-6">
             <img 
               src="/CestaJustaLogo.svg" 
               alt="Logo" 
-              className="w-full max-w-[280px] sm:max-w-[330px] h-auto mx-auto mb-2"
+              className="w-full max-w-[280px] sm:max-w-[330px] h-auto mx-auto mb-4"
             />
-            <CardTitle className="text-lg sm:text-2xl font-bold tracking-tight">
+            <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">
               Sistema de Controle de Alimentos
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="px-4 sm:px-6">
+          <CardContent className="px-6 sm:px-8">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Digite seu email"
+                  placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
+                  className="w-full"
                 />
               </div>
               
@@ -255,15 +274,16 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="w-full"
                 />
               </div>
 
               <Button 
                 type="submit" 
-                className="w-full bg-primary hover:bg-primary/90" 
+                className="w-full bg-primary hover:bg-primary/90 text-white" 
                 disabled={loading || authLoading || !acceptedPolicy}
               >
-                {loading ? "Entrando..." : "Entrar"}
+                {loading ? "Entrando..." : "Entrar no sistema"}
               </Button>
             </form>
 
@@ -277,23 +297,29 @@ const Login = () => {
                   href="/politica-privacidade" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center flex items-center justify-center gap-1"
                 >
-                  📄 Política de Privacidade
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Política de Privacidade
                 </a>
                 <a 
                   href="/portal-titular" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-center flex items-center justify-center gap-1"
                 >
-                  👤 Portal do Titular (Exercer Direitos LGPD)
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Portal do Titular (Exercer Direitos LGPD)
                 </a>
               </div>
             </div>
           </CardContent>
           
-          <CardFooter className="flex justify-center px-4 pb-4">
+          <CardFooter className="flex justify-center px-6 pb-6">
             <div className="text-center text-xs sm:text-sm text-muted-foreground">
               © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de Alimentos - Prefeitura Municipal de Araguari
             </div>
