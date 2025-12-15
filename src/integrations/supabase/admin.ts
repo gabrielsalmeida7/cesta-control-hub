@@ -12,7 +12,9 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('⚠️ VITE_SUPABASE_SERVICE_ROLE_KEY not found. User creation will fail.');
+  if (import.meta.env.DEV) {
+    console.warn('⚠️ VITE_SUPABASE_SERVICE_ROLE_KEY not found. User creation will fail.');
+  }
 }
 
 // Create admin client with service_role key (bypasses RLS)

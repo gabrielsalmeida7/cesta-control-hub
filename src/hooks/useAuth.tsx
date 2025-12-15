@@ -39,7 +39,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await (supabase as any).rpc('bootstrap_admin', { admin_email: email });
       }
     } catch (e) {
-      console.warn('bootstrap_admin failed or not applicable:', e);
+      if (import.meta.env.DEV) {
+        console.warn('bootstrap_admin failed or not applicable:', e);
+      }
     }
   };
 
@@ -83,12 +85,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
   useEffect(() => {
-    console.log('🔐 Auth hook initializing...');
+    if (import.meta.env.DEV) {
+      console.log('🔐 Auth hook initializing...');
+    }
     
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+      if (import.meta.env.DEV) {
+        console.log('Auth state changed:', event, session?.user?.email);
+      }
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -444,7 +450,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log('🚪 Signing out...');
+      if (import.meta.env.DEV) {
+        console.log('🚪 Signing out...');
+      }
       
       
       // 3. Sign out from Supabase (limpa sessão no servidor e localmente)

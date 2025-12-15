@@ -23,7 +23,9 @@ export const useInstitutions = () => {
   return useQuery({
     queryKey: ['institutions', profile?.id], // Incluir user ID para separar cache por usuário
     queryFn: async () => {
-      console.log('🏢 Fetching institutions...', { userId: profile?.id, role: profile?.role });
+      if (import.meta.env.DEV) {
+        console.log('🏢 Fetching institutions...', { userId: profile?.id, role: profile?.role });
+      }
       
       const { data, error } = await supabase
         .from('institutions')
@@ -35,7 +37,9 @@ export const useInstitutions = () => {
         throw error;
       }
       
-      console.log('✅ Institutions fetched:', data?.length || 0, 'records');
+      if (import.meta.env.DEV) {
+        console.log('✅ Institutions fetched:', data?.length || 0, 'records');
+      }
       return data as Institution[];
     },
     retry: 1,
@@ -93,7 +97,9 @@ export const useCreateInstitution = () => {
       }
       
       // Create user via Admin API
-      console.log('[CREATE_INSTITUTION] Creating user via Admin API:', { email });
+      if (import.meta.env.DEV) {
+        console.log('[CREATE_INSTITUTION] Creating user via Admin API:', { email });
+      }
       
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -140,11 +146,13 @@ export const useCreateInstitution = () => {
         throw new Error('Erro ao criar usuário: resposta inválida do servidor. A instituição foi removida automaticamente.');
       }
       
-      console.log('[CREATE_INSTITUTION] User created successfully:', {
-        user_id: authUser.user.id,
-        email: authUser.user.email,
-        email_confirmed: authUser.user.email_confirmed_at
-      });
+      if (import.meta.env.DEV) {
+        console.log('[CREATE_INSTITUTION] User created successfully:', {
+          user_id: authUser.user.id,
+          email: authUser.user.email,
+          email_confirmed: authUser.user.email_confirmed_at
+        });
+      }
       
       // Link user to institution via RPC function
       const { error: linkError } = await supabase
@@ -312,7 +320,9 @@ export const useUpdateInstitution = () => {
             // Não falhar a atualização se não conseguir atualizar o profile
             // mas logar o erro
           } else {
-            console.log('[UPDATE_INSTITUTION] Profile full_name synchronized successfully');
+            if (import.meta.env.DEV) {
+              console.log('[UPDATE_INSTITUTION] Profile full_name synchronized successfully');
+            }
           }
         }
 
@@ -340,12 +350,16 @@ export const useUpdateInstitution = () => {
               // Não falhar a atualização se não conseguir atualizar o profile
               // mas logar o erro
             } else {
-              console.log('[UPDATE_INSTITUTION] Profile email synchronized successfully');
+              if (import.meta.env.DEV) {
+                console.log('[UPDATE_INSTITUTION] Profile email synchronized successfully');
+              }
             }
 
             // Atualizar auth.users.email usando Admin API
             if (!supabaseAdmin) {
-              console.warn('[UPDATE_INSTITUTION] supabaseAdmin not available, cannot update auth.users.email. Email de login não será atualizado.');
+              if (import.meta.env.DEV) {
+                console.warn('[UPDATE_INSTITUTION] supabaseAdmin not available, cannot update auth.users.email. Email de login não será atualizado.');
+              }
               // Não falhar a atualização, mas avisar que o email de login não foi atualizado
             } else {
               const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -357,9 +371,13 @@ export const useUpdateInstitution = () => {
                 console.error('[UPDATE_INSTITUTION] Error updating auth.users.email:', updateAuthEmailError);
                 // Não falhar a atualização se não conseguir atualizar o auth.users.email
                 // mas logar o erro - o usuário precisará usar o email antigo para login
-                console.warn('[UPDATE_INSTITUTION] Email da instituição foi atualizado, mas o email de login pode não ter sido atualizado. Verifique os logs ou entre em contato com o administrador.');
+                if (import.meta.env.DEV) {
+                  console.warn('[UPDATE_INSTITUTION] Email da instituição foi atualizado, mas o email de login pode não ter sido atualizado. Verifique os logs ou entre em contato com o administrador.');
+                }
               } else {
-                console.log('[UPDATE_INSTITUTION] Auth users email synchronized successfully');
+                if (import.meta.env.DEV) {
+                  console.log('[UPDATE_INSTITUTION] Auth users email synchronized successfully');
+                }
               }
             }
 
@@ -373,27 +391,35 @@ export const useUpdateInstitution = () => {
 
             // Se o profile da instituição corresponde ao usuário atual, recarregar o profile
             if (institutionProfile && currentUser && institutionProfile.id === currentUser.id) {
-              console.log('[UPDATE_INSTITUTION] Current user profile matches updated institution, reloading profile...', {
-                profileId: institutionProfile.id,
-                userId: currentUser.id,
-                institutionId: id,
-                newEmail: updates.email
-              });
+              if (import.meta.env.DEV) {
+                console.log('[UPDATE_INSTITUTION] Current user profile matches updated institution, reloading profile...', {
+                  profileId: institutionProfile.id,
+                  userId: currentUser.id,
+                  institutionId: id,
+                  newEmail: updates.email
+                });
+              }
               // Aguardar um pouco para garantir que todas as atualizações foram commitadas
               await new Promise(resolve => setTimeout(resolve, 100));
               await reloadProfile();
-              console.log('[UPDATE_INSTITUTION] Profile reloaded successfully');
+              if (import.meta.env.DEV) {
+                console.log('[UPDATE_INSTITUTION] Profile reloaded successfully');
+              }
             } else {
-              console.log('[UPDATE_INSTITUTION] Profile reload skipped:', {
-                institutionProfileId: institutionProfile?.id,
-                currentUserId: currentUser?.id,
-                matches: institutionProfile?.id === currentUser?.id,
-                hasInstitutionProfile: !!institutionProfile,
-                hasCurrentUser: !!currentUser
-              });
+              if (import.meta.env.DEV) {
+                console.log('[UPDATE_INSTITUTION] Profile reload skipped:', {
+                  institutionProfileId: institutionProfile?.id,
+                  currentUserId: currentUser?.id,
+                  matches: institutionProfile?.id === currentUser?.id,
+                  hasInstitutionProfile: !!institutionProfile,
+                  hasCurrentUser: !!currentUser
+                });
+              }
             }
           } else {
-            console.log('[UPDATE_INSTITUTION] Email não mudou, pulando sincronização');
+            if (import.meta.env.DEV) {
+              console.log('[UPDATE_INSTITUTION] Email não mudou, pulando sincronização');
+            }
           }
         }
       }
@@ -417,22 +443,28 @@ export const useUpdateInstitution = () => {
 
         // Se o profile da instituição corresponde ao usuário atual, recarregar
         if (institutionProfile && currentUser && institutionProfile.id === currentUser.id) {
-          console.log('[UPDATE_INSTITUTION] onSuccess: Reloading profile for current user', {
-            profileId: institutionProfile.id,
-            userId: currentUser.id,
-            institutionId: variables.id,
-            newEmail: variables.updates.email
-          });
+          if (import.meta.env.DEV) {
+            console.log('[UPDATE_INSTITUTION] onSuccess: Reloading profile for current user', {
+              profileId: institutionProfile.id,
+              userId: currentUser.id,
+              institutionId: variables.id,
+              newEmail: variables.updates.email
+            });
+          }
           // Aguardar um pouco para garantir que todas as atualizações foram commitadas
           await new Promise(resolve => setTimeout(resolve, 100));
           await reloadProfile();
-          console.log('[UPDATE_INSTITUTION] onSuccess: Profile reloaded successfully');
+          if (import.meta.env.DEV) {
+            console.log('[UPDATE_INSTITUTION] onSuccess: Profile reloaded successfully');
+          }
         } else {
-          console.log('[UPDATE_INSTITUTION] onSuccess: Profile reload skipped', {
-            institutionProfileId: institutionProfile?.id,
-            currentUserId: currentUser?.id,
-            matches: institutionProfile?.id === currentUser?.id
-          });
+          if (import.meta.env.DEV) {
+            console.log('[UPDATE_INSTITUTION] onSuccess: Profile reload skipped', {
+              institutionProfileId: institutionProfile?.id,
+              currentUserId: currentUser?.id,
+              matches: institutionProfile?.id === currentUser?.id
+            });
+          }
         }
       }
       
@@ -515,7 +547,9 @@ export const useDeleteInstitution = () => {
       
       // Se houver usuário associado, deletá-lo via Admin API
       if (profile && profile.id && supabaseAdmin) {
-        console.log('[DELETE_INSTITUTION] Deleting associated user:', { user_id: profile.id, email: profile.email });
+        if (import.meta.env.DEV) {
+          console.log('[DELETE_INSTITUTION] Deleting associated user:', { user_id: profile.id, email: profile.email });
+        }
         
         const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
         
@@ -526,7 +560,9 @@ export const useDeleteInstitution = () => {
           throw new Error('Erro ao excluir usuário associado: ' + deleteUserError.message + '. A instituição não foi excluída.');
         }
         
-        console.log('[DELETE_INSTITUTION] User deleted successfully');
+        if (import.meta.env.DEV) {
+          console.log('[DELETE_INSTITUTION] User deleted successfully');
+        }
       } else if (profile && profile.id && !supabaseAdmin) {
         throw new Error('Configuração necessária: VITE_SUPABASE_SERVICE_ROLE_KEY não está configurada. Não é possível excluir o usuário associado.');
       }

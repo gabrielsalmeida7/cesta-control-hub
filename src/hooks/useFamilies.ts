@@ -18,7 +18,9 @@ export const useFamilies = () => {
   return useQuery({
     queryKey: ["families", profile?.id], // Incluir user ID para separar cache por usuário
     queryFn: async () => {
-      console.log('👨‍👩‍👧‍👦 Fetching families...', { userId: profile?.id, role: profile?.role });
+      if (import.meta.env.DEV) {
+        console.log('👨‍👩‍👧‍👦 Fetching families...', { userId: profile?.id, role: profile?.role });
+      }
       
       // Desbloquear automaticamente famílias expiradas antes de buscar
       try {
@@ -26,13 +28,19 @@ export const useFamilies = () => {
           .rpc('auto_unblock_expired_families');
         
         if (unblockError) {
-          console.warn('⚠️ Error auto-unblocking families:', unblockError);
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ Error auto-unblocking families:', unblockError);
+          }
         } else if (unblockedCount && unblockedCount > 0) {
-          console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+          if (import.meta.env.DEV) {
+            console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+          }
         }
       } catch (error) {
         // Se a função não existir ainda (migração não executada), apenas logar warning
-        console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
+        }
       }
       
       const { data, error } = await supabase
@@ -84,7 +92,9 @@ export const useFamilies = () => {
         }
       }
       
-      console.log('✅ Families fetched:', data?.length || 0, 'records');
+      if (import.meta.env.DEV) {
+        console.log('✅ Families fetched:', data?.length || 0, 'records');
+      }
       return data;
     },
     retry: 1,
@@ -98,7 +108,9 @@ export const useInstitutionFamilies = (institutionId?: string) => {
     queryKey: ["institution-families", institutionId],
     queryFn: async () => {
       if (!institutionId) {
-        console.log('❌ No institutionId provided');
+        if (import.meta.env.DEV) {
+          console.log('❌ No institutionId provided');
+        }
         return [];
       }
 
@@ -108,16 +120,24 @@ export const useInstitutionFamilies = (institutionId?: string) => {
           .rpc('auto_unblock_expired_families');
         
         if (unblockError) {
-          console.warn('⚠️ Error auto-unblocking families:', unblockError);
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ Error auto-unblocking families:', unblockError);
+          }
         } else if (unblockedCount && unblockedCount > 0) {
-          console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+          if (import.meta.env.DEV) {
+            console.log(`✅ Auto-unblocked ${unblockedCount} expired families`);
+          }
         }
       } catch (error) {
         // Se a função não existir ainda (migração não executada), apenas logar warning
-        console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Function auto_unblock_expired_families not available:', error);
+        }
       }
 
-      console.log('🔍 Fetching families for institution:', institutionId);
+      if (import.meta.env.DEV) {
+        console.log('🔍 Fetching families for institution:', institutionId);
+      }
 
       // Primeiro, buscar os IDs das famílias vinculadas à instituição
       const { data: associations, error: assocError } = await supabase
@@ -130,10 +150,14 @@ export const useInstitutionFamilies = (institutionId?: string) => {
         throw assocError;
       }
 
-      console.log('✅ Found', associations?.length || 0, 'associations');
+      if (import.meta.env.DEV) {
+        console.log('✅ Found', associations?.length || 0, 'associations');
+      }
 
       if (!associations || associations.length === 0) {
-        console.log('⚠️ No families associated with this institution');
+        if (import.meta.env.DEV) {
+          console.log('⚠️ No families associated with this institution');
+        }
         return [];
       }
 
@@ -165,7 +189,9 @@ export const useInstitutionFamilies = (institutionId?: string) => {
         throw error;
       }
 
-      console.log('✅ Families fetched:', data?.length || 0, 'records');
+      if (import.meta.env.DEV) {
+        console.log('✅ Families fetched:', data?.length || 0, 'records');
+      }
       return data || [];
     },
     enabled: !!institutionId
@@ -483,7 +509,9 @@ export const useDisassociateFamilyFromInstitution = () => {
 
       if (!existingLink) {
         const errorMsg = "Vínculo não encontrado entre a família e a instituição";
-        console.warn('[useDisassociateFamilyFromInstitution]', errorMsg);
+        if (import.meta.env.DEV) {
+          console.warn('[useDisassociateFamilyFromInstitution]', errorMsg);
+        }
         throw new Error(errorMsg);
       }
 
