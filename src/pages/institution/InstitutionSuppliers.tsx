@@ -21,11 +21,18 @@ const InstitutionSuppliers = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="container mx-auto px-4 py-8">
-        <InstitutionNavigationButtons />
-        
-        <div className="mt-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">Fornecedores e Estoque</h1>
+      <InstitutionNavigationButtons />
+      
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Fornecedores e Estoque
+            </h2>
+            <p className="text-gray-600">
+              Gerencie fornecedores, produtos e controle de estoque
+            </p>
+          </div>
           
           <Tabs defaultValue="suppliers" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -64,7 +71,7 @@ const InstitutionSuppliers = () => {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
