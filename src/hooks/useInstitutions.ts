@@ -1,9 +1,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { supabaseAdmin } from '@/integrations/supabase/admin';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { logger } from '@/utils/logger';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 type Institution = Tables<'institutions'>;
@@ -51,16 +52,13 @@ export const useInstitutions = () => {
 export const useCreateInstitution = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async (institutionData: InstitutionWithUser) => {
       // Extract password and user data (don't save password in institutions table)
       const { password, email, responsible_name, ...institutionFields } = institutionData;
-      
-      // Check admin client configuration FIRST (before creating anything)
-      if (!supabaseAdmin) {
-        throw new Error('Configuração necessária: A variável VITE_SUPABASE_SERVICE_ROLE_KEY não está configurada. Por favor, adicione esta variável no arquivo .env.local e reinicie o servidor. Veja ENV_SETUP.md para mais detalhes.');
-      }
       
       // Validate email availability first (check auth.users, profiles, AND institutions)
       const { error: validateError } = await supabase
@@ -96,91 +94,96 @@ export const useCreateInstitution = () => {
         throw institutionError;
       }
       
-      // Create user via Admin API
-      if (import.meta.env.DEV) {
-        console.log('[CREATE_INSTITUTION] Creating user via Admin API:', { email });
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Rollback: delete institution if no session
+        await supabase.from('institutions').delete().eq('id', institution.id);
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
       
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          full_name: responsible_name,
+      // Create user via Edge Function (secure backend)
+      if (import.meta.env.DEV) {
+        console.log('[CREATE_INSTITUTION] Creating user via Edge Function:', { email });
+      }
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: functionResponse, error: functionError } = await supabase.functions.invoke(
+        'create-institution-user',
+        {
+          body: {
+            email,
+            password,
+            responsible_name,
+            institution_id: institution.id,
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         }
+      );
+      
+      if (functionError) {
+        console.error('[CREATE_INSTITUTION] Error calling Edge Function:', {
+          error: functionError.message,
+        });
+        
+        // Rollback: delete institution if user creation fails
+        try {
+          await supabase
+            .from('institutions')
+            .delete()
+            .eq('id', institution.id);
+        } catch (rollbackError) {
+          console.error('Erro ao fazer rollback da instituição:', rollbackError);
+        }
+        
+        throw new Error(functionError.message || 'Erro ao criar usuário. A instituição foi removida automaticamente.');
+      }
+      
+      if (!functionResponse?.success) {
+        console.error('[CREATE_INSTITUTION] Edge Function returned error:', functionResponse);
+        
+        // Rollback: delete institution if user creation fails
+        try {
+          await supabase
+            .from('institutions')
+            .delete()
+            .eq('id', institution.id);
+        } catch (rollbackError) {
+          console.error('Erro ao fazer rollback da instituição:', rollbackError);
+        }
+        
+        throw new Error(functionResponse?.error || 'Erro ao criar usuário: resposta inválida do servidor. A instituição foi removida automaticamente.');
+      }
+      
+      if (import.meta.env.DEV) {
+        console.log('[CREATE_INSTITUTION] User created successfully via Edge Function:', {
+          user_id: functionResponse.user_id,
+          email: functionResponse.email,
+        });
+      }
+      
+      // Log de auditoria
+      logger.audit('INSTITUTION_CREATE', user?.id || 'unknown', {
+        institution_id: institution.id,
+        institution_name: institution.name,
+        institution_email: institution.email,
       });
       
-      if (authError) {
-        console.error('[CREATE_INSTITUTION] Error creating user:', {
-          error: authError.message,
-          status: authError.status,
-          code: authError.code
-        });
-        
-        // Rollback: delete institution if user creation fails
-        try {
-          await supabase
-            .from('institutions')
-            .delete()
-            .eq('id', institution.id);
-        } catch (rollbackError) {
-          console.error('Erro ao fazer rollback da instituição:', rollbackError);
-        }
-        
-        throw new Error(authError.message || 'Erro ao criar usuário. A instituição foi removida automaticamente.');
-      }
-      
-      if (!authUser?.user) {
-        console.error('[CREATE_INSTITUTION] User creation returned null user');
-        
-        // Rollback: delete institution if user creation fails
-        try {
-          await supabase
-            .from('institutions')
-            .delete()
-            .eq('id', institution.id);
-        } catch (rollbackError) {
-          console.error('Erro ao fazer rollback da instituição:', rollbackError);
-        }
-        
-        throw new Error('Erro ao criar usuário: resposta inválida do servidor. A instituição foi removida automaticamente.');
-      }
-      
-      if (import.meta.env.DEV) {
-        console.log('[CREATE_INSTITUTION] User created successfully:', {
-          user_id: authUser.user.id,
-          email: authUser.user.email,
-          email_confirmed: authUser.user.email_confirmed_at
-        });
-      }
-      
-      // Link user to institution via RPC function
-      const { error: linkError } = await supabase
-        .rpc('link_institution_user', {
-          p_user_id: authUser.user.id,
-          p_institution_id: institution.id,
-          p_responsible_name: responsible_name,
-        });
-      
-      if (linkError) {
-        // Rollback: delete user and institution if linking fails
-        try {
-          await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
-        } catch (deleteUserError) {
-          console.error('Erro ao deletar usuário durante rollback:', deleteUserError);
-        }
-        
-        try {
-          await supabase
-            .from('institutions')
-            .delete()
-            .eq('id', institution.id);
-        } catch (deleteInstError) {
-          console.error('Erro ao deletar instituição durante rollback:', deleteInstError);
-        }
-        
-        throw new Error(linkError.message || 'Erro ao vincular usuário à instituição. Os dados foram removidos automaticamente.');
-      }
+      await logAction({
+        actionType: 'INSTITUTION_CREATE',
+        tableName: 'institutions',
+        recordId: institution.id,
+        description: `Instituição criada: ${institution.name}`,
+        severity: 'INFO',
+        newData: {
+          id: institution.id,
+          name: institution.name,
+          email: institution.email,
+          responsible_name: institution.responsible_name,
+        },
+      });
       
       return institution;
     },
@@ -228,6 +231,7 @@ export const useUpdateInstitution = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { reloadProfile, profile: currentProfile, user: currentUser } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: InstitutionUpdate }) => {
@@ -424,6 +428,21 @@ export const useUpdateInstitution = () => {
         }
       }
 
+      // Log de auditoria
+      logger.audit('INSTITUTION_UPDATE', currentUser?.id || 'unknown', {
+        institution_id: id,
+        updated_fields: Object.keys(updates),
+      });
+      
+      await logAction({
+        actionType: 'INSTITUTION_UPDATE',
+        tableName: 'institutions',
+        recordId: id,
+        description: `Instituição atualizada: ${data.name}`,
+        severity: 'INFO',
+        newData: updates as Record<string, unknown>,
+      });
+
       return data;
     },
     onSuccess: async (data, variables) => {
@@ -516,6 +535,8 @@ export const useInstitutionData = () => {
 export const useDeleteInstitution = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -534,6 +555,13 @@ export const useDeleteInstitution = () => {
         throw new Error('Não é possível excluir a instituição. Existem entregas registradas associadas a ela. Remova as entregas primeiro ou entre em contato com o administrador.');
       }
       
+      // Buscar dados da instituição antes de deletar (para log)
+      const { data: institutionData } = await supabase
+        .from('institutions')
+        .select('name, email')
+        .eq('id', id)
+        .single();
+      
       // Buscar o usuário associado à instituição
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -546,6 +574,15 @@ export const useDeleteInstitution = () => {
       }
       
       // Se houver usuário associado, deletá-lo via Admin API
+      // Nota: supabaseAdmin pode não estar disponível no frontend, mas tentamos usar se disponível
+      let supabaseAdmin;
+      try {
+        const { supabaseAdmin: admin } = await import('@/integrations/supabase/admin');
+        supabaseAdmin = admin;
+      } catch {
+        // supabaseAdmin não disponível, continuar sem ele
+      }
+      
       if (profile && profile.id && supabaseAdmin) {
         if (import.meta.env.DEV) {
           console.log('[DELETE_INSTITUTION] Deleting associated user:', { user_id: profile.id, email: profile.email });
@@ -576,6 +613,26 @@ export const useDeleteInstitution = () => {
       if (error) {
         throw error;
       }
+      
+      // Log de auditoria (CRITICAL pois é uma exclusão)
+      logger.audit('INSTITUTION_DELETE', user?.id || 'unknown', {
+        institution_id: id,
+        institution_name: institutionData?.name,
+        institution_email: institutionData?.email,
+      });
+      
+      await logAction({
+        actionType: 'INSTITUTION_DELETE',
+        tableName: 'institutions',
+        recordId: id,
+        description: `Instituição excluída: ${institutionData?.name || id}`,
+        severity: 'CRITICAL',
+        oldData: institutionData ? {
+          id,
+          name: institutionData.name,
+          email: institutionData.email,
+        } : undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] });

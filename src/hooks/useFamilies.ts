@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuditLog } from "@/hooks/useAuditLog";
+import { logger } from "@/utils/logger";
 import type {
   Tables,
   TablesInsert,
@@ -201,6 +203,8 @@ export const useInstitutionFamilies = (institutionId?: string) => {
 export const useCreateFamily = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async ({
@@ -265,6 +269,27 @@ export const useCreateFamily = () => {
         }
       }
 
+      // Log de auditoria
+      logger.audit('FAMILY_CREATE', user?.id || 'unknown', {
+        family_id: createdFamily.id,
+        family_name: createdFamily.name,
+        institution_id: institutionId,
+      });
+      
+      await logAction({
+        actionType: 'FAMILY_CREATE',
+        tableName: 'families',
+        recordId: createdFamily.id,
+        description: `Família criada: ${createdFamily.name}`,
+        severity: 'INFO',
+        newData: {
+          id: createdFamily.id,
+          name: createdFamily.name,
+          contact_person: createdFamily.contact_person,
+          members_count: createdFamily.members_count,
+        },
+      });
+
       return createdFamily;
     },
     onSuccess: (data, variables) => {
@@ -313,6 +338,8 @@ export const useCreateFamily = () => {
 export const useUpdateFamily = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async ({
@@ -346,6 +373,22 @@ export const useUpdateFamily = () => {
         }
         throw error;
       }
+      
+      // Log de auditoria
+      logger.audit('FAMILY_UPDATE', user?.id || 'unknown', {
+        family_id: id,
+        updated_fields: Object.keys(updates),
+      });
+      
+      await logAction({
+        actionType: 'FAMILY_UPDATE',
+        tableName: 'families',
+        recordId: id,
+        description: `Família atualizada: ${data.name || id}`,
+        severity: 'INFO',
+        newData: updates as Record<string, unknown>,
+      });
+      
       return data;
     },
     onSuccess: () => {

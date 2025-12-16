@@ -3,6 +3,8 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { logger } from '@/utils/logger';
 
 interface UserProfile {
   id: string;
@@ -32,10 +34,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const ADMIN_SEED_EMAIL = 'teste@admin.com';
+  // Admin seed email from environment variable (optional, for bootstrap)
+  const ADMIN_SEED_EMAIL = import.meta.env.VITE_ADMIN_SEED_EMAIL || '';
   const maybeBootstrapAdmin = async (email?: string | null) => {
     try {
-      if (email && email.toLowerCase() === ADMIN_SEED_EMAIL) {
+      if (ADMIN_SEED_EMAIL && email && email.toLowerCase() === ADMIN_SEED_EMAIL.toLowerCase()) {
         await (supabase as any).rpc('bootstrap_admin', { admin_email: email });
       }
     } catch (e) {
@@ -116,7 +119,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               } else if (profileData) {
                 setProfile(profileData);
                 // Bootstrap admin and reload profile if bootstrap was executed
-                const shouldBootstrap = session.user!.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+                const shouldBootstrap = ADMIN_SEED_EMAIL && session.user!.email?.toLowerCase() === ADMIN_SEED_EMAIL.toLowerCase();
                 if (shouldBootstrap) {
                   await maybeBootstrapAdmin(session.user!.email);
                   // Reload profile after bootstrap to get updated role
@@ -151,7 +154,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               // For institution users, the profile should be created by link_institution_user
               // If it doesn't exist, something went wrong and we shouldn't create a profile without institution_id
               const userEmail = session.user!.email?.toLowerCase() || '';
-              const isAdminSeed = userEmail === ADMIN_SEED_EMAIL;
+              const isAdminSeed = ADMIN_SEED_EMAIL && userEmail === ADMIN_SEED_EMAIL.toLowerCase();
               
               if (!isAdminSeed) {
                 // For non-admin users, if profile doesn't exist, it means link_institution_user wasn't called
@@ -258,7 +261,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             profileData = fetchedProfile;
             setProfile(fetchedProfile);
             // Bootstrap admin and reload profile if bootstrap was executed
-            const shouldBootstrap = authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+            const shouldBootstrap = ADMIN_SEED_EMAIL && authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL.toLowerCase();
             if (shouldBootstrap) {
               await maybeBootstrapAdmin(authSession.user.email);
               // Reload profile after bootstrap to get updated role
@@ -267,7 +270,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } else {
             // Profile doesn't exist, create it (same logic as onAuthStateChange)
             const userEmail = authSession.user.email?.toLowerCase() || '';
-            const defaultRole: 'admin' | 'institution' = userEmail === ADMIN_SEED_EMAIL ? 'admin' : 'institution';
+            const defaultRole: 'admin' | 'institution' = (ADMIN_SEED_EMAIL && userEmail === ADMIN_SEED_EMAIL.toLowerCase()) ? 'admin' : 'institution';
             
             const insertPayload = {
               id: authSession.user.id,
@@ -289,7 +292,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               profileData = inserted;
               setProfile(inserted);
               // Bootstrap admin and reload profile if bootstrap was executed
-              const shouldBootstrap = authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL;
+              const shouldBootstrap = ADMIN_SEED_EMAIL && authSession.user.email?.toLowerCase() === ADMIN_SEED_EMAIL.toLowerCase();
               if (shouldBootstrap) {
                 try {
                   await maybeBootstrapAdmin(authSession.user.email);
@@ -346,6 +349,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) {
+        // Log de tentativa de login falhada
+        logger.audit('FAILED_LOGIN', 'unknown', {
+          email,
+          error_message: error.message,
+          error_code: error.code,
+        });
+        
+        // Tentar registrar no Supabase (pode falhar se não houver sessão)
+        try {
+          await supabase.rpc('audit_log', {
+            p_action_type: 'FAILED_LOGIN',
+            p_description: `Tentativa de login falhada: ${email}`,
+            p_severity: 'WARNING',
+          });
+        } catch {
+          // Ignorar erro se não conseguir registrar no Supabase
+        }
+        
         if (import.meta.env.DEV) {
           console.error("[AUTH]", "Supabase auth error:", {
             error: error.message,
@@ -377,6 +398,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           variant: "destructive",
         });
         return { error };
+      }
+
+      // Log de login bem-sucedido
+      logger.audit('LOGIN', data?.user?.id || 'unknown', {
+        email,
+        user_id: data?.user?.id,
+      });
+      
+      // Tentar registrar no Supabase (pode falhar se não houver sessão ainda)
+      try {
+        await supabase.rpc('audit_log', {
+          p_action_type: 'LOGIN',
+          p_description: `Login bem-sucedido: ${email}`,
+          p_severity: 'INFO',
+        });
+      } catch {
+        // Ignorar erro se não conseguir registrar no Supabase
       }
 
       if (import.meta.env.DEV) {

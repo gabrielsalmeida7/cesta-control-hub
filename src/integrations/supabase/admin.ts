@@ -1,6 +1,7 @@
-// Admin client for creating users
-// WARNING: This should ideally be in a backend/Edge Function, not exposed in frontend
-// For development purposes, we're using it here, but in production this should be moved to a secure backend
+// ⚠️ DEPRECATED: Este arquivo não deve ser usado em produção
+// A criação de usuários agora deve ser feita via Edge Function: supabase/functions/create-institution-user
+// Este arquivo está mantido apenas para compatibilidade durante migração
+// TODO: Remover todas as referências a supabaseAdmin e usar Edge Functions
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 

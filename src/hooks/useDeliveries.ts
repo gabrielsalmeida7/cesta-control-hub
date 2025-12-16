@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuditLog } from "@/hooks/useAuditLog";
+import { logger } from "@/utils/logger";
 import type {
   Tables,
   TablesInsert,
@@ -56,6 +59,8 @@ export const useDeliveries = (institutionId?: string) => {
 export const useCreateDelivery = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async (delivery: DeliveryInsert) => {
@@ -120,6 +125,28 @@ export const useCreateDelivery = () => {
         .single();
 
       if (error) throw error;
+
+      // Log de auditoria
+      logger.audit('DELIVERY_CREATE', user?.id || 'unknown', {
+        delivery_id: data.id,
+        family_id: data.family_id,
+        institution_id: data.institution_id,
+      });
+
+      await logAction({
+        actionType: 'DELIVERY_CREATE',
+        tableName: 'deliveries',
+        recordId: data.id,
+        description: `Entrega registrada para família ${(data.family as any)?.name || data.family_id}`,
+        severity: 'INFO',
+        newData: {
+          id: data.id,
+          family_id: data.family_id,
+          institution_id: data.institution_id,
+          delivery_date: data.delivery_date,
+        },
+      });
+
       return data;
     },
     onSuccess: () => {

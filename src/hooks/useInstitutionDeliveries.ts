@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { logger } from '@/utils/logger';
 import { getCurrentDateTimeISO } from '@/utils/dateFormat';
 
 export const useInstitutionDeliveries = (startDate?: string, endDate?: string) => {
@@ -74,6 +76,7 @@ export const useCreateDelivery = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { logAction } = useAuditLog();
 
   return useMutation({
     mutationFn: async (data: CreateDeliveryData) => {
@@ -124,10 +127,35 @@ export const useCreateDelivery = () => {
           blocking_justification: data.blocking_justification || null,
           delivery_date: getCurrentDateTimeISO(),
         })
-        .select()
+        .select(`
+          *,
+          family:families(id, name, contact_person)
+        `)
         .single();
 
       if (error) throw error;
+
+      // Log de auditoria
+      logger.audit('DELIVERY_CREATE', user?.id || 'unknown', {
+        delivery_id: delivery.id,
+        family_id: delivery.family_id,
+        institution_id: delivery.institution_id,
+      });
+
+      await logAction({
+        actionType: 'DELIVERY_CREATE',
+        tableName: 'deliveries',
+        recordId: delivery.id,
+        description: `Entrega registrada para família ${(delivery.family as any)?.name || delivery.family_id}`,
+        severity: 'INFO',
+        newData: {
+          id: delivery.id,
+          family_id: delivery.family_id,
+          institution_id: delivery.institution_id,
+          delivery_date: delivery.delivery_date,
+        },
+      });
+
       return delivery;
     },
     onSuccess: () => {

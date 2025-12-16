@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { institutionSchema, institutionUpdateSchema } from "@/utils/validation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useInstitutions, useCreateInstitution, useUpdateInstitution, useDeleteInstitution } from "@/hooks/useInstitutions";
@@ -58,8 +61,53 @@ const Institutions = () => {
     responsible_name: string;
   };
 
+  // Schema para criação de instituição com confirmação de senha
+  const createInstitutionSchema = institutionSchema.extend({
+    confirmPassword: z.string(),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: 'As senhas não coincidem',
+    path: ['confirmPassword'],
+  });
+
+  // Schema híbrido que valida condicionalmente baseado no contexto
+  // Se password está vazio, assume que está editando e não valida senha
+  const hybridInstitutionSchema = z.object({
+    name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo').trim(),
+    address: z.string().max(500, 'Endereço muito longo').trim().optional().nullable(),
+    phone: z.string().max(20, 'Telefone muito longo').regex(/^[\d\s()+-]+$/, 'Telefone inválido').optional().nullable(),
+    email: z.string().email('Email inválido').min(1, 'Email é obrigatório').max(255, 'Email muito longo').toLowerCase().trim(),
+    responsible_name: z.string().min(1, 'Nome do responsável é obrigatório').max(255, 'Nome muito longo').trim(),
+    password: z.string().optional(),
+    confirmPassword: z.string().optional(),
+  }).refine((data) => {
+    // Se password está vazio, não validar (está editando)
+    if (!data.password || data.password === '') {
+      return true;
+    }
+    // Se password não está vazio, validar que as senhas coincidem
+    return data.password === data.confirmPassword;
+  }, {
+    message: 'As senhas não coincidem',
+    path: ['confirmPassword'],
+  }).refine((data) => {
+    // Se password está vazio, não validar força da senha (está editando)
+    if (!data.password || data.password === '') {
+      return true;
+    }
+    // Se password não está vazio, validar força da senha
+    return data.password.length >= 8 &&
+           /[A-Z]/.test(data.password) &&
+           /[a-z]/.test(data.password) &&
+           /[0-9]/.test(data.password) &&
+           /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(data.password);
+  }, {
+    message: 'A senha deve ter no mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial',
+    path: ['password'],
+  });
+
   // Setup form - extended to include user creation fields
   const form = useForm<InstitutionFormData>({
+    resolver: zodResolver(hybridInstitutionSchema),
     defaultValues: {
       name: "",
       address: "",
@@ -73,13 +121,24 @@ const Institutions = () => {
 
   // Function to handle creating new institution
   const handleCreate = () => {
-    form.reset();
+    setSelectedInstitution(null); // Garantir que não está editando
+    form.clearErrors();
+    form.reset({
+      name: "",
+      address: "",
+      phone: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      responsible_name: "",
+    });
     setIsCreateDialogOpen(true);
   };
 
   // Function to handle opening the edit dialog
   const handleEdit = (institution: Institution) => {
-    setSelectedInstitution(institution);
+    setSelectedInstitution(institution); // Definir instituição selecionada para o resolver usar schema de edição
+    form.clearErrors();
     form.reset({
       name: institution.name,
       address: institution.address || "",
@@ -99,9 +158,18 @@ const Institutions = () => {
   };
 
   // Function to save institution (create or update)
-  const onSubmit = (data: InstitutionFormData) => {
+  const onSubmit = async (data: InstitutionFormData) => {
     if (selectedInstitution) {
       // Update existing (don't include password fields)
+      // Validar que password está vazio ou não foi fornecido
+      if (data.password && data.password.trim() !== '') {
+        form.setError('password', {
+          type: 'manual',
+          message: 'A senha não pode ser alterada aqui. Use a página de perfil para alterar a senha.'
+        });
+        return;
+      }
+      
       const { password, confirmPassword, ...updateData } = data;
       updateInstitution.mutate(
         { 
@@ -123,19 +191,11 @@ const Institutions = () => {
         }
       );
     } else {
-      // Create new - validate password match
-      if (data.password !== data.confirmPassword) {
-        form.setError('confirmPassword', {
-          type: 'manual',
-          message: 'As senhas não coincidem'
-        });
-        return;
-      }
-      
-      if (data.password.length < 6) {
+      // Create new - Validar que password foi fornecido
+      if (!data.password || data.password.trim() === '') {
         form.setError('password', {
           type: 'manual',
-          message: 'A senha deve ter pelo menos 6 caracteres'
+          message: 'Senha é obrigatória para criar uma nova instituição'
         });
         return;
       }

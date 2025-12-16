@@ -14,6 +14,8 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { familySchema } from '@/utils/validation';
 import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution, useUpdateFamily } from '@/hooks/useFamilies';
 import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
@@ -174,7 +176,8 @@ const InstitutionFamilies = () => {
   };
 
   // Form for creating new family
-  const createForm = useForm<TablesInsert<'families'>>({
+  const createForm = useForm({
+    resolver: zodResolver(familySchema),
     defaultValues: {
       name: "",
       contact_person: "",

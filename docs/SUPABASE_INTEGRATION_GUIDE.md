@@ -20,11 +20,19 @@ Este guia fornece instruções passo-a-passo para integrar o frontend React com 
 
 **Arquivo:** `.env.local` (criar se não existir)
 
+Copie o arquivo `.env.example` para `.env.local` e preencha com suas credenciais do Supabase:
+
 ```bash
-# Supabase Configuration (REAL PROJECT CREDENTIALS)
-VITE_SUPABASE_URL=https://eslfcjhnaojghzuswpgz.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzbGZjamhuYW9qZ2h6dXN3cGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4ODcyMzIsImV4cCI6MjA2NDQ2MzIzMn0.NdhfRgC8fvdQ-XxPiVSUkffQiayg0NZnwaixC12Ey5o
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # Apenas para desenvolvimento local
 ```
+
+**⚠️ IMPORTANTE:** 
+- Nunca commite o arquivo `.env.local` no repositório
+- O `VITE_SUPABASE_SERVICE_ROLE_KEY` não deve ser usado no frontend em produção
+- Use Edge Functions para operações que requerem Service Role Key
 
 **Verificar se está funcionando:**
 
@@ -53,7 +61,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 **Comando para gerar tipos atualizados:**
 
 ```bash
-npx supabase gen types typescript --project-id eslfcjhnaojghzuswpgz > src/integrations/supabase/types.ts
+# Substitua YOUR_PROJECT_ID pelo ID do seu projeto Supabase
+npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/integrations/supabase/types.ts
 ```
 
 ---

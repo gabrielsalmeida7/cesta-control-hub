@@ -1,33 +1,31 @@
-import React, { useState } from "react";
+import React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { resetPasswordSchema } from "@/utils/validation";
 
 const ResetPassword: React.FC = () => {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 6) {
-      toast({ title: "Senha muito curta", description: "A senha deve ter ao menos 6 caracteres.", variant: "destructive" });
-      return;
+  
+  const form = useForm({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
     }
-    if (password !== confirm) {
-      toast({ title: "Senhas diferentes", description: "As senhas informadas não coincidem.", variant: "destructive" });
-      return;
-    }
+  });
 
-    setLoading(true);
+  const handleSubmit = async (data: { password: string; confirmPassword: string }) => {
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ password: data.password });
       if (error) {
         toast({ title: "Erro ao redefinir", description: error.message, variant: "destructive" });
       } else {
@@ -36,8 +34,6 @@ const ResetPassword: React.FC = () => {
       }
     } catch (err: any) {
       toast({ title: "Erro inesperado", description: err?.message || String(err), variant: "destructive" });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -48,19 +44,39 @@ const ResetPassword: React.FC = () => {
           <CardTitle>Redefinir senha</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">Nova senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm">Confirmar senha</Label>
-              <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Salvando..." : "Salvar nova senha"}
-            </Button>
-          </form>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nova senha</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar senha</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? "Salvando..." : "Salvar nova senha"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
         <CardFooter className="justify-center text-sm text-muted-foreground">
           Após salvar, você será redirecionado para o login.
