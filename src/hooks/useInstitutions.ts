@@ -360,6 +360,15 @@ export const useUpdateInstitution = () => {
             }
 
             // Atualizar auth.users.email usando Admin API
+            // Importar supabaseAdmin dinamicamente (pode não estar disponível no frontend)
+            let supabaseAdmin;
+            try {
+              const { supabaseAdmin: admin } = await import('@/integrations/supabase/admin');
+              supabaseAdmin = admin;
+            } catch {
+              // supabaseAdmin não disponível, continuar sem ele
+            }
+            
             if (!supabaseAdmin) {
               if (import.meta.env.DEV) {
                 console.warn('[UPDATE_INSTITUTION] supabaseAdmin not available, cannot update auth.users.email. Email de login não será atualizado.');

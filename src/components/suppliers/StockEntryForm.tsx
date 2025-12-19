@@ -22,8 +22,9 @@ interface StockEntryFormProps {
 
 const StockEntryForm = ({ open, onOpenChange, institutionId }: StockEntryFormProps) => {
   const { profile } = useAuth();
-  const { data: suppliers = [] } = useSuppliers();
-  const { data: products = [] } = useProducts();
+  const finalInstitutionId = institutionId || profile?.institution_id;
+  const { data: suppliers = [] } = useSuppliers(finalInstitutionId);
+  const { data: products = [] } = useProducts(finalInstitutionId);
   const createMovement = useCreateStockMovement();
   const { toast } = useToast();
 

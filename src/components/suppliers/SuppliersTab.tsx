@@ -16,12 +16,16 @@ import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 type SupplierInsert = TablesInsert<"suppliers">;
 type SupplierUpdate = TablesUpdate<"suppliers">;
 
-const SuppliersTab = () => {
+interface SuppliersTabProps {
+  institutionId?: string;
+}
+
+const SuppliersTab = ({ institutionId }: SuppliersTabProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   
-  const { data: suppliers = [], isLoading } = useSuppliers();
+  const { data: suppliers = [], isLoading } = useSuppliers(institutionId);
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();

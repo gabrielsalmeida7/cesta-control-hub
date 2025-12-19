@@ -55,11 +55,11 @@ const InstitutionSuppliers = () => {
             </TabsList>
 
             <TabsContent value="suppliers" className="mt-6">
-              <SuppliersTab />
+              <SuppliersTab institutionId={profile.institution_id} />
             </TabsContent>
 
             <TabsContent value="products" className="mt-6">
-              <ProductsTab />
+              <ProductsTab institutionId={profile.institution_id} />
             </TabsContent>
 
             <TabsContent value="inventory" className="mt-6">
