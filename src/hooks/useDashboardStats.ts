@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { isDevelopment, DEV_INSTITUTION_ID } from '@/utils/environment';
 import { startOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 export interface AdminStats {
@@ -44,7 +45,20 @@ export const useDashboardStats = () => {
           if (import.meta.env.DEV) {
             console.log('📝 Testing institutions query...');
           }
-          const instResult = await supabase.from('institutions').select('*', { count: 'exact', head: true });
+          // Buscar todas as instituições para filtrar a de desenvolvimento em produção
+          const { data: allInstitutions, count: totalCount } = await supabase
+            .from('institutions')
+            .select('*', { count: 'exact', head: false });
+          
+          // Filtrar instituição de desenvolvimento em produção
+          const filteredInstitutions = isDevelopment() 
+            ? allInstitutions 
+            : (allInstitutions || []).filter(inst => inst.id !== DEV_INSTITUTION_ID);
+          
+          const instResult = { 
+            count: filteredInstitutions?.length || 0,
+            data: filteredInstitutions 
+          };
           if (import.meta.env.DEV) {
             console.log('📝 Institutions result:', instResult);
           }
@@ -74,7 +88,7 @@ export const useDashboardStats = () => {
           }
 
           const stats: AdminStats = {
-            totalInstitutions: instResult.count || 0,
+            totalInstitutions: instResult.count || 0, // Já filtrado acima
             totalFamilies: famResult.count || 0,
             totalDeliveries: delResult.count || 0,
             blockedFamilies: blockResult.count || 0,
@@ -88,6 +102,11 @@ export const useDashboardStats = () => {
 
         // Stats para Instituição
         if (profile.role === 'institution' && profile.institution_id) {
+          // Em produção, não permitir acesso à instituição de desenvolvimento
+          if (!isDevelopment() && profile.institution_id === DEV_INSTITUTION_ID) {
+            throw new Error('Instituição de desenvolvimento não disponível em produção');
+          }
+          
           if (import.meta.env.DEV) {
             console.log('🏢 Fetching institution stats for:', profile.institution_id);
           }
