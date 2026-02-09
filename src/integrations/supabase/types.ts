@@ -78,57 +78,159 @@ export type Database = {
       families: {
         Row: {
           address: string | null
+          address_reference: string | null
+          birth_date: string | null
           block_reason: string | null
           blocked_by_institution_id: string | null
           blocked_until: string | null
+          children_ages: Json | null
+          children_count: number | null
+          chronic_disease_description: string | null
+          construction_type: string | null
           contact_person: string
           cpf: string | null
           created_at: string | null
+          family_composition: number | null
+          family_composition_notes: string | null
+          family_income: string | null
+          formal_employment: boolean | null
+          food_insecurity: boolean | null
+          has_chronic_disease: boolean | null
+          has_disability: boolean | null
+          has_electricity: boolean | null
+          has_garbage_collection: boolean | null
+          has_water_supply: boolean | null
+          housing_type: string | null
           id: string
+          id_document: string | null
           is_blocked: boolean | null
           members_count: number | null
+          mother_name: string | null
           name: string
+          occupation: string | null
+          other_aid_description: string | null
+          other_institution_name: string | null
+          other_vulnerabilities: string | null
           phone: string | null
+          poor_health: boolean | null
+          receives_auxilio_gas: boolean | null
+          receives_bolsa_familia: boolean | null
+          receives_bpc: boolean | null
+          receives_government_aid: boolean | null
+          receives_other_aid: boolean | null
+          registered_in_other_institution: boolean | null
+          substance_abuse: boolean | null
           unblock_reason: string | null
           unblocked_at: string | null
           unblocked_by_user_id: string | null
+          unemployment: boolean | null
           updated_at: string | null
+          work_situation: string | null
+          working_count: number | null
         }
         Insert: {
           address?: string | null
+          address_reference?: string | null
+          birth_date?: string | null
           block_reason?: string | null
           blocked_by_institution_id?: string | null
           blocked_until?: string | null
+          children_ages?: Json | null
+          children_count?: number | null
+          chronic_disease_description?: string | null
+          construction_type?: string | null
           contact_person: string
           cpf?: string | null
           created_at?: string | null
+          family_composition?: number | null
+          family_composition_notes?: string | null
+          family_income?: string | null
+          formal_employment?: boolean | null
+          food_insecurity?: boolean | null
+          has_chronic_disease?: boolean | null
+          has_disability?: boolean | null
+          has_electricity?: boolean | null
+          has_garbage_collection?: boolean | null
+          has_water_supply?: boolean | null
+          housing_type?: string | null
           id?: string
+          id_document?: string | null
           is_blocked?: boolean | null
           members_count?: number | null
+          mother_name?: string | null
           name: string
+          occupation?: string | null
+          other_aid_description?: string | null
+          other_institution_name?: string | null
+          other_vulnerabilities?: string | null
           phone?: string | null
+          poor_health?: boolean | null
+          receives_auxilio_gas?: boolean | null
+          receives_bolsa_familia?: boolean | null
+          receives_bpc?: boolean | null
+          receives_government_aid?: boolean | null
+          receives_other_aid?: boolean | null
+          registered_in_other_institution?: boolean | null
+          substance_abuse?: boolean | null
           unblock_reason?: string | null
           unblocked_at?: string | null
           unblocked_by_user_id?: string | null
+          unemployment?: boolean | null
           updated_at?: string | null
+          work_situation?: string | null
+          working_count?: number | null
         }
         Update: {
           address?: string | null
+          address_reference?: string | null
+          birth_date?: string | null
           block_reason?: string | null
           blocked_by_institution_id?: string | null
           blocked_until?: string | null
+          children_ages?: Json | null
+          children_count?: number | null
+          chronic_disease_description?: string | null
+          construction_type?: string | null
           contact_person?: string
           cpf?: string | null
           created_at?: string | null
+          family_composition?: number | null
+          family_composition_notes?: string | null
+          family_income?: string | null
+          formal_employment?: boolean | null
+          food_insecurity?: boolean | null
+          has_chronic_disease?: boolean | null
+          has_disability?: boolean | null
+          has_electricity?: boolean | null
+          has_garbage_collection?: boolean | null
+          has_water_supply?: boolean | null
+          housing_type?: string | null
           id?: string
+          id_document?: string | null
           is_blocked?: boolean | null
           members_count?: number | null
+          mother_name?: string | null
           name?: string
+          occupation?: string | null
+          other_aid_description?: string | null
+          other_institution_name?: string | null
+          other_vulnerabilities?: string | null
           phone?: string | null
+          poor_health?: boolean | null
+          receives_auxilio_gas?: boolean | null
+          receives_bolsa_familia?: boolean | null
+          receives_bpc?: boolean | null
+          receives_government_aid?: boolean | null
+          receives_other_aid?: boolean | null
+          registered_in_other_institution?: boolean | null
+          substance_abuse?: boolean | null
           unblock_reason?: string | null
           unblocked_at?: string | null
           unblocked_by_user_id?: string | null
+          unemployment?: boolean | null
           updated_at?: string | null
+          work_situation?: string | null
+          working_count?: number | null
         }
         Relationships: [
           {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import ConsentManagement from '@/components/ConsentManagement';
@@ -192,7 +192,12 @@ const InstitutionFamilies = () => {
       occupation: "",
       work_situation: "",
       children_count: 0,
-      has_disability: false,
+      children_ages: [],
+      family_composition: null,
+      working_count: 0,
+      formal_employment: false,
+      family_income: null,
+      family_composition_notes: "",
       address_reference: "",
       registered_in_other_institution: false,
       other_institution_name: "",
@@ -233,7 +238,12 @@ const InstitutionFamilies = () => {
       occupation: "",
       work_situation: "",
       children_count: 0,
-      has_disability: false,
+      children_ages: [],
+      family_composition: null,
+      working_count: 0,
+      formal_employment: false,
+      family_income: null,
+      family_composition_notes: "",
       address_reference: "",
       registered_in_other_institution: false,
       other_institution_name: "",
@@ -417,6 +427,21 @@ const InstitutionFamilies = () => {
           ? family.birth_date.split('T')[0] 
           : new Date(family.birth_date).toISOString().split('T')[0])
       : "";
+    // Processar children_ages do JSON
+    let childrenAges: number[] = [];
+    if (family.children_ages) {
+      try {
+        if (typeof family.children_ages === 'string') {
+          childrenAges = JSON.parse(family.children_ages);
+        } else if (Array.isArray(family.children_ages)) {
+          childrenAges = family.children_ages;
+        }
+      } catch (e) {
+        console.error('Erro ao processar children_ages:', e);
+        childrenAges = [];
+      }
+    }
+
     editForm.reset({
       name: family.name || "",
       contact_person: family.contact_person || "",
@@ -431,7 +456,12 @@ const InstitutionFamilies = () => {
       occupation: family.occupation || "",
       work_situation: family.work_situation || "",
       children_count: family.children_count || 0,
-      has_disability: family.has_disability || false,
+      children_ages: childrenAges,
+      family_composition: family.family_composition || null,
+      working_count: family.working_count || 0,
+      formal_employment: family.formal_employment || false,
+      family_income: family.family_income || null,
+      family_composition_notes: family.family_composition_notes || "",
       address_reference: family.address_reference || "",
       registered_in_other_institution: family.registered_in_other_institution || false,
       other_institution_name: family.other_institution_name || "",
@@ -529,9 +559,9 @@ const InstitutionFamilies = () => {
         }
       });
       
-      // Campos booleanos
+      // Campos booleanos (removido has_disability - não será mais editado)
       const booleanFields = [
-        'is_blocked', 'has_disability', 'registered_in_other_institution',
+        'is_blocked', 'registered_in_other_institution',
         'receives_government_aid', 'receives_bolsa_familia', 'receives_auxilio_gas',
         'receives_bpc', 'receives_other_aid', 'has_chronic_disease',
         'has_water_supply', 'has_electricity', 'has_garbage_collection',
@@ -550,6 +580,44 @@ const InstitutionFamilies = () => {
         if (childrenCount >= 0) {
           familyData.children_count = childrenCount;
         }
+      }
+
+      // Processar children_ages para JSON
+      if (data.children_ages !== undefined) {
+        if (data.children_ages && Array.isArray(data.children_ages) && data.children_ages.length > 0) {
+          // Filtrar valores válidos (maiores que 0)
+          const validAges = data.children_ages.filter(age => age && age > 0);
+          familyData.children_ages = validAges.length > 0 ? validAges : null;
+        } else {
+          familyData.children_ages = null;
+        }
+      }
+
+      // Novos campos de composição familiar
+      if (data.family_composition !== undefined) {
+        const composition = data.family_composition ? Number(data.family_composition) : null;
+        familyData.family_composition = composition && composition > 0 ? composition : null;
+      }
+
+      if (data.working_count !== undefined) {
+        const workingCount = data.working_count ? Number(data.working_count) : 0;
+        familyData.working_count = workingCount >= 0 ? workingCount : 0;
+      }
+
+      if (data.formal_employment !== undefined) {
+        familyData.formal_employment = data.formal_employment || false;
+      }
+
+      if (data.family_income !== undefined) {
+        familyData.family_income = data.family_income && data.family_income.trim() 
+          ? data.family_income.trim() 
+          : null;
+      }
+
+      if (data.family_composition_notes !== undefined) {
+        familyData.family_composition_notes = data.family_composition_notes && data.family_composition_notes.trim() 
+          ? data.family_composition_notes.trim() 
+          : null;
       }
       
       // Data de nascimento - converter string vazia para null
@@ -601,6 +669,58 @@ const InstitutionFamilies = () => {
       
       // Salvar estado de assinatura do termo
       familyData.consent_term_signed = editTermSigned || false;
+      
+      // Validação 1: Verificar CPF duplicado (se CPF foi alterado)
+      if (familyData.cpf !== undefined) {
+        const cleanedCpf = familyData.cpf && typeof familyData.cpf === 'string' 
+          ? familyData.cpf.replace(/\D/g, '') 
+          : familyData.cpf;
+        
+        if (cleanedCpf && cleanedCpf.length === 11) {
+          const { data: existingByCpf, error: cpfCheckError } = await supabase
+            .from("families")
+            .select("id, name, cpf")
+            .eq("cpf", cleanedCpf)
+            .neq("id", selectedFamily.id); // Excluir a própria família
+
+          if (cpfCheckError) {
+            console.error("Erro ao verificar CPF duplicado:", cpfCheckError);
+          } else if (existingByCpf && existingByCpf.length > 0) {
+            toast({
+              title: "CPF já cadastrado",
+              description: `Já existe uma família cadastrada com este CPF: ${existingByCpf[0].name}. O CPF deve ser único no sistema.`,
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      }
+
+      // Validação 2: Verificar Nome da Mãe duplicado (se Nome da Mãe foi alterado)
+      if (familyData.mother_name !== undefined) {
+        const trimmedMotherName = familyData.mother_name && typeof familyData.mother_name === 'string' 
+          ? familyData.mother_name.trim() 
+          : familyData.mother_name;
+        
+        if (trimmedMotherName && trimmedMotherName.length > 0) {
+          const { data: existingByMotherName, error: motherNameCheckError } = await supabase
+            .from("families")
+            .select("id, name, mother_name")
+            .ilike("mother_name", trimmedMotherName)
+            .neq("id", selectedFamily.id); // Excluir a própria família
+
+          if (motherNameCheckError) {
+            console.error("Erro ao verificar Nome da Mãe duplicado:", motherNameCheckError);
+          } else if (existingByMotherName && existingByMotherName.length > 0) {
+            toast({
+              title: "Nome da Mãe já cadastrado",
+              description: `Já existe uma família cadastrada com este Nome da Mãe: ${existingByMotherName[0].name}. O Nome da Mãe deve ser único no sistema.`,
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      }
       
       // Log para debug (apenas em desenvolvimento)
       if (import.meta.env.DEV) {
@@ -665,9 +785,71 @@ const InstitutionFamilies = () => {
 
     try {
       // Limpar CPF (remover máscara) antes de salvar
+      const cleanedCpf = data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null;
+      const trimmedMotherName = data.mother_name && typeof data.mother_name === 'string' 
+        ? data.mother_name.trim() 
+        : (data.mother_name || null);
+
+      // Validação 1: Verificar CPF duplicado
+      if (cleanedCpf && cleanedCpf.length === 11) {
+        const { data: existingByCpf, error: cpfCheckError } = await supabase
+          .from("families")
+          .select("id, name, cpf")
+          .eq("cpf", cleanedCpf);
+
+        if (cpfCheckError) {
+          console.error("Erro ao verificar CPF duplicado:", cpfCheckError);
+        } else if (existingByCpf && existingByCpf.length > 0) {
+          toast({
+            title: "CPF já cadastrado",
+            description: `Já existe uma família cadastrada com este CPF: ${existingByCpf[0].name}. O CPF deve ser único no sistema.`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      // Validação 2: Verificar Nome da Mãe duplicado
+      if (trimmedMotherName && trimmedMotherName.length > 0) {
+        const { data: existingByMotherName, error: motherNameCheckError } = await supabase
+          .from("families")
+          .select("id, name, mother_name")
+          .ilike("mother_name", trimmedMotherName);
+
+        if (motherNameCheckError) {
+          console.error("Erro ao verificar Nome da Mãe duplicado:", motherNameCheckError);
+        } else if (existingByMotherName && existingByMotherName.length > 0) {
+          toast({
+            title: "Nome da Mãe já cadastrado",
+            description: `Já existe uma família cadastrada com este Nome da Mãe: ${existingByMotherName[0].name}. O Nome da Mãe deve ser único no sistema.`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      // Processar children_ages para JSON
+      let childrenAgesJson = null;
+      if (data.children_ages && Array.isArray(data.children_ages) && data.children_ages.length > 0) {
+        // Filtrar valores válidos (maiores que 0)
+        const validAges = data.children_ages.filter(age => age && age > 0);
+        if (validAges.length > 0) {
+          childrenAgesJson = validAges;
+        }
+      }
+
       const familyData = {
         ...data,
-        cpf: data.cpf ? (typeof data.cpf === 'string' ? data.cpf.replace(/\D/g, '') : data.cpf) : null
+        cpf: cleanedCpf,
+        children_ages: childrenAgesJson,
+        // Garantir que campos numéricos opcionais sejam null se vazios
+        family_composition: data.family_composition || null,
+        working_count: data.working_count || 0,
+        formal_employment: data.formal_employment || false,
+        family_income: data.family_income || null,
+        family_composition_notes: data.family_composition_notes && data.family_composition_notes.trim() 
+          ? data.family_composition_notes.trim() 
+          : null,
       };
       
       await createFamilyMutation.mutateAsync({
@@ -957,15 +1139,15 @@ const InstitutionFamilies = () => {
                   <p className="font-medium">{selectedFamily.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Pessoa de Contato</p>
+                  <p className="text-sm text-gray-600">Pessoa de Contato (Titular)</p>
                   <p className="font-medium">{selectedFamily.contact_person}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Telefone</p>
+                  <p className="text-sm text-gray-600">Telefone do Titular</p>
                   <p className="font-medium">{selectedFamily.phone || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">CPF</p>
+                  <p className="text-sm text-gray-600">CPF do Titular</p>
                   <p className="font-medium">{selectedFamily.cpf ? formatCpf(selectedFamily.cpf) : 'Não informado'}</p>
                 </div>
                 <div>
@@ -995,7 +1177,7 @@ const InstitutionFamilies = () => {
                   <div className="grid grid-cols-2 gap-4">
                     {selectedFamily.mother_name && (
                       <div>
-                        <p className="text-sm text-gray-600">Nome da Mãe</p>
+                        <p className="text-sm text-gray-600">Nome da Mãe do Titular</p>
                         <p className="font-medium">{selectedFamily.mother_name}</p>
                       </div>
                     )}
@@ -1007,19 +1189,19 @@ const InstitutionFamilies = () => {
                     )}
                     {selectedFamily.id_document && (
                       <div>
-                        <p className="text-sm text-gray-600">ID / RG</p>
+                        <p className="text-sm text-gray-600">ID / RG do Titular</p>
                         <p className="font-medium">{selectedFamily.id_document}</p>
                       </div>
                     )}
                     {selectedFamily.occupation && (
                       <div>
-                        <p className="text-sm text-gray-600">Profissão/Ocupação</p>
+                        <p className="text-sm text-gray-600">Profissão/Ocupação do Titular</p>
                         <p className="font-medium">{selectedFamily.occupation}</p>
                       </div>
                     )}
                     {selectedFamily.work_situation && (
                       <div>
-                        <p className="text-sm text-gray-600">Situação de Trabalho</p>
+                        <p className="text-sm text-gray-600">Situação de Trabalho do Titular</p>
                         <p className="font-medium">{selectedFamily.work_situation}</p>
                       </div>
                     )}
@@ -1035,16 +1217,62 @@ const InstitutionFamilies = () => {
                     <p className="text-sm text-gray-600">Número de Membros</p>
                     <p className="font-medium">{selectedFamily.members_count || 'N/A'}</p>
                   </div>
-                  {selectedFamily.children_count !== undefined && selectedFamily.children_count !== null && (
+                  {selectedFamily.family_composition !== undefined && selectedFamily.family_composition !== null && (
+                    <div>
+                      <p className="text-sm text-gray-600">Composição Familiar</p>
+                      <p className="font-medium">{selectedFamily.family_composition} pessoas</p>
+                    </div>
+                  )}
+                  {selectedFamily.children_count !== undefined && selectedFamily.children_count !== null && selectedFamily.children_count > 0 && (
                     <div>
                       <p className="text-sm text-gray-600">Quantos Filhos</p>
                       <p className="font-medium">{selectedFamily.children_count}</p>
                     </div>
                   )}
-                  <div>
-                    <p className="text-sm text-gray-600">Possui Deficiência na Família</p>
-                    <p className="font-medium">{selectedFamily.has_disability ? "Sim" : "Não"}</p>
-                  </div>
+                  {selectedFamily.children_ages && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-gray-600">Idades dos Filhos</p>
+                      <p className="font-medium">
+                        {(() => {
+                          try {
+                            const ages = typeof selectedFamily.children_ages === 'string' 
+                              ? JSON.parse(selectedFamily.children_ages) 
+                              : selectedFamily.children_ages;
+                            if (Array.isArray(ages) && ages.length > 0) {
+                              return ages.filter((age: number) => age > 0).join(', ') + ' anos';
+                            }
+                            return 'N/A';
+                          } catch {
+                            return 'N/A';
+                          }
+                        })()}
+                      </p>
+                    </div>
+                  )}
+                  {selectedFamily.working_count !== undefined && selectedFamily.working_count !== null && selectedFamily.working_count > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600">Quantos Trabalham</p>
+                      <p className="font-medium">{selectedFamily.working_count}</p>
+                    </div>
+                  )}
+                  {selectedFamily.formal_employment !== undefined && selectedFamily.formal_employment !== null && selectedFamily.working_count > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600">Emprego Formal</p>
+                      <p className="font-medium">{selectedFamily.formal_employment ? "Sim" : "Não"}</p>
+                    </div>
+                  )}
+                  {selectedFamily.family_income && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-gray-600">Renda Familiar</p>
+                      <p className="font-medium">{selectedFamily.family_income}</p>
+                    </div>
+                  )}
+                  {selectedFamily.family_composition_notes && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-gray-600">Observações</p>
+                      <p className="font-medium whitespace-pre-wrap">{selectedFamily.family_composition_notes}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -1224,7 +1452,7 @@ const InstitutionFamilies = () => {
                       rules={{ required: "Pessoa de contato é obrigatória" }}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Pessoa de Contato</FormLabel>
+                          <FormLabel>Pessoa de Contato (Titular)</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="Ex: João Silva" />
                           </FormControl>
@@ -1238,7 +1466,7 @@ const InstitutionFamilies = () => {
                       name="cpf"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>CPF (opcional)</FormLabel>
+                          <FormLabel>CPF do Titular (opcional)</FormLabel>
                           <FormControl>
                             <Input 
                               {...field} 
@@ -1263,7 +1491,7 @@ const InstitutionFamilies = () => {
                       rules={{ required: "Telefone é obrigatório" }}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Telefone</FormLabel>
+                          <FormLabel>Telefone do Titular</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="(11) 99999-9999" />
                           </FormControl>
@@ -1309,7 +1537,7 @@ const InstitutionFamilies = () => {
                     name="mother_name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome da Mãe (opcional)</FormLabel>
+                          <FormLabel>Nome da Mãe do Titular (opcional)</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="Nome completo da mãe" />
                           </FormControl>
@@ -1342,7 +1570,7 @@ const InstitutionFamilies = () => {
                       name="id_document"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID / RG (opcional)</FormLabel>
+                          <FormLabel>ID / RG do Titular (opcional)</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="Número do documento de identidade" />
                           </FormControl>
@@ -1356,7 +1584,7 @@ const InstitutionFamilies = () => {
                       name="occupation"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Profissão/Ocupação (opcional)</FormLabel>
+                          <FormLabel>Profissão/Ocupação do Titular (opcional)</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder="Ex: Pedreiro, Vendedor, etc." />
                           </FormControl>
@@ -1370,7 +1598,7 @@ const InstitutionFamilies = () => {
                       name="work_situation"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Situação de Trabalho (opcional)</FormLabel>
+                          <FormLabel>Situação de Trabalho do Titular (opcional)</FormLabel>
                           <Select value={field.value || ""} onValueChange={field.onChange}>
                             <FormControl>
                               <SelectTrigger>
@@ -1394,29 +1622,123 @@ const InstitutionFamilies = () => {
                 {/* Seção 3: Composição Familiar */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Composição Familiar</h3>
+                  
+                  <FormField
+                    control={createForm.control}
+                    name="family_composition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Composição Familiar (quantas pessoas existem na família)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)} 
+                            min="1"
+                            placeholder="Ex: 4"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={createForm.control}
                     name="children_count"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantos Filhos (opcional)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              value={field.value || 0}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
-                              min="0"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantos Filhos (opcional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || 0}
+                            onChange={(e) => {
+                              const count = parseInt(e.target.value) || 0;
+                              field.onChange(count);
+                              // Atualizar array de idades quando o número de filhos mudar
+                              const currentAges = createForm.getValues('children_ages') || [];
+                              if (count > currentAges.length) {
+                                // Adicionar campos vazios
+                                const newAges = [...currentAges, ...Array(count - currentAges.length).fill(0)];
+                                createForm.setValue('children_ages', newAges);
+                              } else if (count < currentAges.length) {
+                                // Remover campos extras
+                                createForm.setValue('children_ages', currentAges.slice(0, count));
+                              }
+                            }} 
+                            min="0"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {createForm.watch('children_count') > 0 && (
+                    <div className="space-y-2">
+                      <FormLabel>Idades dos Filhos</FormLabel>
+                      {Array.from({ length: createForm.watch('children_count') || 0 }).map((_, index) => (
+                        <FormField
+                          key={index}
+                          control={createForm.control}
+                          name={`children_ages.${index}` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm">Idade do {index + 1}º filho</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                  onChange={(e) => {
+                                    const age = e.target.value ? parseInt(e.target.value) : 0;
+                                    const currentAges = createForm.getValues('children_ages') || [];
+                                    const newAges = [...currentAges];
+                                    newAges[index] = age;
+                                    createForm.setValue('children_ages', newAges);
+                                    field.onChange(age);
+                                  }} 
+                                  min="0"
+                                  max="120"
+                                  placeholder="Ex: 8"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <FormField
+                    control={createForm.control}
+                    name="working_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantos Trabalham (opcional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                            min="0"
+                            placeholder="Ex: 2"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {createForm.watch('working_count') > 0 && (
                     <FormField
                       control={createForm.control}
-                      name="has_disability"
+                      name="formal_employment"
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                           <FormControl>
@@ -1427,12 +1749,58 @@ const InstitutionFamilies = () => {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel>
-                              Possui deficiência na família
+                              É emprego formal (com carteira assinada)?
                             </FormLabel>
                           </div>
                         </FormItem>
                       )}
                     />
+                  )}
+
+                  <FormField
+                    control={createForm.control}
+                    name="family_income"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Renda Familiar (opcional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a faixa de renda" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Sem renda">Sem renda</SelectItem>
+                            <SelectItem value="Até 1 salário mínimo">Até 1 salário mínimo</SelectItem>
+                            <SelectItem value="1 a 2 salários mínimos">1 a 2 salários mínimos</SelectItem>
+                            <SelectItem value="2 a 3 salários mínimos">2 a 3 salários mínimos</SelectItem>
+                            <SelectItem value="3 a 5 salários mínimos">3 a 5 salários mínimos</SelectItem>
+                            <SelectItem value="Acima de 5 salários mínimos">Acima de 5 salários mínimos</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={createForm.control}
+                    name="family_composition_notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Observações (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Observações adicionais sobre a composição familiar..."
+                            rows={3}
+                            className="resize-none"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 {/* Seção 4: Situação Social */}
@@ -1936,7 +2304,7 @@ const InstitutionFamilies = () => {
                   name="cpf"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CPF (opcional)</FormLabel>
+                      <FormLabel>CPF do Titular (opcional)</FormLabel>
                       <FormControl>
                         <Input 
                           {...field} 
@@ -1961,7 +2329,7 @@ const InstitutionFamilies = () => {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Telefone</FormLabel>
+                      <FormLabel>Telefone do Titular</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="(11) 99999-9999" />
                       </FormControl>
@@ -2007,7 +2375,7 @@ const InstitutionFamilies = () => {
                     name="mother_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nome da Mãe (opcional)</FormLabel>
+                        <FormLabel>Nome da Mãe do Titular (opcional)</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Nome completo da mãe" />
                         </FormControl>
@@ -2040,7 +2408,7 @@ const InstitutionFamilies = () => {
                     name="id_document"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>ID / RG (opcional)</FormLabel>
+                        <FormLabel>ID / RG do Titular (opcional)</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Número do documento de identidade" />
                         </FormControl>
@@ -2054,7 +2422,7 @@ const InstitutionFamilies = () => {
                     name="occupation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Profissão/Ocupação (opcional)</FormLabel>
+                        <FormLabel>Profissão/Ocupação do Titular (opcional)</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Ex: Pedreiro, Vendedor, etc." />
                         </FormControl>
@@ -2068,7 +2436,7 @@ const InstitutionFamilies = () => {
                     name="work_situation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Situação de Trabalho (opcional)</FormLabel>
+                        <FormLabel>Situação de Trabalho do Titular (opcional)</FormLabel>
                         <Select value={field.value || ""} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
@@ -2112,6 +2480,27 @@ const InstitutionFamilies = () => {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={editForm.control}
+                    name="family_composition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Composição Familiar (quantas pessoas existem na família)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)} 
+                            min="1"
+                            placeholder="Ex: 4"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
                   <FormField
                     control={editForm.control}
@@ -2124,7 +2513,20 @@ const InstitutionFamilies = () => {
                             type="number" 
                             {...field} 
                             value={field.value || 0}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                            onChange={(e) => {
+                              const count = parseInt(e.target.value) || 0;
+                              field.onChange(count);
+                              // Atualizar array de idades quando o número de filhos mudar
+                              const currentAges = editForm.getValues('children_ages') || [];
+                              if (count > currentAges.length) {
+                                // Adicionar campos vazios
+                                const newAges = [...currentAges, ...Array(count - currentAges.length).fill(0)];
+                                editForm.setValue('children_ages', newAges);
+                              } else if (count < currentAges.length) {
+                                // Remover campos extras
+                                editForm.setValue('children_ages', currentAges.slice(0, count));
+                              }
+                            }} 
                             min="0"
                           />
                         </FormControl>
@@ -2132,23 +2534,128 @@ const InstitutionFamilies = () => {
                       </FormItem>
                     )}
                   />
-                  
+
+                  {editForm.watch('children_count') > 0 && (
+                    <div className="space-y-2">
+                      <FormLabel>Idades dos Filhos</FormLabel>
+                      {Array.from({ length: editForm.watch('children_count') || 0 }).map((_, index) => (
+                        <FormField
+                          key={index}
+                          control={editForm.control}
+                          name={`children_ages.${index}` as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm">Idade do {index + 1}º filho</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                  onChange={(e) => {
+                                    const age = e.target.value ? parseInt(e.target.value) : 0;
+                                    const currentAges = editForm.getValues('children_ages') || [];
+                                    const newAges = [...currentAges];
+                                    newAges[index] = age;
+                                    editForm.setValue('children_ages', newAges);
+                                    field.onChange(age);
+                                  }} 
+                                  min="0"
+                                  max="120"
+                                  placeholder="Ex: 8"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
+
                   <FormField
                     control={editForm.control}
-                    name="has_disability"
+                    name="working_count"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormItem>
+                        <FormLabel>Quantos Trabalham (opcional)</FormLabel>
                         <FormControl>
-                          <Checkbox
-                            checked={field.value || false}
-                            onCheckedChange={field.onChange}
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} 
+                            min="0"
+                            placeholder="Ex: 2"
                           />
                         </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            Possui deficiência na família
-                          </FormLabel>
-                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {editForm.watch('working_count') > 0 && (
+                    <FormField
+                      control={editForm.control}
+                      name="formal_employment"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value || false}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              É emprego formal (com carteira assinada)?
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={editForm.control}
+                    name="family_income"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Renda Familiar (opcional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a faixa de renda" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Sem renda">Sem renda</SelectItem>
+                            <SelectItem value="Até 1 salário mínimo">Até 1 salário mínimo</SelectItem>
+                            <SelectItem value="1 a 2 salários mínimos">1 a 2 salários mínimos</SelectItem>
+                            <SelectItem value="2 a 3 salários mínimos">2 a 3 salários mínimos</SelectItem>
+                            <SelectItem value="3 a 5 salários mínimos">3 a 5 salários mínimos</SelectItem>
+                            <SelectItem value="Acima de 5 salários mínimos">Acima de 5 salários mínimos</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="family_composition_notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Observações (opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Observações adicionais sobre a composição familiar..."
+                            rows={3}
+                            className="resize-none"
+                          />
+                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />

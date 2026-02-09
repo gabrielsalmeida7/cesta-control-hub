@@ -107,9 +107,9 @@ export const institutionUpdateSchema = z.object({
 }).partial();
 
 /**
- * Schema para criação de família
+ * Schema base para família (sem refinamentos)
  */
-export const familySchema = z.object({
+const familySchemaBase = z.object({
   name: z.string()
     .min(1, 'Nome da família é obrigatório')
     .max(255, 'Nome muito longo')
@@ -133,12 +133,77 @@ export const familySchema = z.object({
     .int('Número de membros deve ser inteiro')
     .min(1, 'Deve ter pelo menos 1 membro')
     .max(50, 'Número de membros muito alto'),
+  // Campos de composição familiar
+  children_count: z.number()
+    .int('Quantidade de filhos deve ser inteiro')
+    .min(0, 'Quantidade de filhos não pode ser negativa')
+    .max(20, 'Quantidade de filhos muito alta')
+    .optional()
+    .nullable(),
+  children_ages: z.array(z.number().int().min(0).max(120))
+    .optional()
+    .nullable(),
+  family_composition: z.number()
+    .int('Composição familiar deve ser inteiro')
+    .min(1, 'Deve ter pelo menos 1 pessoa na família')
+    .max(50, 'Composição familiar muito alta')
+    .optional()
+    .nullable(),
+  working_count: z.number()
+    .int('Quantidade de pessoas que trabalham deve ser inteiro')
+    .min(0, 'Quantidade não pode ser negativa')
+    .max(50, 'Quantidade muito alta')
+    .optional()
+    .nullable(),
+  formal_employment: z.boolean()
+    .optional()
+    .nullable(),
+  family_income: z.enum([
+    'Até 1 salário mínimo',
+    '1 a 2 salários mínimos',
+    '2 a 3 salários mínimos',
+    '3 a 5 salários mínimos',
+    'Acima de 5 salários mínimos',
+    'Sem renda'
+  ])
+    .optional()
+    .nullable(),
+  family_composition_notes: z.string()
+    .max(1000, 'Observações muito longas')
+    .trim()
+    .optional()
+    .nullable(),
+});
+
+/**
+ * Schema para criação de família (com refinamentos)
+ */
+export const familySchema = familySchemaBase.refine((data) => {
+  // Validar que working_count não seja maior que family_composition
+  if (data.working_count !== undefined && data.working_count !== null &&
+      data.family_composition !== undefined && data.family_composition !== null) {
+    return data.working_count <= data.family_composition;
+  }
+  return true;
+}, {
+  message: 'Quantidade de pessoas que trabalham não pode ser maior que a composição familiar',
+  path: ['working_count'],
+}).refine((data) => {
+  // Validar que número de idades = número de filhos
+  if (data.children_count !== undefined && data.children_count !== null &&
+      data.children_ages !== undefined && data.children_ages !== null) {
+    return data.children_ages.length === data.children_count;
+  }
+  return true;
+}, {
+  message: 'Número de idades deve ser igual ao número de filhos',
+  path: ['children_ages'],
 });
 
 /**
  * Schema para atualização de família
  */
-export const familyUpdateSchema = familySchema.partial();
+export const familyUpdateSchema = familySchemaBase.partial();
 
 /**
  * Schema para reset de senha

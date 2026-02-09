@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { logger } from '@/utils/logger';
-import { isDevelopment, DEV_INSTITUTION_ID } from '@/utils/environment';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 type Institution = Tables<'institutions'>;
@@ -39,19 +38,10 @@ export const useInstitutions = () => {
         throw error;
       }
       
-      // Filtrar instituição de desenvolvimento em produção
-      const filteredData = isDevelopment() 
-        ? data 
-        : (data || []).filter(inst => inst.id !== DEV_INSTITUTION_ID);
-      
       if (import.meta.env.DEV) {
-        console.log('✅ Institutions fetched:', filteredData?.length || 0, 'records', {
-          total: data?.length || 0,
-          filtered: filteredData?.length || 0,
-          devInstitutionFiltered: !isDevelopment()
-        });
+        console.log('✅ Institutions fetched:', data?.length || 0, 'records');
       }
-      return filteredData as Institution[];
+      return data as Institution[];
     },
     retry: 1,
     refetchOnWindowFocus: false,
@@ -530,11 +520,6 @@ export const useInstitutionData = () => {
     queryFn: async () => {
       if (!profile?.institution_id) {
         return null;
-      }
-
-      // Em produção, não permitir acesso à instituição de desenvolvimento
-      if (!isDevelopment() && profile.institution_id === DEV_INSTITUTION_ID) {
-        throw new Error('Instituição de desenvolvimento não disponível em produção');
       }
 
       const { data, error } = await supabase

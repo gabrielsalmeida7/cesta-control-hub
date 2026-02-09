@@ -610,7 +610,7 @@ export const useDisassociateFamilyFromInstitution = () => {
 
 // Tipo para resultado da busca de família
 export type FamilySearchResult = {
-  scenario: 1 | 2 | 3 | 4;
+  scenario: 1 | 2 | 3 | 4 | 5;
   family: Family & {
     institution_families?: Array<{
       institution_id: string;
@@ -620,27 +620,41 @@ export type FamilySearchResult = {
       };
     }>;
   } | null;
+  families?: Array<Family & {
+    institution_families?: Array<{
+      institution_id: string;
+      institution: {
+        id: string;
+        name: string;
+      };
+    }>;
+  }>; // Para múltiplos resultados (cenário 5)
   message: string;
   institutionName?: string;
 };
 
 /**
- * Busca família por CPF ou nome e verifica vínculos
- * Retorna um dos 4 cenários conforme Roles-RDN-Fluxos:
+ * Busca família por CPF, nome da família ou nome da mãe e verifica vínculos
+ * Retorna um dos 5 cenários:
  * 1: Família encontrada e desvinculada
  * 2: Família encontrada e já vinculada a outra instituição
  * 3: Família não encontrada
  * 4: Família já vinculada à própria instituição
+ * 5: Múltiplas famílias encontradas (apenas para busca por Nome da Mãe)
  */
 export const searchFamilyByCpf = async (
   searchTerm: string,
-  currentInstitutionId?: string
+  currentInstitutionId?: string,
+  searchBy: "cpf" | "name" | "mother_name" = "cpf"
 ): Promise<FamilySearchResult> => {
   // Limpar CPF (remover caracteres não numéricos)
   const cleanCpf = searchTerm.replace(/\D/g, '');
   const trimmedSearch = searchTerm.trim();
   
-  // Buscar família por CPF (prioridade) ou por nome
+  // Determinar se deve buscar múltiplos resultados (apenas para Nome da Mãe)
+  const allowMultiple = searchBy === "mother_name";
+  
+  // Buscar família por CPF, nome da família ou nome da mãe
   let query = supabase
     .from("families")
     .select(`
@@ -649,21 +663,54 @@ export const searchFamilyByCpf = async (
         institution_id,
         institution:institution_id(id, name)
       )
-    `)
-    .limit(1);
+    `);
+  
+  // Aplicar limit apenas se não for busca por Nome da Mãe
+  if (!allowMultiple) {
+    query = query.limit(1);
+  }
 
-  // Se tem 11 dígitos, buscar por CPF (sem máscara no banco)
-  if (cleanCpf.length === 11) {
-    query = query.eq("cpf", cleanCpf);
-  } else if (trimmedSearch.length > 0) {
-    // Caso contrário, buscar por nome
-    query = query.ilike("name", `%${trimmedSearch}%`);
+  // Determinar tipo de busca baseado no parâmetro searchBy
+  if (searchBy === "cpf") {
+    // Se tem 11 dígitos, buscar por CPF (sem máscara no banco)
+    if (cleanCpf.length === 11) {
+      query = query.eq("cpf", cleanCpf);
+    } else {
+      // CPF inválido
+      return {
+        scenario: 3,
+        family: null,
+        message: "CPF deve conter 11 dígitos."
+      };
+    }
+  } else if (searchBy === "name") {
+    // Buscar por nome da família
+    if (trimmedSearch.length > 0) {
+      query = query.ilike("name", `%${trimmedSearch}%`);
+    } else {
+      return {
+        scenario: 3,
+        family: null,
+        message: "Digite o nome da família para buscar."
+      };
+    }
+  } else if (searchBy === "mother_name") {
+    // Buscar por nome da mãe
+    if (trimmedSearch.length > 0) {
+      query = query.ilike("mother_name", `%${trimmedSearch}%`);
+    } else {
+      return {
+        scenario: 3,
+        family: null,
+        message: "Digite o nome da mãe para buscar."
+      };
+    }
   } else {
-    // Termo de busca vazio
+    // Tipo de busca inválido
     return {
       scenario: 3,
       family: null,
-      message: "Digite um CPF ou nome para buscar."
+      message: "Tipo de busca inválido."
     };
   }
 
@@ -675,13 +722,41 @@ export const searchFamilyByCpf = async (
 
   // Cenário 3: Família não encontrada
   if (!families || families.length === 0) {
+    let searchTypeText = "";
+    if (searchBy === "cpf") {
+      searchTypeText = "este CPF";
+    } else if (searchBy === "name") {
+      searchTypeText = "este nome da família";
+    } else if (searchBy === "mother_name") {
+      searchTypeText = "este nome da mãe";
+    }
+    
     return {
       scenario: 3,
       family: null,
-      message: `Nenhuma família encontrada com ${cleanCpf.length === 11 ? 'este CPF' : 'este nome'}.`
+      message: `Nenhuma família encontrada com ${searchTypeText}.`
     };
   }
 
+  // Cenário 5: Múltiplas famílias encontradas (apenas para busca por Nome da Mãe)
+  if (allowMultiple && families.length > 1) {
+    return {
+      scenario: 5,
+      family: null,
+      families: families as Array<Family & {
+        institution_families?: Array<{
+          institution_id: string;
+          institution: {
+            id: string;
+            name: string;
+          };
+        }>;
+      }>,
+      message: `Foram encontradas ${families.length} famílias com este Nome da Mãe.`
+    };
+  }
+
+  // Processar resultado único (cenários 1, 2 ou 4)
   const family = families[0];
   const associations = family.institution_families || [];
 

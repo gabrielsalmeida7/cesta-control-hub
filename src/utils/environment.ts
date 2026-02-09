@@ -55,9 +55,3 @@ export const isDevelopment = (): boolean => {
 export const isProduction = (): boolean => {
   return !isDevelopment();
 };
-
-/**
- * ID da instituição de desenvolvimento que deve ser ocultada em produção
- */
-export const DEV_INSTITUTION_ID = 'eaaab164-b376-4c97-866b-a80d811e4d0d';
-

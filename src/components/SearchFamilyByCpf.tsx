@@ -24,7 +24,7 @@ const formatCpf = (value: string): string => {
 
 const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchBy, setSearchBy] = useState<"cpf" | "name">("cpf");
+  const [searchBy, setSearchBy] = useState<"cpf" | "name" | "mother_name">("cpf");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<FamilySearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
-      setError("Digite um CPF ou nome para buscar.");
+      setError("Digite um CPF, nome da família ou nome da mãe para buscar.");
       return;
     }
 
@@ -45,7 +45,8 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
     try {
       const result = await searchFamilyByCpf(
         searchTerm,
-        profile?.institution_id
+        profile?.institution_id,
+        searchBy
       );
       setSearchResult(result);
     } catch (err: any) {
@@ -77,12 +78,33 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
     }
   };
 
+  const handleAssociateMultiple = async (familyId: string, cpf?: string) => {
+    if (!profile?.institution_id) return;
+
+    try {
+      await associateMutation.mutateAsync({
+        familyId: familyId,
+        institutionId: profile.institution_id
+      });
+      
+      // Chamar callback se fornecido
+      if (onFamilyFound) {
+        onFamilyFound(familyId, cpf);
+      }
+      
+      // Limpar busca após vincular
+      setSearchTerm("");
+      setSearchResult(null);
+    } catch (err) {
+      // Erro já é tratado pelo hook
+    }
+  };
+
   const handleCreateNew = () => {
-    if (!searchResult?.family) return;
-    
-    // Chamar callback com CPF preenchido (se houver)
+    // Chamar callback para criar nova família
+    // No cenário 3, não há família encontrada, então passa string vazia
     if (onFamilyFound) {
-      onFamilyFound("", searchResult.family.cpf || undefined);
+      onFamilyFound("", undefined);
     }
   };
 
@@ -103,7 +125,9 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               placeholder={
                 searchBy === "cpf"
                   ? "Digite o CPF (000.000.000-00)"
-                  : "Digite o nome da família"
+                  : searchBy === "name"
+                  ? "Digite o nome da família"
+                  : "Digite o nome da mãe"
               }
               value={searchTerm}
               onChange={(e) => {
@@ -140,8 +164,8 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
           </Button>
         </div>
 
-        {/* Toggle entre CPF e Nome */}
-        <div className="flex gap-2 text-sm">
+        {/* Toggle entre CPF, Nome da Família e Nome da Mãe */}
+        <div className="flex gap-2 text-sm flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -172,7 +196,23 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            Buscar por Nome
+            Buscar por Nome da Família
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchBy("mother_name");
+              setSearchTerm("");
+              setSearchResult(null);
+              setError(null);
+            }}
+            className={`px-3 py-1 rounded ${
+              searchBy === "mother_name"
+                ? "bg-primary text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            Buscar por Nome da Mãe
           </button>
         </div>
       </div>
@@ -247,6 +287,9 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                   {searchResult.family.cpf && (
                     <p><strong>CPF:</strong> {formatCpf(searchResult.family.cpf)}</p>
                   )}
+                  {searchResult.family.mother_name && (
+                    <p><strong>Nome da Mãe:</strong> {searchResult.family.mother_name}</p>
+                  )}
                   {searchResult.family.phone && (
                     <p><strong>Telefone:</strong> {searchResult.family.phone}</p>
                   )}
@@ -301,6 +344,77 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                   {searchResult.message}
                 </AlertDescription>
               </Alert>
+            )}
+
+            {/* Cenário 5: Múltiplas famílias encontradas */}
+            {searchResult.scenario === 5 && searchResult.families && (
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    {searchResult.message} ({searchResult.families.length} encontrada(s))
+                  </AlertDescription>
+                </Alert>
+                
+                <div className="max-h-96 overflow-y-auto space-y-3">
+                  {searchResult.families.map((family) => {
+                    const associations = family.institution_families || [];
+                    const isLinkedToCurrentInstitution = profile?.institution_id && associations.some(
+                      assoc => assoc.institution_id === profile.institution_id
+                    );
+                    
+                    return (
+                      <Card key={family.id}>
+                        <CardContent className="pt-4">
+                          <div className="space-y-3">
+                            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                              <p><strong>Nome:</strong> {family.name}</p>
+                              <p><strong>Contato:</strong> {family.contact_person}</p>
+                              {family.cpf && (
+                                <p><strong>CPF:</strong> {formatCpf(family.cpf)}</p>
+                              )}
+                              {family.mother_name && (
+                                <p><strong>Nome da Mãe:</strong> {family.mother_name}</p>
+                              )}
+                              {family.phone && (
+                                <p><strong>Telefone:</strong> {family.phone}</p>
+                              )}
+                              <p><strong>Membros:</strong> {family.members_count || 1}</p>
+                            </div>
+
+                            {isLinkedToCurrentInstitution ? (
+                              <Alert>
+                                <CheckCircle className="h-4 w-4 text-blue-600" />
+                                <AlertDescription className="text-blue-800 text-sm">
+                                  Esta família já está vinculada à sua instituição.
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <Button
+                                onClick={() => handleAssociateMultiple(family.id, family.cpf || undefined)}
+                                disabled={associateMutation.isPending}
+                                className="w-full bg-primary hover:bg-primary/90"
+                              >
+                                {associateMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Vinculando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link className="mr-2 h-4 w-4" />
+                                    Vincular à Minha Instituição
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -10,7 +10,7 @@ import { useSuppliers } from '@/hooks/useSuppliers';
 import { useProducts } from '@/hooks/useProducts';
 import { useCreateStockMovement } from '@/hooks/useInventory';
 import { useAuth } from '@/hooks/useAuth';
-import { getCurrentDateBrasilia } from '@/utils/dateFormat';
+import { getCurrentDateTimeISO } from '@/utils/dateFormat';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,7 +50,7 @@ const StockEntryForm = ({ open, onOpenChange, institutionId }: StockEntryFormPro
         movement_type: 'ENTRADA',
         quantity: parseFloat(data.quantity),
         supplier_id: data.supplier_id || null,
-        movement_date: getCurrentDateBrasilia(),
+        movement_date: getCurrentDateTimeISO(),
         notes: data.notes || null,
       });
 

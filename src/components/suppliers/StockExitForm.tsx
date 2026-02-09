@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useForm } from 'react-hook-form';
 import { useInventory, useCreateStockMovement } from '@/hooks/useInventory';
 import { useAuth } from '@/hooks/useAuth';
-import { getCurrentDateBrasilia } from '@/utils/dateFormat';
+import { getCurrentDateTimeISO } from '@/utils/dateFormat';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -62,7 +62,7 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
         product_id: data.product_id,
         movement_type: 'SAIDA',
         quantity: parseFloat(data.quantity),
-        movement_date: getCurrentDateBrasilia(),
+        movement_date: getCurrentDateTimeISO(),
         notes: notesWithDestination,
       });
       onOpenChange(false);
