@@ -25,6 +25,7 @@ type StockMovement = Tables<'stock_movements'> & {
     delivery_date: string | null;
     family: { id: string; name: string } | null;
   } | null;
+  beneficiary_institution: { id: string; full_name: string; trade_name: string | null } | null;
 };
 
 type GroupedMovement = {
@@ -115,15 +116,13 @@ const StockMovementsTab = ({ institutionId: propInstitutionId }: StockMovementsT
       movement,
     }));
 
-    // Ordenar: agrupados primeiro (por data mais recente), depois individuais
-    const sortedGrouped = grouped.sort((a, b) => 
-      new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime()
-    );
-    const sortedIndividual = individual.sort((a, b) =>
-      new Date(b.movement.movement_date).getTime() - new Date(a.movement.movement_date).getTime()
-    );
-
-    return [...sortedGrouped, ...sortedIndividual];
+    // Ordenar tudo por data (mais recente primeiro): agrupados e individuais juntos
+    const withDate: { item: ProcessedMovement; date: string }[] = [
+      ...grouped.map((g) => ({ item: g as ProcessedMovement, date: g.delivery_date })),
+      ...individual.map((i) => ({ item: i as ProcessedMovement, date: i.movement.movement_date })),
+    ];
+    withDate.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return withDate.map(({ item }) => item);
   };
 
   const processedMovements = useMemo(() => processMovements(movements), [movements]);
@@ -333,6 +332,10 @@ const StockMovementsTab = ({ institutionId: propInstitutionId }: StockMovementsT
                         )}
                         <TableCell>
                           {(() => {
+                            // Saída para instituição beneficiada
+                            if (movement.beneficiary_institution_id && movement.beneficiary_institution) {
+                              return `Instituição: ${movement.beneficiary_institution.trade_name || movement.beneficiary_institution.full_name}`;
+                            }
                             // Se tem supplier_id (e não tem delivery_id), é fornecedor
                             if (movement.supplier_id && movement.supplier?.name) {
                               return `Fornecedor: ${movement.supplier.name}`;
@@ -341,7 +344,6 @@ const StockMovementsTab = ({ institutionId: propInstitutionId }: StockMovementsT
                             if (movement.notes && movement.notes.trim()) {
                               return movement.notes;
                             }
-                            // Caso contrário
                             return '-';
                           })()}
                         </TableCell>

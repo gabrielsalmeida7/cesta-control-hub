@@ -346,6 +346,50 @@ export type Database = {
           },
         ]
       }
+      beneficiary_institutions: {
+        Row: {
+          id: string
+          institution_id: string
+          full_name: string
+          trade_name: string | null
+          cnpj: string | null
+          responsible_name: string | null
+          address: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          institution_id: string
+          full_name: string
+          trade_name?: string | null
+          cnpj?: string | null
+          responsible_name?: string | null
+          address?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          institution_id?: string
+          full_name?: string
+          trade_name?: string | null
+          cnpj?: string | null
+          responsible_name?: string | null
+          address?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_institutions_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           id: string
@@ -472,6 +516,7 @@ export type Database = {
           quantity: number
           supplier_id: string | null
           delivery_id: string | null
+          beneficiary_institution_id: string | null
           movement_date: string
           notes: string | null
           created_by_user_id: string | null
@@ -485,6 +530,7 @@ export type Database = {
           quantity: number
           supplier_id?: string | null
           delivery_id?: string | null
+          beneficiary_institution_id?: string | null
           movement_date?: string
           notes?: string | null
           created_by_user_id?: string | null
@@ -498,6 +544,7 @@ export type Database = {
           quantity?: number
           supplier_id?: string | null
           delivery_id?: string | null
+          beneficiary_institution_id?: string | null
           movement_date?: string
           notes?: string | null
           created_by_user_id?: string | null
@@ -530,6 +577,13 @@ export type Database = {
             columns: ["delivery_id"]
             isOneToOne: false
             referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_beneficiary_institution_id_fkey"
+            columns: ["beneficiary_institution_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiary_institutions"
             referencedColumns: ["id"]
           },
         ]

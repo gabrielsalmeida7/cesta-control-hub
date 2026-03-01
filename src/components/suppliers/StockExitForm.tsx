@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { useForm } from 'react-hook-form';
 import { useInventory, useCreateStockMovement } from '@/hooks/useInventory';
 import { useAuth } from '@/hooks/useAuth';
+import { useBeneficiaryInstitutions } from '@/hooks/useBeneficiaryInstitutions';
 import { getCurrentDateTimeISO } from '@/utils/dateFormat';
-import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+
+type DestinationType = 'free' | 'institution';
 
 interface StockExitFormProps {
   open: boolean;
@@ -20,28 +22,44 @@ interface StockExitFormProps {
 
 const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps) => {
   const { profile } = useAuth();
-  const { data: inventory = [] } = useInventory(institutionId || profile?.institution_id);
+  const instId = institutionId || profile?.institution_id;
+  const { data: inventory = [] } = useInventory(instId);
+  const { data: beneficiaryInstitutions = [] } = useBeneficiaryInstitutions(instId);
   const createMovement = useCreateStockMovement();
-  const { toast } = useToast();
 
-  const form = useForm({
+  const form = useForm<{
+    product_id: string;
+    quantity: string;
+    destinationType: DestinationType;
+    beneficiary_institution_id: string;
+    destination: string;
+    notes: string;
+  }>({
     defaultValues: {
       product_id: '',
       quantity: '',
-      destination: '', // Campo de texto para destino
+      destinationType: 'free',
+      beneficiary_institution_id: '',
+      destination: '',
       notes: '',
     },
   });
 
   const selectedProductId = form.watch('product_id');
+  const destinationType = form.watch('destinationType');
   const availableQuantity = inventory.find(
     (item) => item.product_id === selectedProductId
   )?.quantity || 0;
 
-  const handleSubmit = async (data: any) => {
-    if (!profile?.institution_id && !institutionId) {
-      return;
-    }
+  const handleSubmit = async (data: {
+    product_id: string;
+    quantity: string;
+    destinationType: DestinationType;
+    beneficiary_institution_id: string;
+    destination: string;
+    notes: string;
+  }) => {
+    if (!instId) return;
 
     if (parseFloat(data.quantity) > availableQuantity) {
       form.setError('quantity', {
@@ -51,23 +69,35 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
       return;
     }
 
+    if (data.destinationType === 'institution' && !data.beneficiary_institution_id) {
+      form.setError('beneficiary_institution_id', {
+        type: 'manual',
+        message: 'Selecione a instituição beneficiada',
+      });
+      return;
+    }
+
     try {
-      // Se destino foi preenchido, incluir nas notas
-      const notesWithDestination = data.destination 
-        ? `${data.destination}${data.notes ? ' | ' + data.notes : ''}`
-        : data.notes || null;
+      const notesWithDestination =
+        data.destinationType === 'free' && data.destination
+          ? `${data.destination}${data.notes ? ' | ' + data.notes : ''}`
+          : data.notes || null;
 
       await createMovement.mutateAsync({
-        institution_id: institutionId || profile!.institution_id!,
+        institution_id: instId,
         product_id: data.product_id,
         movement_type: 'SAIDA',
         quantity: parseFloat(data.quantity),
         movement_date: getCurrentDateTimeISO(),
         notes: notesWithDestination,
+        beneficiary_institution_id:
+          data.destinationType === 'institution' && data.beneficiary_institution_id
+            ? data.beneficiary_institution_id
+            : null,
       });
       onOpenChange(false);
       form.reset();
-    } catch (error) {
+    } catch {
       // Error handled by hook
     }
   };
@@ -83,6 +113,65 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="destinationType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de destino</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v: DestinationType) => {
+                        field.onChange(v);
+                        if (v === 'free') form.setValue('beneficiary_institution_id', '');
+                        else form.setValue('destination', '');
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Destino livre</SelectItem>
+                        <SelectItem value="institution">Saída para instituição</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {destinationType === 'institution' && (
+              <FormField
+                control={form.control}
+                name="beneficiary_institution_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instituição beneficiada *</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a instituição" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {beneficiaryInstitutions.map((inst) => (
+                            <SelectItem key={inst.id} value={inst.id}>
+                              {inst.trade_name || inst.full_name}
+                            </SelectItem>
+                          ))}
+                          {beneficiaryInstitutions.length === 0 && (
+                            <SelectItem value="__none__" disabled>
+                              Nenhuma instituição cadastrada. Cadastre na aba Instituições.
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="product_id"
@@ -136,19 +225,21 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="destination"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Destino</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Ex: Entrega para família, Transferência para outra instituição, etc." />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {destinationType === 'free' && (
+              <FormField
+                control={form.control}
+                name="destination"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Destino</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Ex: Entrega para família, Transferência para outra instituição, etc." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="notes"

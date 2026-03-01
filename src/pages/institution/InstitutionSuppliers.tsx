@@ -4,12 +4,13 @@ import InstitutionNavigationButtons from '@/components/InstitutionNavigationButt
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Package, Warehouse, ArrowDownUp } from 'lucide-react';
+import { Plus, Package, Warehouse, ArrowDownUp, Building2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import SuppliersTab from '@/components/suppliers/SuppliersTab';
 import ProductsTab from '@/components/suppliers/ProductsTab';
 import InventoryTab from '@/components/suppliers/InventoryTab';
 import StockMovementsTab from '@/components/suppliers/StockMovementsTab';
+import BeneficiaryInstitutionsTab from '@/components/suppliers/BeneficiaryInstitutionsTab';
 
 const InstitutionSuppliers = () => {
   const { profile } = useAuth();
@@ -35,10 +36,14 @@ const InstitutionSuppliers = () => {
           </div>
           
           <Tabs defaultValue="suppliers" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="suppliers">
                 <Package className="h-4 w-4 mr-2" />
                 Fornecedores
+              </TabsTrigger>
+              <TabsTrigger value="beneficiary-institutions">
+                <Building2 className="h-4 w-4 mr-2" />
+                Instituições
               </TabsTrigger>
               <TabsTrigger value="products">
                 <Package className="h-4 w-4 mr-2" />
@@ -56,6 +61,10 @@ const InstitutionSuppliers = () => {
 
             <TabsContent value="suppliers" className="mt-6">
               <SuppliersTab institutionId={profile.institution_id} />
+            </TabsContent>
+
+            <TabsContent value="beneficiary-institutions" className="mt-6">
+              <BeneficiaryInstitutionsTab institutionId={profile.institution_id} />
             </TabsContent>
 
             <TabsContent value="products" className="mt-6">

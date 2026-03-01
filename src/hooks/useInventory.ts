@@ -93,6 +93,11 @@ export const useStockMovements = (filters?: StockMovementFilters) => {
               id,
               name
             )
+          ),
+          beneficiary_institution:beneficiary_institutions(
+            id,
+            full_name,
+            trade_name
           )
         `);
 
@@ -138,6 +143,7 @@ export const useStockMovements = (filters?: StockMovementFilters) => {
           delivery_date: string | null;
           family: { id: string; name: string } | null;
         } | null;
+        beneficiary_institution: { id: string; full_name: string; trade_name: string | null } | null;
       })[];
     },
     enabled: !!profile,
