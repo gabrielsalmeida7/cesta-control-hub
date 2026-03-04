@@ -357,6 +357,50 @@ export type Database = {
           address: string | null
           created_at: string | null
           updated_at: string | null
+          foundation_date: string | null
+          legal_nature: string | null
+          legal_nature_other: string | null
+          main_activity_areas: string[] | null
+          street: string | null
+          address_number: string | null
+          address_complement: string | null
+          neighborhood: string | null
+          city: string | null
+          state: string | null
+          zip_code: string | null
+          reference_point: string | null
+          phone_fixed: string | null
+          phone_mobile: string | null
+          email: string | null
+          social_media: string | null
+          responsible_role: string | null
+          responsible_cpf: string | null
+          responsible_rg: string | null
+          responsible_phone: string | null
+          responsible_email: string | null
+          vice_president_name: string | null
+          treasurer_name: string | null
+          statute_file_path: string | null
+          election_minutes_file_path: string | null
+          cnpj_card_file_path: string | null
+          address_proof_file_path: string | null
+          legal_rep_document_file_path: string | null
+          negative_certificates_file_path: string | null
+          document_review_date: string | null
+          document_review_by_user_id: string | null
+          families_served_count: number | null
+          people_served_count: number | null
+          audience_profile: string[] | null
+          service_frequency: string | null
+          registration_status: string | null
+          created_by_user_id: string | null
+          technical_notes: string | null
+          terms_accepted: boolean | null
+          norms_accepted: boolean | null
+          technical_visit_done: boolean | null
+          legal_acceptance: boolean | null
+          legal_acceptance_at: string | null
+          legal_acceptance_ip: string | null
         }
         Insert: {
           id?: string
@@ -368,6 +412,50 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           updated_at?: string | null
+          foundation_date?: string | null
+          legal_nature?: string | null
+          legal_nature_other?: string | null
+          main_activity_areas?: string[] | null
+          street?: string | null
+          address_number?: string | null
+          address_complement?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
+          reference_point?: string | null
+          phone_fixed?: string | null
+          phone_mobile?: string | null
+          email?: string | null
+          social_media?: string | null
+          responsible_role?: string | null
+          responsible_cpf?: string | null
+          responsible_rg?: string | null
+          responsible_phone?: string | null
+          responsible_email?: string | null
+          vice_president_name?: string | null
+          treasurer_name?: string | null
+          statute_file_path?: string | null
+          election_minutes_file_path?: string | null
+          cnpj_card_file_path?: string | null
+          address_proof_file_path?: string | null
+          legal_rep_document_file_path?: string | null
+          negative_certificates_file_path?: string | null
+          document_review_date?: string | null
+          document_review_by_user_id?: string | null
+          families_served_count?: number | null
+          people_served_count?: number | null
+          audience_profile?: string[] | null
+          service_frequency?: string | null
+          registration_status?: string | null
+          created_by_user_id?: string | null
+          technical_notes?: string | null
+          terms_accepted?: boolean | null
+          norms_accepted?: boolean | null
+          technical_visit_done?: boolean | null
+          legal_acceptance?: boolean | null
+          legal_acceptance_at?: string | null
+          legal_acceptance_ip?: string | null
         }
         Update: {
           id?: string
@@ -379,6 +467,50 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           updated_at?: string | null
+          foundation_date?: string | null
+          legal_nature?: string | null
+          legal_nature_other?: string | null
+          main_activity_areas?: string[] | null
+          street?: string | null
+          address_number?: string | null
+          address_complement?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
+          reference_point?: string | null
+          phone_fixed?: string | null
+          phone_mobile?: string | null
+          email?: string | null
+          social_media?: string | null
+          responsible_role?: string | null
+          responsible_cpf?: string | null
+          responsible_rg?: string | null
+          responsible_phone?: string | null
+          responsible_email?: string | null
+          vice_president_name?: string | null
+          treasurer_name?: string | null
+          statute_file_path?: string | null
+          election_minutes_file_path?: string | null
+          cnpj_card_file_path?: string | null
+          address_proof_file_path?: string | null
+          legal_rep_document_file_path?: string | null
+          negative_certificates_file_path?: string | null
+          document_review_date?: string | null
+          document_review_by_user_id?: string | null
+          families_served_count?: number | null
+          people_served_count?: number | null
+          audience_profile?: string[] | null
+          service_frequency?: string | null
+          registration_status?: string | null
+          created_by_user_id?: string | null
+          technical_notes?: string | null
+          terms_accepted?: boolean | null
+          norms_accepted?: boolean | null
+          technical_visit_done?: boolean | null
+          legal_acceptance?: boolean | null
+          legal_acceptance_at?: string | null
+          legal_acceptance_ip?: string | null
         }
         Relationships: [
           {
@@ -386,6 +518,20 @@ export type Database = {
             columns: ["institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_institutions_document_review_by_user_id_fkey"
+            columns: ["document_review_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_institutions_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
