@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Loader2, Package } from 'lucide-react';
 import {
   useBeneficiaryInstitutions,
   useCreateBeneficiaryInstitution,
@@ -38,9 +38,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCnpj, validateCnpj, validateCpf } from '@/utils/documentFormat';
+import { formatCnpj, formatCpf, validateCnpj, validateCpf } from '@/utils/documentFormat';
+import { formatDateBrasilia, formatDateTimeBrasilia } from '@/utils/dateFormat';
 import { useAuth } from '@/hooks/useAuth';
-import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useStockMovements } from '@/hooks/useInventory';
+import { Badge } from '@/components/ui/badge';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import {
   LEGAL_NATURE_OPTIONS,
   MAIN_ACTIVITY_OPTIONS,
@@ -53,6 +56,16 @@ import {
 
 type BeneficiaryInsert = TablesInsert<'beneficiary_institutions'>;
 type BeneficiaryUpdate = TablesUpdate<'beneficiary_institutions'>;
+type BeneficiaryRow = Tables<'beneficiary_institutions'>;
+
+const formatBeneficiaryAddress = (row: BeneficiaryRow) => {
+  const line1 = [row.street, row.address_number].filter(Boolean).join(', ');
+  const line1c = [line1, row.address_complement].filter(Boolean).join(' — ');
+  const cityState = [row.city, row.state].filter(Boolean).join(' / ');
+  const parts = [line1c, row.neighborhood, cityState, row.zip_code].filter(Boolean);
+  if (parts.length > 0) return parts.join(' · ');
+  return row.address?.trim() || '—';
+};
 
 const getDefaultValues = (): Partial<BeneficiaryInsert> => ({
   full_name: '',
@@ -104,8 +117,23 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailsRow, setDetailsRow] = useState<BeneficiaryRow | null>(null);
+
+  const supplierInstitutionId = institutionId || profile?.institution_id;
 
   const { data: list = [], isLoading } = useBeneficiaryInstitutions(institutionId);
+  const { data: beneficiaryStockMovements = [], isLoading: stockMovementsLoading } =
+    useStockMovements({
+      institutionId: supplierInstitutionId,
+      beneficiaryInstitutionId: detailsRow?.id,
+      movementType: 'SAIDA',
+      queryEnabled: !!detailsRow,
+    });
+
+  const lastStockExit = useMemo(() => {
+    if (!beneficiaryStockMovements.length) return null;
+    return beneficiaryStockMovements[0];
+  }, [beneficiaryStockMovements]);
   const createMutation = useCreateBeneficiaryInstitution();
   const updateMutation = useUpdateBeneficiaryInstitution();
   const deleteMutation = useDeleteBeneficiaryInstitution();
@@ -272,7 +300,7 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
                 <TableHead>Responsável</TableHead>
                 <TableHead>Cidade</TableHead>
                 <TableHead>Situação</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
+                <TableHead className="w-[180px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -292,7 +320,16 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
                     <TableCell>{row.city ?? '-'}</TableCell>
                     <TableCell>{row.registration_status ?? 'Ativo'}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDetailsRow(row)}
+                          title="Detalhes"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Detalhes
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -318,6 +355,213 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
           </Table>
         </div>
       )}
+
+      <Dialog
+        open={!!detailsRow}
+        onOpenChange={(open) => {
+          if (!open) setDetailsRow(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
+            <DialogTitle>
+              Instituição beneficiada: {detailsRow?.full_name ?? ''}
+            </DialogTitle>
+            <DialogDescription>
+              Dados cadastrais e histórico de saídas de estoque registradas para esta instituição.
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailsRow && (
+            <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Razão social</p>
+                  <p className="font-medium">{detailsRow.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Nome fantasia</p>
+                  <p className="font-medium">{detailsRow.trade_name ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">CNPJ</p>
+                  <p className="font-medium">
+                    {detailsRow.cnpj ? formatCnpj(detailsRow.cnpj) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Situação do cadastro</p>
+                  <Badge variant="secondary" className="mt-0.5">
+                    {detailsRow.registration_status ?? 'Ativo'}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Responsável legal</p>
+                  <p className="font-medium">{detailsRow.responsible_name ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">CPF do responsável</p>
+                  <p className="font-medium">
+                    {detailsRow.responsible_cpf
+                      ? formatCpf(detailsRow.responsible_cpf)
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">E-mail</p>
+                  <p className="font-medium break-all">{detailsRow.email ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Celular / WhatsApp</p>
+                  <p className="font-medium">{detailsRow.phone_mobile ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Telefone fixo</p>
+                  <p className="font-medium">{detailsRow.phone_fixed ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Cidade / UF</p>
+                  <p className="font-medium">
+                    {[detailsRow.city, detailsRow.state].filter(Boolean).join(' / ') || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Famílias / pessoas atendidas</p>
+                  <p className="font-medium">
+                    {detailsRow.families_served_count != null ||
+                    detailsRow.people_served_count != null
+                      ? `${detailsRow.families_served_count ?? '—'} fam. · ${detailsRow.people_served_count ?? '—'} pessoas`
+                      : '—'}
+                  </p>
+                </div>
+                {detailsRow.service_frequency && (
+                  <div>
+                    <p className="text-sm text-gray-600">Periodicidade do atendimento</p>
+                    <p className="font-medium">{detailsRow.service_frequency}</p>
+                  </div>
+                )}
+                {detailsRow.foundation_date && (
+                  <div>
+                    <p className="text-sm text-gray-600">Data de fundação</p>
+                    <p className="font-medium">
+                      {formatDateBrasilia(detailsRow.foundation_date)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-600">Endereço</p>
+                <p className="font-medium">{formatBeneficiaryAddress(detailsRow)}</p>
+              </div>
+
+              {detailsRow.technical_notes?.trim() && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-gray-600">Observações técnicas</p>
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {detailsRow.technical_notes}
+                  </p>
+                </div>
+              )}
+
+              {lastStockExit && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <h4 className="font-medium text-blue-900 mb-1 flex items-center gap-2">
+                    <Package className="h-4 w-4 shrink-0" />
+                    Última remessa do nosso estoque para esta instituição
+                  </h4>
+                  <p className="text-xs text-blue-900/75 mb-2">
+                    Saída registrada com destino à instituição beneficiada que você está
+                    visualizando — não corresponde à última saída geral do estoque.
+                  </p>
+                  <div className="space-y-1 text-sm text-blue-950">
+                    <p>
+                      <strong>Data:</strong>{' '}
+                      {formatDateTimeBrasilia(lastStockExit.movement_date)}
+                    </p>
+                    <p>
+                      <strong>Item:</strong>{' '}
+                      {(lastStockExit as { product?: { name?: string } }).product?.name ??
+                        '—'}
+                    </p>
+                    <p>
+                      <strong>Quantidade:</strong> {lastStockExit.quantity}{' '}
+                      {(lastStockExit as { product?: { unit?: string } }).product?.unit ?? ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <h4 className="text-sm font-semibold text-gray-800 mb-1">
+                  Histórico de remessas do nosso estoque para esta instituição
+                </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Apenas saídas em que esta instituição beneficiada foi indicada como destino.
+                </p>
+                {stockMovementsLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500 gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Carregando movimentações…
+                  </div>
+                ) : beneficiaryStockMovements.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-4">
+                    Nenhuma remessa do nosso estoque foi registrada com destino a esta
+                    instituição beneficiada.
+                  </p>
+                ) : (
+                  <div className="border rounded-md max-h-[280px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Produto</TableHead>
+                          <TableHead className="text-right w-[72px]">Qtd</TableHead>
+                          <TableHead className="w-[56px]">Un.</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {beneficiaryStockMovements.map((m) => {
+                          const mov = m as typeof m & {
+                            product?: { name: string; unit: string };
+                          };
+                          return (
+                            <TableRow key={m.id}>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {formatDateTimeBrasilia(m.movement_date)}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {mov.product?.name ?? '—'}
+                                {m.notes ? (
+                                  <span className="block text-xs text-muted-foreground mt-0.5">
+                                    {m.notes}
+                                  </span>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-sm text-right">
+                                {m.quantity}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {mov.product?.unit ?? '—'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="px-6 py-4 border-t flex-shrink-0">
+            <Button type="button" variant="outline" onClick={() => setDetailsRow(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col">

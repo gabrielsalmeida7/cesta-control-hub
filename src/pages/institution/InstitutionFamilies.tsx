@@ -2,9 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import ConsentManagement from '@/components/ConsentManagement';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, FileText } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, FileText, ListFilter, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,8 +41,17 @@ type Family = Tables<'families'> & {
   last_delivery_institution?: string;
 };
 
+type FamilyStatusFilter = 'all' | 'unblocked' | 'blocked';
+type FamilySortOption =
+  | 'name_asc'
+  | 'name_desc'
+  | 'last_delivery_desc'
+  | 'last_delivery_asc';
+
 const InstitutionFamilies = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<FamilyStatusFilter>('all');
+  const [sortOption, setSortOption] = useState<FamilySortOption>('name_asc');
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -282,7 +292,7 @@ const InstitutionFamilies = () => {
     if (!allDeliveries || allDeliveries.length === 0) {
       // Se não há entregas, retornar famílias sem última entrega
       return familiesData.map((family) => ({
-        id: family.id,
+        ...family,
         family_name: family.name || family.contact_person || 'N/A',
         main_cpf: family.cpf || '',
         address: family.address || 'Não informado',
@@ -297,7 +307,6 @@ const InstitutionFamilies = () => {
         contact_person: family.contact_person,
         phone: family.phone,
         cpf: family.cpf,
-        ...family
       }));
     }
 
@@ -361,7 +370,7 @@ const InstitutionFamilies = () => {
       }
       
       return {
-        id: family.id,
+        ...family,
         family_name: family.name || family.contact_person || 'N/A',
         main_cpf: family.cpf || '',
         address: family.address || 'Não informado',
@@ -376,20 +385,76 @@ const InstitutionFamilies = () => {
         contact_person: family.contact_person,
         phone: family.phone,
         cpf: family.cpf,
-        ...family
       };
     });
   }, [familiesData, allDeliveries, profile?.institution_id]);
 
-  const filteredFamilies = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
+  const displayedFamilies = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
     const searchNumbers = searchTerm.replace(/\D/g, '');
-    return families.filter(family =>
-      family.family_name.toLowerCase().includes(searchLower) ||
-      (family.main_cpf && family.main_cpf.replace(/\D/g, '').includes(searchNumbers)) ||
-      (family.contact_person && family.contact_person.toLowerCase().includes(searchLower))
-    );
-  }, [families, searchTerm]);
+
+    let list = families.filter((family) => {
+      if (!q && !searchNumbers) return true;
+      const textMatches = (value: string | null | undefined) =>
+        (value ?? '').toLowerCase().includes(q);
+      const cpfDigits = (value: string | null | undefined) =>
+        (value ?? '').replace(/\D/g, '');
+      const nameMatch =
+        textMatches(family.name) ||
+        textMatches(family.family_name) ||
+        textMatches(family.contact_person) ||
+        textMatches(family.mother_name);
+      const cpfMatch =
+        searchNumbers.length > 0 &&
+        (cpfDigits(family.cpf).includes(searchNumbers) ||
+          cpfDigits(family.main_cpf).includes(searchNumbers) ||
+          cpfDigits(family.contact_person).includes(searchNumbers));
+      return nameMatch || cpfMatch;
+    });
+
+    if (statusFilter === 'blocked') {
+      list = list.filter((f) => f.is_blocked);
+    } else if (statusFilter === 'unblocked') {
+      list = list.filter((f) => !f.is_blocked);
+    }
+
+    const byName = (a: Family, b: Family) =>
+      (a.name || a.family_name || '')
+        .toLowerCase()
+        .localeCompare((b.name || b.family_name || '').toLowerCase(), 'pt-BR');
+
+    const deliveryTs = (f: Family) =>
+      f.last_delivery_date ? new Date(f.last_delivery_date).getTime() : null;
+
+    return [...list].sort((a, b) => {
+      switch (sortOption) {
+        case 'name_asc':
+          return byName(a, b);
+        case 'name_desc':
+          return byName(b, a);
+        case 'last_delivery_desc': {
+          const ta = deliveryTs(a);
+          const tb = deliveryTs(b);
+          if (ta === null && tb === null) return byName(a, b);
+          if (ta === null) return 1;
+          if (tb === null) return -1;
+          return tb - ta;
+        }
+        case 'last_delivery_asc': {
+          const ta = deliveryTs(a);
+          const tb = deliveryTs(b);
+          if (ta === null && tb === null) return byName(a, b);
+          if (ta === null) return 1;
+          if (tb === null) return -1;
+          return ta - tb;
+        }
+        default: {
+          const _exhaustive: never = sortOption;
+          return _exhaustive;
+        }
+      }
+    });
+  }, [families, searchTerm, statusFilter, sortOption]);
 
   const getStatusBadge = (family: Family) => {
     if (family.is_blocked) {
@@ -977,18 +1042,69 @@ const InstitutionFamilies = () => {
             </div>
           </div>
 
-          {/* Barra de pesquisa */}
+          {/* Pesquisa, filtro de status e ordenação */}
           <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Buscar por nome da família ou CPF..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="family-search" className="text-sm text-muted-foreground">
+                    Buscar
+                  </Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="family-search"
+                      placeholder="Nome da família ou CPF..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="grid w-full gap-4 sm:grid-cols-2 lg:w-auto lg:min-w-[280px]">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <ListFilter className="h-3.5 w-3.5" />
+                      Status
+                    </Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(v) => setStatusFilter(v as FamilyStatusFilter)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="unblocked">Liberadas</SelectItem>
+                        <SelectItem value="blocked">Bloqueadas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      Ordenar por
+                    </Label>
+                    <Select
+                      value={sortOption}
+                      onValueChange={(v) => setSortOption(v as FamilySortOption)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Ordenação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name_asc">Nome (A–Z)</SelectItem>
+                        <SelectItem value="name_desc">Nome (Z–A)</SelectItem>
+                        <SelectItem value="last_delivery_desc">
+                          Última entrega (mais recente)
+                        </SelectItem>
+                        <SelectItem value="last_delivery_asc">
+                          Última entrega (mais antiga)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1046,7 +1162,7 @@ const InstitutionFamilies = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredFamilies.map((family) => (
+                  {displayedFamilies.map((family) => (
                     <TableRow key={family.id}>
                       <TableCell className="font-medium">{family.name}</TableCell>
                       <TableCell>{family.contact_person}</TableCell>
@@ -1114,9 +1230,11 @@ const InstitutionFamilies = () => {
                 </TableBody>
               </Table>
               
-              {filteredFamilies.length === 0 && (
+              {displayedFamilies.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">Nenhuma família encontrada</p>
+                  <p className="text-gray-500">
+                    Nenhuma família encontrada com os filtros atuais.
+                  </p>
                 </div>
               )}
             </CardContent>

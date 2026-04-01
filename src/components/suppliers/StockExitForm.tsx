@@ -1,16 +1,27 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useForm } from 'react-hook-form';
 import { useInventory, useCreateStockMovement } from '@/hooks/useInventory';
 import { useAuth } from '@/hooks/useAuth';
 import { useBeneficiaryInstitutions } from '@/hooks/useBeneficiaryInstitutions';
 import { getCurrentDateTimeISO } from '@/utils/dateFormat';
-import { Loader2 } from 'lucide-react';
+import { formatCnpj } from '@/utils/documentFormat';
+import { cn } from '@/lib/utils';
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 
 type DestinationType = 'free' | 'institution';
 
@@ -47,6 +58,14 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
 
   const selectedProductId = form.watch('product_id');
   const destinationType = form.watch('destinationType');
+  const [beneficiaryPopoverOpen, setBeneficiaryPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    if (destinationType !== 'institution') {
+      setBeneficiaryPopoverOpen(false);
+    }
+  }, [destinationType]);
+
   const availableQuantity = inventory.find(
     (item) => item.product_id === selectedProductId
   )?.quantity || 0;
@@ -145,31 +164,116 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
               <FormField
                 control={form.control}
                 name="beneficiary_institution_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Instituição beneficiada *</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a instituição" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {beneficiaryInstitutions.map((inst) => (
-                            <SelectItem key={inst.id} value={inst.id}>
-                              {inst.trade_name || inst.full_name}
-                            </SelectItem>
-                          ))}
-                          {beneficiaryInstitutions.length === 0 && (
-                            <SelectItem value="__none__" disabled>
-                              Nenhuma instituição cadastrada. Cadastre na aba Instituições.
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedInst = beneficiaryInstitutions.find(
+                    (i) => i.id === field.value
+                  );
+                  const triggerLabel = selectedInst
+                    ? selectedInst.trade_name || selectedInst.full_name
+                    : null;
+                  return (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Instituição beneficiada *</FormLabel>
+                      <Popover
+                        open={beneficiaryPopoverOpen}
+                        onOpenChange={setBeneficiaryPopoverOpen}
+                      >
+                        <FormControl>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={beneficiaryPopoverOpen}
+                              disabled={beneficiaryInstitutions.length === 0}
+                              className={cn(
+                                'w-full justify-between font-normal',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              <span className="truncate text-left">
+                                {beneficiaryInstitutions.length === 0
+                                  ? 'Nenhuma instituição cadastrada'
+                                  : triggerLabel ?? 'Selecione a instituição'}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                        </FormControl>
+                        <PopoverContent
+                          className="p-0 w-[min(calc(100vw-2rem),500px)]"
+                          align="start"
+                        >
+                          <Command shouldFilter>
+                            <CommandInput placeholder="Buscar por nome, fantasia ou CNPJ…" />
+                            <CommandList>
+                              <CommandEmpty>
+                                Nenhuma instituição encontrada com esse termo.
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {beneficiaryInstitutions.map((inst) => {
+                                  const primary = inst.trade_name || inst.full_name;
+                                  const secondary =
+                                    inst.trade_name && inst.trade_name !== inst.full_name
+                                      ? inst.full_name
+                                      : null;
+                                  const cnpjLabel = inst.cnpj
+                                    ? formatCnpj(inst.cnpj)
+                                    : '';
+                                  const searchBlob = [
+                                    inst.full_name,
+                                    inst.trade_name,
+                                    inst.cnpj,
+                                    inst.cnpj?.replace(/\D/g, ''),
+                                    inst.city,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ');
+                                  return (
+                                    <CommandItem
+                                      key={inst.id}
+                                      value={searchBlob}
+                                      onSelect={() => {
+                                        field.onChange(inst.id);
+                                        setBeneficiaryPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          'mr-2 h-4 w-4 shrink-0',
+                                          field.value === inst.id ? 'opacity-100' : 'opacity-0'
+                                        )}
+                                      />
+                                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                        <span className="truncate font-medium">{primary}</span>
+                                        {secondary ? (
+                                          <span className="truncate text-xs text-muted-foreground">
+                                            {secondary}
+                                          </span>
+                                        ) : null}
+                                        {cnpjLabel ? (
+                                          <span className="text-xs text-muted-foreground">
+                                            CNPJ: {cnpjLabel}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {beneficiaryInstitutions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Cadastre instituições beneficiadas na aba Instituições.
+                        </p>
+                      ) : null}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             )}
             <FormField

@@ -17,6 +17,10 @@ interface StockMovementFilters {
   movementType?: "ENTRADA" | "SAIDA";
   productId?: string;
   institutionId?: string;
+  /** Filtra saídas vinculadas a uma instituição beneficiada cadastrada */
+  beneficiaryInstitutionId?: string;
+  /** Se `false`, a query não executa (ex.: modal de detalhes fechado) */
+  queryEnabled?: boolean;
 }
 
 export const useInventory = (institutionId?: string) => {
@@ -124,6 +128,13 @@ export const useStockMovements = (filters?: StockMovementFilters) => {
         query = query.eq("product_id", filters.productId);
       }
 
+      if (filters?.beneficiaryInstitutionId) {
+        query = query.eq(
+          "beneficiary_institution_id",
+          filters.beneficiaryInstitutionId
+        );
+      }
+
       const { data, error } = await query.order("movement_date", {
         ascending: false,
       });
@@ -146,7 +157,7 @@ export const useStockMovements = (filters?: StockMovementFilters) => {
         beneficiary_institution: { id: string; full_name: string; trade_name: string | null } | null;
       })[];
     },
-    enabled: !!profile,
+    enabled: !!profile && filters?.queryEnabled !== false,
   });
 };
 

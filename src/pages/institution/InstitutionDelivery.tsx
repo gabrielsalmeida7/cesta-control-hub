@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Search, Package, AlertTriangle, Plus, Minus, Loader2, Warehouse, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Package, AlertTriangle, Plus, Minus, Loader2, Warehouse, ChevronDown, ChevronUp, XCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -259,6 +259,12 @@ const InstitutionDelivery = () => {
                   <div className="space-y-2 max-h-[600px] overflow-y-auto">
                     {filteredFamilies.map((family) => {
                       const isBlocked = family.is_blocked && family.blocked_until && new Date(family.blocked_until) > new Date();
+                      const daysRemaining = family.blocked_until
+                        ? Math.ceil(
+                            (new Date(family.blocked_until).getTime() - new Date().getTime()) /
+                              (1000 * 60 * 60 * 24)
+                          )
+                        : 0;
                       return (
                         <div
                           key={family.id}
@@ -275,8 +281,21 @@ const InstitutionDelivery = () => {
                               <p className="text-sm text-gray-600">{family.contact_person}</p>
                               <p className="text-sm text-gray-500">{family.phone || 'Sem telefone'}</p>
                             </div>
-                            <Badge variant={isBlocked ? "destructive" : "default"} className={isBlocked ? "" : "bg-green-500"}>
-                              {isBlocked ? "Bloqueada" : "Liberada"}
+                            <Badge
+                              variant={isBlocked ? 'destructive' : 'default'}
+                              className={`flex items-center gap-1 shrink-0 ${isBlocked ? '' : 'bg-green-500'}`}
+                            >
+                              {isBlocked ? (
+                                <>
+                                  <XCircle className="h-3 w-3" />
+                                  Bloqueada ({daysRemaining} dias)
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-3 w-3" />
+                                  Liberada
+                                </>
+                              )}
                             </Badge>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
