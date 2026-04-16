@@ -207,21 +207,30 @@ const Login = () => {
         {/* Overlay escuro para legibilidade */}
         <div className="absolute inset-0 bg-black/50"></div>
         
-        {/* Conteúdo sobreposto */}
-        <div className="relative z-10 flex flex-col justify-center items-start p-8 md:p-12 text-white">
-          <div className="mb-6">
-            <div className="mb-4">
-              <img 
-                src="/CestaLogin.svg" 
-                alt="Logo Cesta Justa" 
-                className="w-auto h-12"
-              />
+        {/* Conteúdo sobreposto: texto centralizado na área útil; logo institucional embaixo */}
+        <div className="relative z-10 flex h-full w-full flex-col p-8 md:p-12 text-white">
+          <div className="flex min-h-0 flex-1 flex-col items-start justify-center">
+            <div className="mb-6">
+              <div className="mb-4">
+                <img
+                  src="/CestaLogin.svg"
+                  alt="Logo Cesta Justa"
+                  className="h-12 w-auto"
+                />
+              </div>
+              <h1 className="mb-4 text-4xl font-bold md:text-5xl">Cesta Justa</h1>
+              <h2 className="mb-4 text-xl font-semibold md:text-2xl">Sistema de Controle de Alimentos</h2>
+              <p className="max-w-md text-lg text-white/90 md:text-xl">
+                Gestão responsável e transparente para garantir acesso digno à alimentação.
+              </p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Cesta Justa</h1>
-            <h2 className="text-xl md:text-2xl font-semibold mb-4">Sistema de Controle de Alimentos</h2>
-            <p className="text-lg md:text-xl text-white/90 max-w-md">
-              Gestão responsável e transparente para garantir acesso digno à alimentação.
-            </p>
+          </div>
+          <div className="mt-auto w-full flex-shrink-0 pt-6 md:pt-8">
+            <img
+              src="/LogoBranca.png"
+              alt="Prefeitura Municipal de Araguari"
+              className="h-auto w-full max-w-lg object-contain object-left"
+            />
           </div>
         </div>
       </div>
@@ -321,7 +330,7 @@ const Login = () => {
           
           <CardFooter className="flex justify-center px-6 pb-4 flex-shrink-0">
             <div className="text-center text-xs text-muted-foreground">
-              © {new Date().getFullYear()} - Secretaria de Assistência Social - Banco de Alimentos - Prefeitura Municipal de Araguari
+              © {new Date().getFullYear()} - Secretaria Municipal do Desenvolvimento Social - Banco de Alimentos - Prefeitura Municipal de Araguari
             </div>
           </CardFooter>
         </Card>
