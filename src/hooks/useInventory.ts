@@ -220,3 +220,103 @@ export const useCreateStockMovement = () => {
   });
 };
 
+export const useCreateStockMovementsBatch = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (movements: StockMovementInsert[]) => {
+      if (movements.length === 0) {
+        throw new Error("Nenhuma movimentação para registrar.");
+      }
+
+      const institutionId = movements[0].institution_id;
+      const distinctInstitutionIds = Array.from(
+        new Set(movements.map((m) => m.institution_id))
+      );
+
+      if (distinctInstitutionIds.length !== 1) {
+        throw new Error("Todas as movimentações devem pertencer à mesma instituição.");
+      }
+
+      // Validar estoque suficiente para saídas
+      const outgoing = movements.filter((m) => m.movement_type === "SAIDA");
+      if (outgoing.length > 0) {
+        const requestedByProduct = new Map<string, number>();
+        for (const movement of outgoing) {
+          requestedByProduct.set(
+            movement.product_id,
+            (requestedByProduct.get(movement.product_id) || 0) + movement.quantity
+          );
+        }
+
+        const productIds = Array.from(requestedByProduct.keys());
+
+        const { data: inventory, error: inventoryError } = await supabase
+          .from("inventory")
+          .select("product_id, quantity, product:products(name,unit)")
+          .eq("institution_id", institutionId)
+          .in("product_id", productIds);
+
+        if (inventoryError) throw inventoryError;
+
+        const availableByProduct = new Map<string, { quantity: number; name?: string; unit?: string }>();
+        for (const row of (inventory || []) as Array<{
+          product_id: string;
+          quantity: number;
+          product?: { name: string; unit: string } | null;
+        }>) {
+          availableByProduct.set(row.product_id, {
+            quantity: row.quantity || 0,
+            name: row.product?.name || undefined,
+            unit: row.product?.unit || undefined,
+          });
+        }
+
+        for (const [productId, requestedQuantity] of requestedByProduct.entries()) {
+          const available = availableByProduct.get(productId)?.quantity || 0;
+          if (available < requestedQuantity) {
+            const meta = availableByProduct.get(productId);
+            const label = meta?.name
+              ? `${meta.name}${meta.unit ? ` (${meta.unit})` : ""}`
+              : productId;
+
+            throw new Error(
+              `Estoque insuficiente para ${label}. Quantidade disponível: ${available}, quantidade solicitada: ${requestedQuantity}`
+            );
+          }
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("stock_movements")
+        .insert(
+          movements.map((movement) => ({
+            ...movement,
+            created_by_user_id: user?.id || null,
+          }))
+        )
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      toast({
+        title: "Sucesso",
+        description: "Movimentações registradas com sucesso!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao registrar movimentações.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+

@@ -14,8 +14,8 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useForm } from 'react-hook-form';
-import { useInventory, useCreateStockMovement } from '@/hooks/useInventory';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { useInventory, useCreateStockMovement, useCreateStockMovementsBatch } from '@/hooks/useInventory';
 import { useAuth } from '@/hooks/useAuth';
 import { useBeneficiaryInstitutions } from '@/hooks/useBeneficiaryInstitutions';
 import { getCurrentDateTimeISO } from '@/utils/dateFormat';
@@ -37,14 +37,18 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
   const { data: inventory = [] } = useInventory(instId);
   const { data: beneficiaryInstitutions = [] } = useBeneficiaryInstitutions(instId);
   const createMovement = useCreateStockMovement();
+  const createMovementsBatch = useCreateStockMovementsBatch();
 
   const form = useForm<{
-    product_id: string;
-    quantity: string;
     destinationType: DestinationType;
     beneficiary_institution_id: string;
     destination: string;
     notes: string;
+    // Modo "Destino livre"
+    product_id: string;
+    quantity: string;
+    // Modo "Saída para instituição"
+    items: { product_id: string; quantity: string }[];
   }>({
     defaultValues: {
       product_id: '',
@@ -53,12 +57,25 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
       beneficiary_institution_id: '',
       destination: '',
       notes: '',
+      items: [],
     },
   });
 
   const selectedProductId = form.watch('product_id');
   const destinationType = form.watch('destinationType');
+  const watchedItems = form.watch('items');
+  const selectedItemProductIds = new Set(
+    (watchedItems || []).map((i) => i.product_id).filter(Boolean)
+  );
   const [beneficiaryPopoverOpen, setBeneficiaryPopoverOpen] = useState(false);
+  const {
+    fields: itemFields,
+    append: appendItem,
+    remove: removeItem,
+  } = useFieldArray({
+    control: form.control,
+    name: 'items',
+  });
 
   useEffect(() => {
     if (destinationType !== 'institution') {
@@ -66,29 +83,66 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
     }
   }, [destinationType]);
 
+  useEffect(() => {
+    if (destinationType === 'institution' && itemFields.length === 0) {
+      appendItem({ product_id: '', quantity: '' });
+    }
+  }, [appendItem, destinationType, itemFields.length]);
+
   const availableQuantity = inventory.find(
     (item) => item.product_id === selectedProductId
   )?.quantity || 0;
 
   const handleSubmit = async (data: {
-    product_id: string;
-    quantity: string;
     destinationType: DestinationType;
     beneficiary_institution_id: string;
     destination: string;
     notes: string;
+    // Modo "Destino livre"
+    product_id: string;
+    quantity: string;
+    // Modo "Saída para instituição"
+    items: { product_id: string; quantity: string }[];
   }) => {
     if (!instId) return;
 
-    if (parseFloat(data.quantity) > availableQuantity) {
-      form.setError('quantity', {
-        type: 'manual',
-        message: `Quantidade disponível: ${availableQuantity}`,
-      });
+    if (data.destinationType === 'free') {
+      if (parseFloat(data.quantity) > availableQuantity) {
+        form.setError('quantity', {
+          type: 'manual',
+          message: `Quantidade disponível: ${availableQuantity}`,
+        });
+        return;
+      }
+
+      try {
+        const destinationPrefix =
+          data.destination && data.destination.trim()
+            ? data.destination.trim()
+            : null;
+
+        const notesWithDestination = destinationPrefix
+          ? `${destinationPrefix}${data.notes ? ' | ' + data.notes : ''}`
+          : data.notes || null;
+
+        await createMovement.mutateAsync({
+          institution_id: instId,
+          product_id: data.product_id,
+          movement_type: 'SAIDA',
+          quantity: parseFloat(data.quantity),
+          movement_date: getCurrentDateTimeISO(),
+          notes: notesWithDestination,
+          beneficiary_institution_id: null,
+        });
+        onOpenChange(false);
+        form.reset();
+      } catch {
+        // Error handled by hook
+      }
       return;
     }
 
-    if (data.destinationType === 'institution' && !data.beneficiary_institution_id) {
+    if (!data.beneficiary_institution_id) {
       form.setError('beneficiary_institution_id', {
         type: 'manual',
         message: 'Selecione a instituição beneficiada',
@@ -96,24 +150,46 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
       return;
     }
 
-    try {
-      const notesWithDestination =
-        data.destinationType === 'free' && data.destination
-          ? `${data.destination}${data.notes ? ' | ' + data.notes : ''}`
-          : data.notes || null;
+    const normalizedItems = (data.items || [])
+      .map((item) => ({
+        product_id: item.product_id,
+        quantity: parseFloat(item.quantity),
+      }))
+      .filter((item) => item.product_id);
 
-      await createMovement.mutateAsync({
+    if (normalizedItems.length === 0) {
+      form.setError('items' as any, {
+        type: 'manual',
+        message: 'Selecione pelo menos um produto e informe a quantidade.',
+      });
+      return;
+    }
+
+    const productIds = normalizedItems.map((i) => i.product_id);
+    const duplicatedIds = productIds.filter(
+      (id, index) => productIds.indexOf(id) !== index
+    );
+    if (duplicatedIds.length > 0) {
+      form.setError('items' as any, {
+        type: 'manual',
+        message: 'Não é permitido repetir o mesmo produto na mesma saída. Ajuste as linhas e quantidades.',
+      });
+      return;
+    }
+
+    try {
+      const notesWithDestination = data.notes || null;
+      const rows = normalizedItems.map((item) => ({
         institution_id: instId,
-        product_id: data.product_id,
-        movement_type: 'SAIDA',
-        quantity: parseFloat(data.quantity),
+        product_id: item.product_id,
+        movement_type: 'SAIDA' as const,
+        quantity: item.quantity,
         movement_date: getCurrentDateTimeISO(),
         notes: notesWithDestination,
-        beneficiary_institution_id:
-          data.destinationType === 'institution' && data.beneficiary_institution_id
-            ? data.beneficiary_institution_id
-            : null,
-      });
+        beneficiary_institution_id: data.beneficiary_institution_id,
+      }));
+
+      await createMovementsBatch.mutateAsync(rows);
       onOpenChange(false);
       form.reset();
     } catch {
@@ -121,9 +197,23 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
     }
   };
 
+  const isPending =
+    destinationType === 'institution'
+      ? createMovementsBatch.isPending
+      : createMovement.isPending;
+
+  const itemsErrorMessage = (form.formState.errors.items as any)?.message as
+    | string
+    | undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent
+        className={cn(
+          'sm:max-w-[500px] max-h-[80vh] overflow-y-auto',
+          destinationType === 'institution' && 'sm:max-w-[900px]'
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Registrar Saída de Estoque</DialogTitle>
           <DialogDescription>
@@ -276,73 +366,210 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                 }}
               />
             )}
-            <FormField
-              control={form.control}
-              name="product_id"
-              rules={{ required: 'Produto é obrigatório' }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Produto *</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {inventory
-                          .filter((item) => item.quantity > 0)
-                          .map((item) => (
-                            <SelectItem key={item.product_id} value={item.product_id}>
-                              {item.product?.name} ({item.product?.unit}) - Disponível: {item.quantity}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {selectedProductId && (
-              <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                Quantidade disponível: <strong>{availableQuantity}</strong>
+            {destinationType === 'institution' ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <FormLabel>Produtos e quantidades *</FormLabel>
+                  {itemsErrorMessage ? (
+                    <p className="text-sm text-destructive">{itemsErrorMessage}</p>
+                  ) : null}
+                </div>
+
+                {itemFields.map((itemField, index) => {
+                  const lineProductId = watchedItems?.[index]?.product_id || '';
+                  const availableForLine =
+                    inventory.find((inv) => inv.product_id === lineProductId)?.quantity || 0;
+
+                  const productOptions = inventory
+                    .filter((inv) => inv.quantity > 0)
+                    .filter(
+                      (inv) =>
+                        !selectedItemProductIds.has(inv.product_id) ||
+                        inv.product_id === lineProductId
+                    );
+
+                  const quantityRules =
+                    availableForLine > 0
+                      ? {
+                          required: 'Quantidade é obrigatória',
+                          min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
+                          max: {
+                            value: availableForLine,
+                            message: `Quantidade não pode ser maior que ${availableForLine}`,
+                          },
+                        }
+                      : {
+                          required: 'Quantidade é obrigatória',
+                          min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
+                        };
+
+                  return (
+                    <div
+                      key={itemField.id}
+                      className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-3 items-end"
+                    >
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.product_id`}
+                        rules={{ required: 'Produto é obrigatório' }}
+                        render={({ field }) => (
+                          <FormItem className="min-w-0">
+                            <FormLabel>Produto</FormLabel>
+                            <FormControl>
+                              <Select
+                                value={field.value}
+                                onValueChange={(v) => {
+                                  field.onChange(v);
+                                  form.setValue(`items.${index}.quantity`, '', {
+                                    shouldValidate: true,
+                                  });
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione o produto" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {productOptions.map((inv) => (
+                                    <SelectItem key={inv.product_id} value={inv.product_id}>
+                                      {inv.product?.name} ({inv.product?.unit}) - Disponível: {inv.quantity}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        rules={quantityRules as any}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Qtd</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                disabled={!lineProductId}
+                                placeholder="0.00"
+                              />
+                            </FormControl>
+                            {lineProductId ? (
+                              <p className="text-xs text-gray-600 bg-gray-50 p-1 rounded mt-1">
+                                Disponível: <strong>{availableForLine}</strong>
+                              </p>
+                            ) : null}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => removeItem(index)}
+                        disabled={itemFields.length === 1}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  );
+                })}
+
+                <div className="flex">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => appendItem({ product_id: '', quantity: '' })}
+                  >
+                    Adicionar produto
+                  </Button>
+                </div>
               </div>
-            )}
-            <FormField
-              control={form.control}
-              name="quantity"
-              rules={{
-                required: 'Quantidade é obrigatória',
-                min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
-                max: {
-                  value: availableQuantity,
-                  message: `Quantidade não pode ser maior que ${availableQuantity}`,
-                },
-              }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantidade *</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" min="0.01" max={availableQuantity} placeholder="0.00" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {destinationType === 'free' && (
-              <FormField
-                control={form.control}
-                name="destination"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Destino</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Ex: Entrega para família, Transferência para outra instituição, etc." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="product_id"
+                  rules={{ required: 'Produto é obrigatório' }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Produto *</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o produto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {inventory
+                              .filter((item) => item.quantity > 0)
+                              .map((item) => (
+                                <SelectItem key={item.product_id} value={item.product_id}>
+                                  {item.product?.name} ({item.product?.unit}) - Disponível: {item.quantity}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {selectedProductId && (
+                  <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                    Quantidade disponível: <strong>{availableQuantity}</strong>
+                  </div>
                 )}
-              />
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  rules={{
+                    required: 'Quantidade é obrigatória',
+                    min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
+                    max: {
+                      value: availableQuantity,
+                      message: `Quantidade não pode ser maior que ${availableQuantity}`,
+                    },
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantidade *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          max={availableQuantity}
+                          placeholder="0.00"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="destination"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Destino</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Ex: Entrega para família, Transferência para outra instituição, etc."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
             <FormField
               control={form.control}
@@ -365,8 +592,8 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMovement.isPending}>
-                {createMovement.isPending ? (
+              <Button type="submit" disabled={isPending}>
+                {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Salvando...
