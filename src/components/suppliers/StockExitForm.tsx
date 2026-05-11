@@ -391,7 +391,7 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                   const quantityRules =
                     availableForLine > 0
                       ? {
-                          required: 'Quantidade é obrigatória',
+                          required: true,
                           min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
                           max: {
                             value: availableForLine,
@@ -399,7 +399,7 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                           },
                         }
                       : {
-                          required: 'Quantidade é obrigatória',
+                          required: true,
                           min: { value: 0.01, message: 'Quantidade deve ser maior que zero' },
                         };
 
@@ -448,7 +448,7 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                         rules={quantityRules as any}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Qtd</FormLabel>
+                            <FormLabel>Qtd *</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -459,11 +459,6 @@ const StockExitForm = ({ open, onOpenChange, institutionId }: StockExitFormProps
                                 placeholder="0.00"
                               />
                             </FormControl>
-                            {lineProductId ? (
-                              <p className="text-xs text-gray-600 bg-gray-50 p-1 rounded mt-1">
-                                Disponível: <strong>{availableForLine}</strong>
-                              </p>
-                            ) : null}
                             <FormMessage />
                           </FormItem>
                         )}
