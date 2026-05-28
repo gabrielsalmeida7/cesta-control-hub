@@ -62,6 +62,59 @@ const parseDeliveryNotes = (notes: string | null | undefined) => {
   };
 };
 
+type DeliveryMovementItem = {
+  status?: string;
+  quantity: number;
+  product?: { name?: string; unit?: string } | null;
+  cancellation_reason?: string | null;
+};
+
+const renderDeliveryMovementBadges = (deliveryItems: DeliveryMovementItem[]) =>
+  deliveryItems.map((movement, index) => {
+    const cancelled = movement.status === 'CANCELLED';
+    const unit = movement.product?.unit || 'unidade';
+
+    return (
+      <Badge
+        key={index}
+        variant={cancelled ? 'secondary' : 'outline'}
+        className={`text-xs ${cancelled ? 'line-through opacity-70' : ''}`}
+        title={
+          cancelled
+            ? `Cancelado: ${movement.cancellation_reason || 'sem motivo registrado'}`
+            : `${movement.quantity} ${unit}`
+        }
+      >
+        {movement.product?.name || 'Produto'}
+        <span className="ml-1 text-gray-500">
+          ({movement.quantity} {unit})
+        </span>
+        {cancelled ? <span className="ml-1">· cancelado</span> : null}
+      </Badge>
+    );
+  });
+
+const renderDeliveryMovementDetails = (deliveryItems: DeliveryMovementItem[]) =>
+  deliveryItems.map((movement, index) => {
+    const cancelled = movement.status === 'CANCELLED';
+    const unit = movement.product?.unit || 'unidade';
+
+    return (
+      <div
+        key={index}
+        className={`flex items-center gap-2 bg-white p-2 rounded border ${cancelled ? 'opacity-60' : ''}`}
+      >
+        <Badge variant={cancelled ? 'secondary' : 'outline'} className="text-xs">
+          {movement.product?.name || 'Produto'}
+          {cancelled ? ' (cancelado)' : ''}
+        </Badge>
+        <span className={`text-sm text-gray-600 ${cancelled ? 'line-through' : ''}`}>
+          {movement.quantity} {unit}
+        </span>
+      </div>
+    );
+  });
+
 const InstitutionReports = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -288,12 +341,7 @@ const InstitutionReports = () => {
                               }
                               
                               // Exibir itens das movimentações de estoque
-                              return deliveryItems.map((movement: any, index: number) => (
-                                <Badge key={index} variant="outline" className="text-xs" title={`${movement.quantity} ${movement.product?.unit || 'unidade'}`}>
-                                  {movement.product?.name || 'Produto'}
-                                  <span className="ml-1 text-gray-500">({movement.quantity} {movement.product?.unit || 'unidade'})</span>
-                                </Badge>
-                              ));
+                              return renderDeliveryMovementBadges(deliveryItems);
                             })()}
                           </div>
                         </TableCell>
@@ -432,16 +480,7 @@ const InstitutionReports = () => {
                       }
                       
                       // Exibir itens das movimentações de estoque
-                      return deliveryItems.map((movement: any, index: number) => (
-                        <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
-                          <Badge variant="outline" className="text-xs">
-                            {movement.product?.name || 'Produto'}
-                          </Badge>
-                          <span className="text-sm text-gray-600">
-                            {movement.quantity} {movement.product?.unit || 'unidade'}
-                          </span>
-                        </div>
-                      ));
+                      return renderDeliveryMovementDetails(deliveryItems);
                     })()}
                   </div>
                 </div>

@@ -132,7 +132,8 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
 
   const lastStockExit = useMemo(() => {
     if (!beneficiaryStockMovements.length) return null;
-    return beneficiaryStockMovements[0];
+    const activeExit = beneficiaryStockMovements.find((m) => m.status !== 'CANCELLED');
+    return activeExit ?? beneficiaryStockMovements[0];
   }, [beneficiaryStockMovements]);
   const createMutation = useCreateBeneficiaryInstitution();
   const updateMutation = useUpdateBeneficiaryInstitution();
@@ -516,6 +517,7 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
                         <TableRow>
                           <TableHead>Data</TableHead>
                           <TableHead>Produto</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right w-[72px]">Qtd</TableHead>
                           <TableHead className="w-[56px]">Un.</TableHead>
                         </TableRow>
@@ -525,8 +527,9 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
                           const mov = m as typeof m & {
                             product?: { name: string; unit: string };
                           };
+                          const cancelled = m.status === 'CANCELLED';
                           return (
-                            <TableRow key={m.id}>
+                            <TableRow key={m.id} className={cancelled ? 'opacity-60' : undefined}>
                               <TableCell className="text-sm whitespace-nowrap">
                                 {formatDateTimeBrasilia(m.movement_date)}
                               </TableCell>
@@ -537,8 +540,20 @@ const BeneficiaryInstitutionsTab = ({ institutionId }: BeneficiaryInstitutionsTa
                                     {m.notes}
                                   </span>
                                 ) : null}
+                                {cancelled && m.cancellation_reason ? (
+                                  <span className="block text-xs text-muted-foreground mt-0.5">
+                                    {m.cancellation_reason}
+                                  </span>
+                                ) : null}
                               </TableCell>
-                              <TableCell className="text-sm text-right">
+                              <TableCell>
+                                {cancelled ? (
+                                  <Badge variant="secondary">Cancelada</Badge>
+                                ) : (
+                                  <Badge variant="outline">Ativa</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className={`text-sm text-right ${cancelled ? 'line-through' : ''}`}>
                                 {m.quantity}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">

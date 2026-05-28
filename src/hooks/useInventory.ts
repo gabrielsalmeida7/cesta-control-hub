@@ -11,10 +11,13 @@ type Inventory = Tables<"inventory">;
 type StockMovement = Tables<"stock_movements">;
 type StockMovementInsert = TablesInsert<"stock_movements">;
 
+export type StockMovementStatus = "ACTIVE" | "CANCELLED";
+
 interface StockMovementFilters {
   startDate?: string;
   endDate?: string;
   movementType?: "ENTRADA" | "SAIDA";
+  status?: StockMovementStatus;
   productId?: string;
   institutionId?: string;
   /** Filtra saídas vinculadas a uma instituição beneficiada cadastrada */
@@ -122,6 +125,10 @@ export const useStockMovements = (filters?: StockMovementFilters) => {
 
       if (filters?.movementType) {
         query = query.eq("movement_type", filters.movementType);
+      }
+
+      if (filters?.status) {
+        query = query.eq("status", filters.status);
       }
 
       if (filters?.productId) {
@@ -314,6 +321,85 @@ export const useCreateStockMovementsBatch = () => {
       toast({
         title: "Erro",
         description: error.message || "Erro ao registrar movimentações.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useCancelStockMovement = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      movementId,
+      reason,
+    }: {
+      movementId: string;
+      reason: string;
+    }) => {
+      const { error } = await supabase.rpc("cancel_stock_movement", {
+        p_movement_id: movementId,
+        p_reason: reason,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      toast({
+        title: "Sucesso",
+        description: "Movimentação cancelada com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao cancelar movimentação.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useCancelDeliveryMovements = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      deliveryId,
+      reason,
+    }: {
+      deliveryId: string;
+      reason: string;
+    }) => {
+      const { data, error } = await supabase.rpc("cancel_delivery_movements", {
+        p_delivery_id: deliveryId,
+        p_reason: reason,
+      });
+
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["institution-deliveries"] });
+      toast({
+        title: "Sucesso",
+        description:
+          count === 1
+            ? "1 movimentação da entrega foi cancelada."
+            : `${count} movimentações da entrega foram canceladas.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao cancelar movimentações da entrega.",
         variant: "destructive",
       });
     },

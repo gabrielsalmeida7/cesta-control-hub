@@ -31,6 +31,8 @@ export const useInstitutionDeliveries = (startDate?: string, endDate?: string) =
               id,
               product_id,
               quantity,
+              status,
+              cancellation_reason,
               product:products(
                 id,
                 name,
