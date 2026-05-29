@@ -434,6 +434,7 @@ export type Database = {
           receives_bolsa_familia: boolean | null
           receives_bpc: boolean | null
           receives_government_aid: boolean | null
+          receives_loas: boolean | null
           receives_other_aid: boolean | null
           registered_in_other_institution: boolean | null
           substance_abuse: boolean | null
@@ -493,6 +494,7 @@ export type Database = {
           receives_bolsa_familia?: boolean | null
           receives_bpc?: boolean | null
           receives_government_aid?: boolean | null
+          receives_loas?: boolean | null
           receives_other_aid?: boolean | null
           registered_in_other_institution?: boolean | null
           substance_abuse?: boolean | null
@@ -552,6 +554,7 @@ export type Database = {
           receives_bolsa_familia?: boolean | null
           receives_bpc?: boolean | null
           receives_government_aid?: boolean | null
+          receives_loas?: boolean | null
           receives_other_aid?: boolean | null
           registered_in_other_institution?: boolean | null
           substance_abuse?: boolean | null
@@ -1267,6 +1270,7 @@ export type Database = {
           receives_bolsa_familia: boolean | null
           receives_bpc: boolean | null
           receives_government_aid: boolean | null
+          receives_loas: boolean | null
           receives_other_aid: boolean | null
           registered_in_other_institution: boolean | null
           substance_abuse: boolean | null

@@ -45,6 +45,8 @@ type FamilyStatusFilter = 'all' | 'unblocked' | 'blocked';
 type FamilySortOption =
   | 'name_asc'
   | 'name_desc'
+  | 'registration_asc'
+  | 'registration_desc'
   | 'last_delivery_desc'
   | 'last_delivery_asc';
 
@@ -215,6 +217,7 @@ const InstitutionFamilies = () => {
       receives_bolsa_familia: false,
       receives_auxilio_gas: false,
       receives_bpc: false,
+      receives_loas: false,
       receives_other_aid: false,
       other_aid_description: "",
       has_chronic_disease: false,
@@ -261,6 +264,7 @@ const InstitutionFamilies = () => {
       receives_bolsa_familia: false,
       receives_auxilio_gas: false,
       receives_bpc: false,
+      receives_loas: false,
       receives_other_aid: false,
       other_aid_description: "",
       has_chronic_disease: false,
@@ -389,6 +393,16 @@ const InstitutionFamilies = () => {
     });
   }, [familiesData, allDeliveries, profile?.institution_id]);
 
+  const registrationNumberByFamilyId = useMemo(() => {
+    const sorted = [...families].sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : Number.MAX_SAFE_INTEGER;
+      if (ta !== tb) return ta - tb;
+      return (a.id ?? '').localeCompare(b.id ?? '');
+    });
+    return new Map(sorted.map((f, i) => [f.id, i + 1]));
+  }, [families]);
+
   const displayedFamilies = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     const searchNumbers = searchTerm.replace(/\D/g, '');
@@ -426,12 +440,19 @@ const InstitutionFamilies = () => {
     const deliveryTs = (f: Family) =>
       f.last_delivery_date ? new Date(f.last_delivery_date).getTime() : null;
 
+    const registrationNum = (f: Family) =>
+      registrationNumberByFamilyId.get(f.id) ?? Number.MAX_SAFE_INTEGER;
+
     return [...list].sort((a, b) => {
       switch (sortOption) {
         case 'name_asc':
           return byName(a, b);
         case 'name_desc':
           return byName(b, a);
+        case 'registration_asc':
+          return registrationNum(a) - registrationNum(b);
+        case 'registration_desc':
+          return registrationNum(b) - registrationNum(a);
         case 'last_delivery_desc': {
           const ta = deliveryTs(a);
           const tb = deliveryTs(b);
@@ -454,7 +475,7 @@ const InstitutionFamilies = () => {
         }
       }
     });
-  }, [families, searchTerm, statusFilter, sortOption]);
+  }, [families, searchTerm, statusFilter, sortOption, registrationNumberByFamilyId]);
 
   const getStatusBadge = (family: Family) => {
     if (family.is_blocked) {
@@ -534,6 +555,7 @@ const InstitutionFamilies = () => {
       receives_bolsa_familia: family.receives_bolsa_familia || false,
       receives_auxilio_gas: family.receives_auxilio_gas || false,
       receives_bpc: family.receives_bpc || false,
+      receives_loas: family.receives_loas || false,
       receives_other_aid: family.receives_other_aid || false,
       other_aid_description: family.other_aid_description || "",
       has_chronic_disease: family.has_chronic_disease || false,
@@ -628,7 +650,7 @@ const InstitutionFamilies = () => {
       const booleanFields = [
         'is_blocked', 'registered_in_other_institution',
         'receives_government_aid', 'receives_bolsa_familia', 'receives_auxilio_gas',
-        'receives_bpc', 'receives_other_aid', 'has_chronic_disease',
+        'receives_bpc', 'receives_loas', 'receives_other_aid', 'has_chronic_disease',
         'has_water_supply', 'has_electricity', 'has_garbage_collection',
         'food_insecurity', 'unemployment', 'poor_health', 'substance_abuse'
       ];
@@ -1096,6 +1118,8 @@ const InstitutionFamilies = () => {
                       <SelectContent>
                         <SelectItem value="name_asc">Nome (A–Z)</SelectItem>
                         <SelectItem value="name_desc">Nome (Z–A)</SelectItem>
+                        <SelectItem value="registration_asc">Nº Cadastro (menor)</SelectItem>
+                        <SelectItem value="registration_desc">Nº Cadastro (maior)</SelectItem>
                         <SelectItem value="last_delivery_desc">
                           Última entrega (mais recente)
                         </SelectItem>
@@ -1153,8 +1177,8 @@ const InstitutionFamilies = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome da Família</TableHead>
-                    <TableHead>CPF Principal</TableHead>
+                    <TableHead>Nº Cadastro</TableHead>
+                    <TableHead>Titular</TableHead>
                     <TableHead>Membros</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Última Entrega</TableHead>
@@ -1164,7 +1188,9 @@ const InstitutionFamilies = () => {
                 <TableBody>
                   {displayedFamilies.map((family) => (
                     <TableRow key={family.id}>
-                      <TableCell className="font-medium">{family.name}</TableCell>
+                      <TableCell className="font-medium tabular-nums">
+                        {registrationNumberByFamilyId.get(family.id) ?? '—'}
+                      </TableCell>
                       <TableCell>{family.contact_person}</TableCell>
                       <TableCell>{family.members_count || 'N/A'}</TableCell>
                       <TableCell>{getStatusBadge(family)}</TableCell>
@@ -1412,6 +1438,7 @@ const InstitutionFamilies = () => {
                           {selectedFamily.receives_bolsa_familia && <p className="text-sm">• Bolsa Família</p>}
                           {selectedFamily.receives_auxilio_gas && <p className="text-sm">• Auxílio Gás</p>}
                           {selectedFamily.receives_bpc && <p className="text-sm">• BPC</p>}
+                          {selectedFamily.receives_loas && <p className="text-sm">• LOAS</p>}
                           {selectedFamily.receives_other_aid && (
                             <p className="text-sm">• Outros: {selectedFamily.other_aid_description || "Sim"}</p>
                           )}
@@ -2027,6 +2054,22 @@ const InstitutionFamilies = () => {
                               />
                             </FormControl>
                             <FormLabel className="font-normal">BPC</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="receives_loas"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">LOAS</FormLabel>
                           </FormItem>
                         )}
                       />
@@ -2885,6 +2928,22 @@ const InstitutionFamilies = () => {
                               />
                             </FormControl>
                             <FormLabel className="font-normal">BPC</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="receives_loas"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">LOAS</FormLabel>
                           </FormItem>
                         )}
                       />

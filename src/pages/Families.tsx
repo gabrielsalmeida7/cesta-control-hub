@@ -91,6 +91,7 @@ const Families = () => {
       receives_bolsa_familia: false,
       receives_auxilio_gas: false,
       receives_bpc: false,
+      receives_loas: false,
       receives_other_aid: false,
       other_aid_description: "",
       has_chronic_disease: false,
@@ -131,6 +132,7 @@ const Families = () => {
       receives_bolsa_familia: false,
       receives_auxilio_gas: false,
       receives_bpc: false,
+      receives_loas: false,
       receives_other_aid: false,
       other_aid_description: "",
       has_chronic_disease: false,
@@ -284,6 +286,7 @@ const Families = () => {
       receives_bolsa_familia: family.receives_bolsa_familia || false,
       receives_auxilio_gas: family.receives_auxilio_gas || false,
       receives_bpc: family.receives_bpc || false,
+      receives_loas: family.receives_loas || false,
       receives_other_aid: family.receives_other_aid || false,
       other_aid_description: family.other_aid_description || "",
       has_chronic_disease: family.has_chronic_disease || false,
@@ -659,6 +662,7 @@ const Families = () => {
                           {selectedFamily.receives_bolsa_familia && <p className="text-sm">• Bolsa Família</p>}
                           {selectedFamily.receives_auxilio_gas && <p className="text-sm">• Auxílio Gás</p>}
                           {selectedFamily.receives_bpc && <p className="text-sm">• BPC</p>}
+                          {selectedFamily.receives_loas && <p className="text-sm">• LOAS</p>}
                           {selectedFamily.receives_other_aid && (
                             <p className="text-sm">• Outros: {selectedFamily.other_aid_description || "Sim"}</p>
                           )}
@@ -1255,6 +1259,22 @@ const Families = () => {
                                 />
                               </FormControl>
                               <FormLabel className="font-normal">BPC</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={createForm.control}
+                          name="receives_loas"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value || false}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">LOAS</FormLabel>
                             </FormItem>
                           )}
                         />
@@ -1921,6 +1941,22 @@ const Families = () => {
                               />
                             </FormControl>
                             <FormLabel className="font-normal">BPC</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="receives_loas"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">LOAS</FormLabel>
                           </FormItem>
                         )}
                       />
