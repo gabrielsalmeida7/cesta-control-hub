@@ -64,12 +64,22 @@ export const useCreateDelivery = () => {
 
   return useMutation({
     mutationFn: async (delivery: DeliveryInsert) => {
+      const blockingPeriodDays = delivery.blocking_period_days ?? 30;
+      if (
+        !Number.isInteger(blockingPeriodDays) ||
+        blockingPeriodDays <= 0 ||
+        blockingPeriodDays > 999
+      ) {
+        throw new Error('Período de bloqueio inválido. Informe um número inteiro entre 1 e 999 dias.');
+      }
+
       // Validar entrega antes de inserir usando função do backend
       const { data: validationResult, error: validationError } = await supabase
         .rpc('validate_delivery', {
           p_family_id: delivery.family_id,
           p_institution_id: delivery.institution_id,
-          p_blocking_justification: (delivery as any).blocking_justification || null
+          p_blocking_justification: (delivery as any).blocking_justification || null,
+          p_blocking_period_days: blockingPeriodDays,
         });
 
       if (validationError) {

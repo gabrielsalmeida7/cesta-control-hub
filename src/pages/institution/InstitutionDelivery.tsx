@@ -29,6 +29,18 @@ const InstitutionDelivery = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFamily, setSelectedFamily] = useState<any>(null);
   const [blockingPeriod, setBlockingPeriod] = useState('30');
+  const [customBlockingDays, setCustomBlockingDays] = useState('30');
+
+  const getBlockingPeriodDays = (): number | null => {
+    if (blockingPeriod === 'custom') {
+      const days = parseInt(customBlockingDays, 10);
+      if (!Number.isInteger(days) || days <= 0) return null;
+      return days;
+    }
+    const days = parseInt(blockingPeriod, 10);
+    if (!Number.isInteger(days) || days <= 0) return null;
+    return days;
+  };
   const [notes, setNotes] = useState('');
   const [deliveryItems, setDeliveryItems] = useState<DeliveryItem[]>([]);
   const [showFraudAlert, setShowFraudAlert] = useState(false);
@@ -109,6 +121,25 @@ const InstitutionDelivery = () => {
       return;
     }
 
+    const blockingDays = getBlockingPeriodDays();
+    if (blockingDays === null) {
+      toast({
+        title: "Erro",
+        description: "Informe um período de bloqueio válido (número inteiro maior que zero).",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (blockingDays > 999) {
+      toast({
+        title: "Erro",
+        description: "O período de bloqueio não pode exceder 999 dias.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Verificar se família está bloqueada - se sim, mostrar modal de fraude
     if (selectedFamily.is_blocked && selectedFamily.blocked_until) {
       const blockedUntil = new Date(selectedFamily.blocked_until);
@@ -139,10 +170,20 @@ const InstitutionDelivery = () => {
         return;
       }
 
+      const blockingDays = getBlockingPeriodDays();
+      if (blockingDays === null) {
+        toast({
+          title: "Erro",
+          description: "Informe um período de bloqueio válido (número inteiro maior que zero).",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Criar entrega
       const delivery = await createDeliveryMutation.mutateAsync({
         family_id: selectedFamily.id,
-        blocking_period_days: parseInt(blockingPeriod),
+        blocking_period_days: blockingDays,
         notes: notes && notes.trim() ? notes : undefined,
         blocking_justification: justification || undefined,
       });
@@ -188,7 +229,7 @@ const InstitutionDelivery = () => {
 
       toast({
         title: "Entrega Registrada",
-        description: `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingPeriod} dias. Recibo gerado automaticamente.`
+        description: `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingDays} dias. Recibo gerado automaticamente.`
       });
 
       // Resetar formulário
@@ -196,6 +237,8 @@ const InstitutionDelivery = () => {
       setDeliveryItems([]);
       setNotes('');
       setSearchTerm('');
+      setBlockingPeriod('30');
+      setCustomBlockingDays('30');
       setBlockingJustification('');
       setShowFraudAlert(false);
     } catch (error) {
@@ -502,7 +545,15 @@ const InstitutionDelivery = () => {
                 {/* Período de Bloqueio */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Período de Bloqueio</label>
-                  <Select value={blockingPeriod} onValueChange={setBlockingPeriod}>
+                  <Select
+                    value={blockingPeriod}
+                    onValueChange={(value) => {
+                      setBlockingPeriod(value);
+                      if (value !== 'custom') {
+                        setCustomBlockingDays(value);
+                      }
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -512,8 +563,24 @@ const InstitutionDelivery = () => {
                       <SelectItem value="20">20 dias</SelectItem>
                       <SelectItem value="30">30 dias</SelectItem>
                       <SelectItem value="45">45 dias</SelectItem>
+                      <SelectItem value="custom">Personalizado</SelectItem>
                     </SelectContent>
                   </Select>
+                  {blockingPeriod === 'custom' && (
+                    <div className="mt-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={999}
+                        placeholder="Informe o número de dias"
+                        value={customBlockingDays}
+                        onChange={(e) => setCustomBlockingDays(e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Informe qualquer quantidade de dias (máximo 999)
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Observações */}

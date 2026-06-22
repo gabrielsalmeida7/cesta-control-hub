@@ -84,12 +84,21 @@ export const useCreateDelivery = () => {
     mutationFn: async (data: CreateDeliveryData) => {
       if (!profile?.institution_id) throw new Error('Institution not found');
 
+      if (
+        !Number.isInteger(data.blocking_period_days) ||
+        data.blocking_period_days <= 0 ||
+        data.blocking_period_days > 999
+      ) {
+        throw new Error('Período de bloqueio inválido. Informe um número inteiro entre 1 e 999 dias.');
+      }
+
       // Validar entrega antes de inserir usando função do backend
       const { data: validationResult, error: validationError } = await supabase
         .rpc('validate_delivery', {
           p_family_id: data.family_id,
           p_institution_id: profile.institution_id,
-          p_blocking_justification: data.blocking_justification || null
+          p_blocking_justification: data.blocking_justification || null,
+          p_blocking_period_days: data.blocking_period_days,
         });
 
       if (validationError) {
@@ -191,6 +200,12 @@ export const useCreateDelivery = () => {
         toast({
           title: "Família Não Encontrada",
           description: error.message || "Família não encontrada.",
+          variant: "destructive"
+        });
+      } else if (error.validationError === 'INVALID_BLOCKING_PERIOD') {
+        toast({
+          title: "Período de Bloqueio Inválido",
+          description: error.message || "Informe um período de bloqueio válido.",
           variant: "destructive"
         });
       } else {

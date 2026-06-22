@@ -1345,6 +1345,15 @@ export type Database = {
             }
             Returns: Json
           }
+        | {
+            Args: {
+              p_blocking_justification?: string
+              p_blocking_period_days?: number
+              p_family_id: string
+              p_institution_id: string
+            }
+            Returns: Json
+          }
       validate_institution_user_creation: {
         Args: { p_email: string }
         Returns: boolean
