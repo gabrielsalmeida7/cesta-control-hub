@@ -15,9 +15,17 @@ export default defineConfig(({ mode }) => ({
     componentTagger(),
   ].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: '@cesta/shared/validation', replacement: path.resolve(__dirname, './shared/src/validation.ts') },
+      { find: '@cesta/shared/documentFormat', replacement: path.resolve(__dirname, './shared/src/documentFormat.ts') },
+      { find: '@cesta/shared/familyForm', replacement: path.resolve(__dirname, './shared/src/familyForm.ts') },
+      {
+        find: '@cesta/shared/familyFormValidation',
+        replacement: path.resolve(__dirname, './shared/src/familyFormValidation.ts'),
+      },
+      { find: '@cesta/shared', replacement: path.resolve(__dirname, './shared/src/index.ts') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
   },
   build: {
     outDir: "dist",

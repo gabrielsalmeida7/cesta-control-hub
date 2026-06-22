@@ -142,36 +142,37 @@ Replicar no mobile (iOS e Android) as mesmas funcionalidades e a mesma identidad
 - [x] Projeto Expo inicializado em `mobile/`
 - [x] Documento de planejamento
 
-### Fase 1 — Infraestrutura
+### Fase 1 — Infraestrutura ✅
 
-- [ ] Instalar Expo Router, React Query, Supabase, NativeWind
-- [ ] Configurar cliente Supabase mobile
-- [ ] Implementar `AuthProvider` e fluxo de login
-- [ ] Layout base com navegação por role
-- [ ] Tema e componentes UI base
+- [x] Instalar Expo Router, React Query, Supabase, NativeWind
+- [x] Configurar cliente Supabase mobile
+- [x] Implementar `AuthProvider` e fluxo de login
+- [x] Layout base com navegação por role
+- [x] Tema e componentes UI base
 
-### Fase 2 — Módulos core (MVP mobile)
+### Fase 2 — Módulos core (MVP mobile) ✅
 
-- [ ] Dashboard (admin e instituição)
-- [ ] Instituições (admin)
-- [ ] Famílias (admin e instituição)
-- [ ] Entregas com validação de bloqueio
-- [ ] Busca de família por CPF
+- [x] Dashboard (admin e instituição)
+- [x] Instituições (admin)
+- [x] Famílias (admin e instituição)
+- [x] Entregas com validação de bloqueio
+- [x] Busca de família por CPF
 
-### Fase 3 — Módulos complementares
+### Fase 3 — Módulos complementares ✅
 
-- [ ] Relatórios e gráficos
-- [ ] Fornecedores, estoque e movimentações
-- [ ] Comprovantes (câmera / galeria com `expo-image-picker`)
-- [ ] Portal do titular e LGPD
+- [x] Relatórios e exportação CSV
+- [x] Fornecedores, estoque e produtos
+- [x] Comprovantes (expo-print + sharing)
+- [x] Portal do titular e LGPD
+- [x] Reset senha (deep link via expo-linking)
 
-### Fase 4 — Qualidade e publicação
+### Fase 4 — Qualidade e publicação ✅
 
-- [ ] Testes em dispositivos físicos (iOS/Android)
-- [ ] Otimização de performance (listas virtualizadas)
-- [ ] Configurar EAS Build (`eas.json`)
-- [ ] Ícones, splash screen e metadados das lojas
-- [ ] Submissão App Store / Google Play
+- [x] TypeScript strict + verificação de tipos
+- [x] FlatList virtualizada nas listas
+- [x] Configurar EAS Build (`eas.json`)
+- [x] Ícones, splash screen (assets placeholder)
+- [ ] Submissão App Store / Google Play (requer conta desenvolvedor)
 
 ---
 
