@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/Header';
 import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
-import { Calendar, Download, Package, Users, BarChart3, Loader2, Eye } from 'lucide-react';
+import { Search, Download, Package, Users, BarChart3, Loader2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
 import { useReportExport } from '@/hooks/useReportExport';
 import { useFamiliesWithMultipleInstitutions } from '@/hooks/useAlerts';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { formatDateBrasilia, formatDateTimeBrasilia } from '@/utils/dateFormat';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -115,25 +117,101 @@ const renderDeliveryMovementDetails = (deliveryItems: DeliveryMovementItem[]) =>
     );
   });
 
+const formatBrDateInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const parseBrDateToIso = (value: string): string | null => {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  if (year < 1000 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+};
+
 const InstitutionReports = () => {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [draftStartDate, setDraftStartDate] = useState('');
+  const [draftEndDate, setDraftEndDate] = useState('');
+  const [appliedStartDate, setAppliedStartDate] = useState('');
+  const [appliedEndDate, setAppliedEndDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { profile } = useAuth();
+  const { toast } = useToast();
 
-  const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(startDate, endDate);
+  const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(appliedStartDate, appliedEndDate);
   const { data: familiesWithMultiple = [], isLoading: familiesLoading } = useFamiliesWithMultipleInstitutions(profile?.institution_id);
   const { exportDeliveriesReport } = useReportExport();
 
-  const filteredDeliveries = deliveries;
+  const filteredDeliveries = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return deliveries;
+
+    return deliveries.filter((delivery) => {
+      const familyName = (delivery.family?.name ?? '').toLowerCase();
+      const contactPerson = (delivery.family?.contact_person ?? '').toLowerCase();
+      return familyName.includes(q) || contactPerson.includes(q);
+    });
+  }, [deliveries, searchTerm]);
+
+  const applyDateFilters = () => {
+    if (draftStartDate.trim()) {
+      const startIso = parseBrDateToIso(draftStartDate);
+      if (!startIso) {
+        toast({
+          title: 'Data inválida',
+          description: 'Informe a data inicial no formato DD/MM/AAAA.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setAppliedStartDate(startIso);
+    } else {
+      setAppliedStartDate('');
+    }
+
+    if (draftEndDate.trim()) {
+      const endIso = parseBrDateToIso(draftEndDate);
+      if (!endIso) {
+        toast({
+          title: 'Data inválida',
+          description: 'Informe a data final no formato DD/MM/AAAA.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setAppliedEndDate(endIso);
+    } else {
+      setAppliedEndDate('');
+    }
+  };
 
   const totalDeliveries = filteredDeliveries.length;
   const totalFamilies = new Set(filteredDeliveries.map(d => d.family?.id)).size;
   const totalItems = filteredDeliveries.length; // Assumindo 1 item por entrega (cesta básica)
 
   const exportReport = () => {
-    exportDeliveriesReport(startDate, endDate);
+    exportDeliveriesReport(appliedStartDate, appliedEndDate);
   };
 
   if (isLoading) {
@@ -189,23 +267,59 @@ const InstitutionReports = () => {
             <CardHeader>
               <CardTitle>Filtros</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="delivery-search" className="text-sm text-muted-foreground">
+                    Buscar
+                  </Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="delivery-search"
+                      placeholder="Nome da família ou contato..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Data Inicial</label>
+                  <Label htmlFor="start-date" className="text-sm font-medium mb-2 block">
+                    Data Inicial
+                  </Label>
                   <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    id="start-date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="DD/MM/AAAA"
+                    maxLength={10}
+                    value={draftStartDate}
+                    onChange={(e) => setDraftStartDate(formatBrDateInput(e.target.value))}
+                    onKeyDown={(e) => e.key === 'Enter' && applyDateFilters()}
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Data Final</label>
+                  <Label htmlFor="end-date" className="text-sm font-medium mb-2 block">
+                    Data Final
+                  </Label>
                   <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    id="end-date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="DD/MM/AAAA"
+                    maxLength={10}
+                    value={draftEndDate}
+                    onChange={(e) => setDraftEndDate(formatBrDateInput(e.target.value))}
+                    onKeyDown={(e) => e.key === 'Enter' && applyDateFilters()}
                   />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={applyDateFilters} className="w-full">
+                    Filtrar
+                  </Button>
                 </div>
                 <div className="flex items-end">
                   <Button onClick={exportReport} variant="outline" className="w-full">
@@ -395,9 +509,11 @@ const InstitutionReports = () => {
                       <TableCell colSpan={8} className="text-center py-8">
                         <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">
-                          {startDate || endDate 
-                            ? 'Nenhuma entrega encontrada no período selecionado'
-                            : 'Nenhuma entrega registrada ainda'}
+                          {searchTerm.trim()
+                            ? 'Nenhuma entrega encontrada para a busca'
+                            : appliedStartDate || appliedEndDate
+                              ? 'Nenhuma entrega encontrada no período selecionado'
+                              : 'Nenhuma entrega registrada ainda'}
                         </p>
                       </TableCell>
                     </TableRow>
