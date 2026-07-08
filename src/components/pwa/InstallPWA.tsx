@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { usePwaInstall, type PwaInstallMode } from "@/hooks/usePwaInstall";
 
 const publicRoutes = ["/login", "/reset-password", "/politica-privacidade", "/portal-titular"];
@@ -22,13 +23,10 @@ function getBannerDescription(installMode: PwaInstallMode, isSecureContext: bool
 
   switch (installMode) {
     case "native-prompt":
-      return "Instale o app para acesso rápido em campo, mesmo offline parcial.";
     case "ios-manual":
-      return "Adicione à Tela de Início para usar como app em campo.";
     case "android-manual":
-      return "Instale pelo menu do Chrome para acesso rápido em campo.";
     case "desktop-manual":
-      return "Instale no computador para abrir em janela própria, como um app.";
+      return "Instale o app para acesso mais rápido em campo.";
     default: {
       const _exhaustive: never = installMode;
       return _exhaustive;
@@ -61,6 +59,7 @@ export function InstallPWA() {
     install,
     dismiss,
   } = usePwaInstall();
+  const isOnline = useOnlineStatus();
   const [showGuide, setShowGuide] = useState(false);
 
   const isPublicRoute = publicRoutes.some((route) => location.pathname.startsWith(route));
@@ -80,7 +79,11 @@ export function InstallPWA() {
 
   return (
     <>
-      <div className="fixed inset-x-4 bottom-4 z-[90] mx-auto max-w-lg rounded-lg border border-[#004E64]/20 bg-white p-4 shadow-lg sm:inset-x-auto sm:right-4 sm:left-auto">
+      <div
+        className={`fixed inset-x-4 z-[90] mx-auto max-w-lg rounded-lg border border-[#004E64]/20 bg-white p-4 shadow-lg sm:inset-x-auto sm:left-auto sm:right-4 ${
+          isOnline ? "top-4" : "top-14"
+        }`}
+      >
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#004E64] text-white">
             <Smartphone className="h-5 w-5" aria-hidden="true" />

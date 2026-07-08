@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => ({
         "CestaLogin.svg",
       ],
       manifest: {
-        name: "Cesta Control Hub",
-        short_name: "CestaJusta",
+        name: "Cesta Justa",
+        short_name: "Cesta Justa",
         description: "Sistema de Controle de Cestas Básicas",
         lang: "pt-BR",
         start_url: "/",

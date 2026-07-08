@@ -21,6 +21,7 @@ import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInsti
 import { useDeliveries } from '@/hooks/useDeliveries';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useOfflineAction } from '@/hooks/useOfflineAction';
 import { useConsentManagement } from '@/hooks/useConsentManagement';
 import { supabase } from '@/integrations/supabase/client';
 import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
@@ -77,6 +78,7 @@ const InstitutionFamilies = () => {
   const updateFamilyMutation = useUpdateFamily();
   const disassociateMutation = useDisassociateFamilyFromInstitution();
   const { toast } = useToast();
+  const { guardOnline } = useOfflineAction();
   const { generateTerm, downloadTerm, isGenerating } = useConsentManagement();
   
   // Usar deliveries das famílias (que já vêm da query) como fonte primária
@@ -836,6 +838,10 @@ const InstitutionFamilies = () => {
   };
 
   const handleCreateFamily = (cpf?: string) => {
+    if (!guardOnline("O cadastro de família")) {
+      return;
+    }
+
     createForm.reset();
     if (cpf && typeof cpf === 'string') {
       // CPF vem sem máscara (apenas números) do componente de busca
@@ -844,6 +850,14 @@ const InstitutionFamilies = () => {
     }
     setIsCreateDialogOpen(true);
     setIsSearchDialogOpen(false);
+  };
+
+  const handleOpenSearchFamilyDialog = () => {
+    if (!guardOnline("O vínculo de família existente")) {
+      return;
+    }
+
+    setIsSearchDialogOpen(true);
   };
 
   const handleFamilyFound = (familyId: string, cpf?: string) => {
@@ -861,6 +875,10 @@ const InstitutionFamilies = () => {
   };
 
   const onSubmitCreate = async (data: TablesInsert<'families'>) => {
+    if (!guardOnline("O cadastro de família")) {
+      return;
+    }
+
     if (!profile?.institution_id) {
       toast({
         title: "Erro",
@@ -1051,13 +1069,13 @@ const InstitutionFamilies = () => {
             <div className="flex gap-2">
               <Button 
                 variant="outline"
-                onClick={() => setIsSearchDialogOpen(true)}
+                onClick={handleOpenSearchFamilyDialog}
               >
                 <LinkIcon className="mr-2 h-4 w-4" /> Adicionar Família Existente
               </Button>
               <Button 
                 className="bg-primary hover:bg-primary/90"
-                onClick={handleCreateFamily}
+                onClick={() => handleCreateFamily()}
               >
                 <UserPlus className="mr-2 h-4 w-4" /> Cadastrar Nova Família
               </Button>

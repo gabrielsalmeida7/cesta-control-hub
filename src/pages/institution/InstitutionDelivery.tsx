@@ -18,6 +18,7 @@ import { useGenerateDeliveryReceipt } from '@/hooks/useReceipts';
 import { getCurrentDateBrasilia } from '@/utils/dateFormat';
 import FraudAlertDialog from '@/components/FraudAlertDialog';
 import { useOfflineAction } from '@/hooks/useOfflineAction';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DeliveryItem {
   item_name: string;
@@ -51,6 +52,7 @@ const InstitutionDelivery = () => {
   const { toast } = useToast();
   const { profile } = useAuth();
   const { isOnline, guardOnline } = useOfflineAction();
+  const isMobile = useIsMobile();
   
   const { data: families = [], isLoading } = useInstitutionFamilies(profile?.institution_id);
   const { data: inventory = [] } = useInventory(profile?.institution_id);
@@ -220,22 +222,25 @@ const InstitutionDelivery = () => {
         }
       }
 
-      // Gerar recibo automaticamente após entrega
-      try {
-        await generateDeliveryReceipt.mutateAsync(delivery.id);
-      } catch (error: any) {
-        console.error('Erro ao gerar recibo automaticamente:', error);
-        // Não falhar a operação se apenas a geração do recibo falhar
-        toast({
-          title: "Aviso",
-          description: "Entrega registrada, mas houve erro ao gerar recibo automaticamente. Você pode gerar manualmente depois.",
-          variant: "default"
-        });
+      // Gerar recibo automaticamente após entrega (somente desktop — no mobile consultar via web)
+      if (!isMobile) {
+        try {
+          await generateDeliveryReceipt.mutateAsync(delivery.id);
+        } catch (error: unknown) {
+          console.error('Erro ao gerar recibo automaticamente:', error);
+          toast({
+            title: "Aviso",
+            description: "Entrega registrada, mas houve erro ao gerar recibo automaticamente. Você pode gerar manualmente depois.",
+            variant: "default"
+          });
+        }
       }
 
       toast({
         title: "Entrega Registrada",
-        description: `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingDays} dias. Recibo gerado automaticamente.`
+        description: isMobile
+          ? `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingDays} dias.`
+          : `Entrega registrada para ${selectedFamily.name}. Família bloqueada por ${blockingDays} dias. Recibo gerado automaticamente.`
       });
 
       // Resetar formulário
