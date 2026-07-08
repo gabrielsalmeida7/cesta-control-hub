@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { logger } from '@/utils/logger';
+import { clearAppQueryCache } from '@/lib/queryCache';
 
 interface UserProfile {
   id: string;
@@ -334,6 +335,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const refreshSessionOnFocus = async () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.warn("[SESSION]", "Failed to refresh session on focus:", error.message);
+        }
+        return;
+      }
+
+      if (!currentSession) {
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+        return;
+      }
+
+      setSession(currentSession);
+      setUser(currentSession.user);
+    };
+
+    document.addEventListener("visibilitychange", refreshSessionOnFocus);
+    window.addEventListener("focus", refreshSessionOnFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", refreshSessionOnFocus);
+      window.removeEventListener("focus", refreshSessionOnFocus);
+    };
+  }, []);
+
   const signIn = async (email: string, password: string) => {
     try {
       if (import.meta.env.DEV) {
@@ -526,6 +562,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setSession(null);
       setProfile(null);
+      await clearAppQueryCache();
       
       if (import.meta.env.DEV) {
         console.log("[AUTH]", "Sign out complete - states reset. Navigation will be handled by ProtectedRoute or Header component");

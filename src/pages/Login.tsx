@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineAction } from "@/hooks/useOfflineAction";
 import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
@@ -25,6 +26,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { signIn, user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { isOnline, guardOnline } = useOfflineAction();
 
   // Verificar se já aceitou a política (localStorage)
   useEffect(() => {
@@ -64,6 +66,10 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!guardOnline("O login")) {
+      return;
+    }
     
     // Verificar se aceitou a política
     if (!acceptedPolicy) {
@@ -287,10 +293,16 @@ const Login = () => {
                 />
               </div>
 
+              {!isOnline && (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Sem conexão com a internet. O login exige rede ativa.
+                </p>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full bg-primary hover:bg-primary/90 text-white" 
-                disabled={loading || authLoading || !acceptedPolicy}
+                disabled={loading || authLoading || !acceptedPolicy || !isOnline}
               >
                 {loading ? "Entrando..." : "Entrar no sistema"}
               </Button>

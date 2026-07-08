@@ -3,7 +3,6 @@ import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -22,16 +21,20 @@ import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TitularPortal from "./pages/TitularPortal";
 import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
+import { OfflineBanner } from "./components/pwa/OfflineBanner";
+import { InstallPWA } from "./components/pwa/InstallPWA";
+import { PwaUpdatePrompt } from "./components/pwa/PwaUpdatePrompt";
+import { QueryProvider } from "./components/QueryProvider";
 
 const App = () => {
   return (
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
+      <QueryProvider>
         <BrowserRouter>
           <TooltipProvider>
             <AuthProvider>
+              <OfflineBanner />
+              <PwaUpdatePrompt />
               <Toaster />
               <Sonner />
               <Routes>
@@ -134,10 +137,11 @@ const App = () => {
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              <InstallPWA />
             </AuthProvider>
           </TooltipProvider>
         </BrowserRouter>
-      </QueryClientProvider>
+      </QueryProvider>
     </React.StrictMode>
   );
 };

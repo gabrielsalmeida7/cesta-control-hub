@@ -17,6 +17,7 @@ import { useInventory, useCreateStockMovement } from '@/hooks/useInventory';
 import { useGenerateDeliveryReceipt } from '@/hooks/useReceipts';
 import { getCurrentDateBrasilia } from '@/utils/dateFormat';
 import FraudAlertDialog from '@/components/FraudAlertDialog';
+import { useOfflineAction } from '@/hooks/useOfflineAction';
 
 interface DeliveryItem {
   item_name: string;
@@ -49,6 +50,7 @@ const InstitutionDelivery = () => {
   const [isItemsListExpanded, setIsItemsListExpanded] = useState(true);
   const { toast } = useToast();
   const { profile } = useAuth();
+  const { isOnline, guardOnline } = useOfflineAction();
   
   const { data: families = [], isLoading } = useInstitutionFamilies(profile?.institution_id);
   const { data: inventory = [] } = useInventory(profile?.institution_id);
@@ -70,6 +72,10 @@ const InstitutionDelivery = () => {
   };
 
   const handleDeliverySubmit = async () => {
+    if (!guardOnline("O registro de entrega")) {
+      return;
+    }
+
     if (!selectedFamily) {
       toast({
         title: "Erro",
@@ -608,7 +614,7 @@ const InstitutionDelivery = () => {
                 <Button 
                   onClick={handleDeliverySubmit}
                   className="w-full"
-                  disabled={!selectedFamily || createDeliveryMutation.isPending}
+                  disabled={!selectedFamily || createDeliveryMutation.isPending || !isOnline}
                 >
                   {createDeliveryMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
