@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -248,11 +248,8 @@ const Login = () => {
             <img 
               src="/CestaJustaLogo.svg" 
               alt="Logo Cesta Justa" 
-              className="w-full max-w-[240px] sm:max-w-[280px] h-auto mx-auto mb-3"
+              className="w-full max-w-[240px] sm:max-w-[280px] h-auto mx-auto mb-2"
             />
-            <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">
-              Cesta Justa
-            </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Sistema de Controle de Alimentos
             </CardDescription>
