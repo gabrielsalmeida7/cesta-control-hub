@@ -65,11 +65,28 @@ const InstitutionDelivery = () => {
 
   const availableFamilies = families || [];
 
-  const filteredFamilies = availableFamilies.filter(family =>
-    family.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    family.contact_person.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (family.cpf && family.cpf.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')))
-  );
+  const filteredFamilies = availableFamilies.filter((family) => {
+    const q = searchTerm.trim().toLowerCase();
+    const searchNumbers = searchTerm.replace(/\D/g, '');
+
+    if (!q && !searchNumbers) return true;
+
+    const textMatches = (value: string | null | undefined) =>
+      (value ?? '').toLowerCase().includes(q);
+    const cpfDigits = (value: string | null | undefined) =>
+      (value ?? '').replace(/\D/g, '');
+
+    const nameMatch =
+      textMatches(family.name) ||
+      textMatches(family.contact_person) ||
+      textMatches(family.mother_name);
+    const cpfMatch =
+      searchNumbers.length > 0 &&
+      (cpfDigits(family.cpf).includes(searchNumbers) ||
+        cpfDigits(family.contact_person).includes(searchNumbers));
+
+    return nameMatch || cpfMatch;
+  });
 
   const stockItemsCount = deliveryItems.filter(item => item.product_id).length;
 
