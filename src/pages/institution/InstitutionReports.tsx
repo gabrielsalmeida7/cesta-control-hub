@@ -1,7 +1,5 @@
 
 import React, { useState, useMemo } from 'react';
-import Header from '@/components/Header';
-import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import { Search, Download, Package, Users, BarChart3, Loader2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import DashboardCard from '@/components/DashboardCard';
+import { InstitutionLayout } from '@/components/layout/InstitutionLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
+import {
+  DeliveryReportMobileCard,
+  DeliveryReportItemsFallback,
+} from '@/components/institution/DeliveryReportMobileCard';
 import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
 import { useReportExport } from '@/hooks/useReportExport';
 import { useFamiliesWithMultipleInstitutions } from '@/hooks/useAlerts';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateBrasilia, formatDateTimeBrasilia } from '@/utils/dateFormat';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -158,6 +163,7 @@ const InstitutionReports = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { profile } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(appliedStartDate, appliedEndDate);
   const { data: familiesWithMultiple = [], isLoading: familiesLoading } = useFamiliesWithMultipleInstitutions(profile?.institution_id);
@@ -214,53 +220,59 @@ const InstitutionReports = () => {
     exportDeliveriesReport(appliedStartDate, appliedEndDate);
   };
 
+  const renderDeliveryItems = (delivery: (typeof filteredDeliveries)[number]) => {
+    const deliveryItems = (delivery as { stock_movements?: DeliveryMovementItem[] }).stock_movements || [];
+
+    if (deliveryItems.length === 0) {
+      const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
+      return (
+        <>
+          <DeliveryReportItemsFallback />
+          {additionalItems.map((item, index) => (
+            <Badge key={index} variant="outline" className="text-xs" title={`${item.quantity} ${item.unit}`}>
+              {item.name}
+            </Badge>
+          ))}
+        </>
+      );
+    }
+
+    return renderDeliveryMovementBadges(deliveryItems);
+  };
+
+
+  const loadingContent = (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>
+  );
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <InstitutionNavigationButtons />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        </main>
-      </div>
+      <InstitutionLayout title="Relatórios">
+        {loadingContent}
+      </InstitutionLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <InstitutionNavigationButtons />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-red-600">Erro ao carregar relatórios: {error.message}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-      </div>
+      <InstitutionLayout title="Relatórios">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-red-600">Erro ao carregar relatórios: {error.message}</p>
+          </CardContent>
+        </Card>
+      </InstitutionLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <InstitutionNavigationButtons />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Relatórios de Entregas
-            </h2>
-            <p className="text-gray-600">
-              Acompanhe as entregas realizadas pela sua instituição
-            </p>
-          </div>
+    <InstitutionLayout title="Relatórios">
+      <PageHeader
+        title="Relatórios de Entregas"
+        description="Acompanhe as entregas realizadas pela sua instituição"
+      />
 
           {/* Filtros */}
           <Card className="mb-6">
@@ -406,6 +418,45 @@ const InstitutionReports = () => {
               <CardTitle>Histórico de Entregas</CardTitle>
             </CardHeader>
             <CardContent>
+              {isMobile ? (
+                <div className="space-y-3">
+                  {filteredDeliveries.length > 0 ? (
+                    filteredDeliveries.map((delivery) => {
+                      const blockingJustification = (delivery as { blocking_justification?: string }).blocking_justification;
+                      const { observations } = parseDeliveryNotes(delivery.notes);
+
+                      return (
+                        <DeliveryReportMobileCard
+                          key={delivery.id}
+                          deliveryDate={delivery.delivery_date}
+                          familyName={delivery.family?.name || 'N/A'}
+                          contactPerson={delivery.family?.contact_person}
+                          itemsContent={renderDeliveryItems(delivery)}
+                          blockingPeriodDays={delivery.blocking_period_days}
+                          hasJustification={!!blockingJustification}
+                          justificationPreview={blockingJustification}
+                          observationsPreview={observations || '-'}
+                          onViewDetails={() => {
+                            setSelectedDelivery(delivery);
+                            setIsDetailsOpen(true);
+                          }}
+                        />
+                      );
+                    })
+                  ) : (
+                    <div className="py-8 text-center">
+                      <Package className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                      <p className="text-gray-500">
+                        {searchTerm.trim()
+                          ? 'Nenhuma entrega encontrada para a busca'
+                          : appliedStartDate || appliedEndDate
+                            ? 'Nenhuma entrega encontrada no período selecionado'
+                            : 'Nenhuma entrega registrada ainda'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -520,12 +571,10 @@ const InstitutionReports = () => {
                   )}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </main>
 
-      {/* Modal de Detalhes da Entrega */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 pt-6 pb-4">
@@ -637,7 +686,7 @@ const InstitutionReports = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </InstitutionLayout>
   );
 };
 

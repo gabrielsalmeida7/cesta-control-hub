@@ -144,7 +144,7 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col md:flex-row">
+    <div className="login-page safe-area-top min-h-[100dvh] overflow-hidden flex flex-col md:flex-row md:h-screen">
       {/* Modal de Política de Privacidade */}
       <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
         <DialogContent className="max-w-md">
@@ -242,17 +242,20 @@ const Login = () => {
       </div>
 
       {/* Seção Direita - Formulário de Login */}
-      <div className="flex-1 h-screen overflow-hidden flex items-center justify-center p-4 md:p-6 bg-gray-50">
-        <Card className="w-full max-w-md bg-white shadow-xl rounded-lg max-h-[calc(100vh-2rem)] flex flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center p-4 md:p-6 bg-gray-50 safe-area-bottom">
+        <Card className="w-full max-w-md bg-white shadow-xl rounded-lg max-h-[100dvh] md:max-h-[calc(100vh-2rem)] flex flex-col my-auto">
           <CardHeader className="space-y-1 text-center px-6 pt-6 pb-4 flex-shrink-0">
             <img 
               src="/CestaJustaLogo.svg" 
-              alt="Logo" 
+              alt="Logo Cesta Justa" 
               className="w-full max-w-[240px] sm:max-w-[280px] h-auto mx-auto mb-3"
             />
             <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">
-              Sistema de Controle de Alimentos
+              Cesta Justa
             </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Sistema de Controle de Alimentos
+            </CardDescription>
           </CardHeader>
           
           <CardContent className="px-6 sm:px-8 flex-1">
@@ -301,7 +304,7 @@ const Login = () => {
 
               <Button 
                 type="submit" 
-                className="w-full bg-primary hover:bg-primary/90 text-white" 
+                className="touch-target w-full bg-primary hover:bg-primary/90 text-white" 
                 disabled={loading || authLoading || !acceptedPolicy || !isOnline}
               >
                 {loading ? "Entrando..." : "Entrar no sistema"}

@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const PrivacyPolicy = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-[100dvh] flex flex-col bg-gray-50 safe-area-top safe-area-bottom">
       <PublicHeader />
       
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center">
+            <CardTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-center">
               Política de Privacidade e Proteção de Dados
             </CardTitle>
             <p className="text-center text-sm text-gray-500 mt-2">

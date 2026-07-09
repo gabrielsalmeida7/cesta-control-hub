@@ -38,7 +38,7 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="login-page safe-area-top safe-area-bottom min-h-[100dvh] flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Redefinir senha</CardTitle>
@@ -72,7 +72,7 @@ const ResetPassword: React.FC = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="touch-target w-full" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Salvando..." : "Salvar nova senha"}
               </Button>
             </form>

@@ -111,14 +111,13 @@ const TitularPortal = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-[100dvh] flex flex-col bg-gray-50 safe-area-top safe-area-bottom">
       <PublicHeader />
       
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Portal do Titular de Dados</h1>
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">Portal do Titular de Dados</h1>
             <p className="text-gray-600">
               Exerça seus direitos garantidos pela LGPD (Lei nº 13.709/2018)
             </p>
@@ -134,7 +133,7 @@ const TitularPortal = () => {
           </Alert>
 
           {/* Rights Cards */}
-          <div className="grid md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {rights.map((right) => (
               <Card 
                 key={right.id}
@@ -176,6 +175,7 @@ const TitularPortal = () => {
                   placeholder="000.000.000-00"
                   value={cpf}
                   onChange={(e) => setCpf(formatCpf(e.target.value))}
+                  inputMode="numeric"
                   maxLength={14}
                   className="mt-1"
                 />
@@ -222,9 +222,10 @@ const TitularPortal = () => {
                 </AlertDescription>
               </Alert>
 
-              <div className="flex justify-end gap-4 pt-4">
+              <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end sm:gap-4">
                 <Button
                   variant="outline"
+                  className="touch-target w-full sm:w-auto"
                   onClick={() => {
                     setCpf("");
                     setRequestType("");
@@ -234,6 +235,7 @@ const TitularPortal = () => {
                   Limpar
                 </Button>
                 <Button
+                  className="touch-target w-full sm:w-auto"
                   onClick={handleSubmit}
                   disabled={isSubmitting || !cpf || !requestType}
                 >

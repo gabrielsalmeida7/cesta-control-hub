@@ -11,10 +11,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { usePwaInstall, type PwaInstallMode } from "@/hooks/usePwaInstall";
 
 const publicRoutes = ["/login", "/reset-password", "/politica-privacidade", "/portal-titular"];
+
+function isInstitutionRoute(pathname: string) {
+  return pathname.startsWith("/institution");
+}
 
 function getBannerDescription(installMode: PwaInstallMode, isSecureContext: boolean) {
   if (!isSecureContext) {
@@ -60,9 +65,11 @@ export function InstallPWA() {
     dismiss,
   } = usePwaInstall();
   const isOnline = useOnlineStatus();
+  const isMobile = useIsMobile();
   const [showGuide, setShowGuide] = useState(false);
 
   const isPublicRoute = publicRoutes.some((route) => location.pathname.startsWith(route));
+  const isInstitutionMobile = isMobile && isInstitutionRoute(location.pathname);
 
   if (!user || isPublicRoute || !canInstall) {
     return null;
@@ -81,7 +88,11 @@ export function InstallPWA() {
     <>
       <div
         className={`fixed inset-x-4 z-[90] mx-auto max-w-lg rounded-lg border border-[#004E64]/20 bg-white p-4 shadow-lg sm:inset-x-auto sm:left-auto sm:right-4 ${
-          isOnline ? "top-4" : "top-14"
+          isInstitutionMobile
+            ? "bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4"
+            : isOnline
+              ? "top-4"
+              : "top-14"
         }`}
       >
         <div className="flex items-start gap-3">

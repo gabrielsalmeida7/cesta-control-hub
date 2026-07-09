@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import Header from '@/components/Header';
-import InstitutionNavigationButtons from '@/components/InstitutionNavigationButtons';
 import ConsentManagement from '@/components/ConsentManagement';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, FileText, ListFilter, ArrowUpDown } from 'lucide-react';
+import { InstitutionLayout } from '@/components/layout/InstitutionLayout';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { FamilyListMobileCard } from '@/components/institution/FamilyListMobileCard';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, ListFilter, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,10 +53,14 @@ type FamilySortOption =
   | 'last_delivery_desc'
   | 'last_delivery_asc';
 
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 50] as const;
+
 const InstitutionFamilies = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FamilyStatusFilter>('all');
   const [sortOption, setSortOption] = useState<FamilySortOption>('name_asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -80,7 +86,7 @@ const InstitutionFamilies = () => {
   const { toast } = useToast();
   const { guardOnline } = useOfflineAction();
   const { generateTerm, downloadTerm, isGenerating } = useConsentManagement();
-  
+  const isMobile = useIsMobile();
   // Usar deliveries das famílias (que já vêm da query) como fonte primária
   // Essas deliveries já incluem TODAS as entregas (de qualquer instituição) para cada família
   const allDeliveries = useMemo(() => {
@@ -478,6 +484,26 @@ const InstitutionFamilies = () => {
       }
     });
   }, [families, searchTerm, statusFilter, sortOption, registrationNumberByFamilyId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, sortOption, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedFamilies.length / pageSize));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const paginatedFamilies = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return displayedFamilies.slice(start, start + pageSize);
+  }, [displayedFamilies, page, pageSize]);
+
+  const paginationStart = displayedFamilies.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const paginationEnd = Math.min(page * pageSize, displayedFamilies.length);
 
   const getStatusBadge = (family: Family) => {
     if (family.is_blocked) {
@@ -1020,67 +1046,49 @@ const InstitutionFamilies = () => {
 
   if (familiesLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <InstitutionNavigationButtons />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        </main>
-      </div>
+      <InstitutionLayout title="Famílias">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </InstitutionLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <InstitutionNavigationButtons />
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-red-600">Erro ao carregar famílias: {error.message}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
-      </div>
+      <InstitutionLayout title="Famílias">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-red-600">Erro ao carregar famílias: {error.message}</p>
+          </CardContent>
+        </Card>
+      </InstitutionLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <InstitutionNavigationButtons />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8 flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Famílias Cadastradas
-              </h2>
-              <p className="text-gray-600">
-                Visualize o status das famílias e histórico de entregas
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                onClick={handleOpenSearchFamilyDialog}
-              >
-                <LinkIcon className="mr-2 h-4 w-4" /> Adicionar Família Existente
-              </Button>
-              <Button 
-                className="bg-primary hover:bg-primary/90"
-                onClick={() => handleCreateFamily()}
-              >
-                <UserPlus className="mr-2 h-4 w-4" /> Cadastrar Nova Família
-              </Button>
-            </div>
-          </div>
+    <InstitutionLayout title="Famílias">
+      <PageHeader
+        title="Famílias Cadastradas"
+        description="Visualize o status das famílias e histórico de entregas"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              className="touch-target w-full sm:w-auto"
+              onClick={handleOpenSearchFamilyDialog}
+            >
+              <LinkIcon className="mr-2 h-4 w-4" /> Vincular existente
+            </Button>
+            <Button
+              className="touch-target w-full bg-primary hover:bg-primary/90 sm:w-auto"
+              onClick={() => handleCreateFamily()}
+            >
+              <UserPlus className="mr-2 h-4 w-4" /> Nova família
+            </Button>
+          </>
+        }
+      />
 
           {/* Pesquisa, filtro de status e ordenação */}
           <Card className="mb-6">
@@ -1192,6 +1200,32 @@ const InstitutionFamilies = () => {
               <CardTitle>Lista de Famílias</CardTitle>
             </CardHeader>
             <CardContent>
+              {isMobile ? (
+                <div className="space-y-3">
+                  {paginatedFamilies.map((family) => (
+                    <FamilyListMobileCard
+                      key={family.id}
+                      registrationNumber={registrationNumberByFamilyId.get(family.id) ?? '—'}
+                      contactPerson={family.contact_person}
+                      membersCount={family.members_count}
+                      statusBadge={getStatusBadge(family)}
+                      lastDeliveryDate={family.last_delivery_date}
+                      onViewDetails={() => handleViewDetails(family)}
+                      onEdit={() => handleEditFamily(family)}
+                      onUnlink={() => handleUnlinkClick(family)}
+                      isUnlinking={disassociateMutation.isPending}
+                    />
+                  ))}
+                  {displayedFamilies.length === 0 && (
+                    <div className="py-8 text-center">
+                      <p className="text-gray-500">
+                        Nenhuma família encontrada com os filtros atuais.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1204,7 +1238,7 @@ const InstitutionFamilies = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedFamilies.map((family) => (
+                  {paginatedFamilies.map((family) => (
                     <TableRow key={family.id}>
                       <TableCell className="font-medium tabular-nums">
                         {registrationNumberByFamilyId.get(family.id) ?? '—'}
@@ -1240,20 +1274,6 @@ const InstitutionFamilies = () => {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handlePrintConsentTerm(family)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                            disabled={isGenerating}
-                          >
-                            {isGenerating ? (
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            ) : (
-                              <FileText className="h-4 w-4 mr-1" />
-                            )}
-                            Termo LGPD
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
                             onClick={() => handleUnlinkClick(family)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                             disabled={disassociateMutation.isPending}
@@ -1281,21 +1301,76 @@ const InstitutionFamilies = () => {
                   </p>
                 </div>
               )}
+              </>
+              )}
+
+              {displayedFamilies.length > 0 && (
+                <div className="mt-6 flex flex-col gap-4 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                    <p className="text-sm text-gray-600">
+                      Mostrando {paginationStart}–{paginationEnd} de {displayedFamilies.length} famílias
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="page-size" className="text-sm text-gray-600 whitespace-nowrap">
+                        Por página
+                      </Label>
+                      <Select
+                        value={String(pageSize)}
+                        onValueChange={(value) => setPageSize(Number(value))}
+                      >
+                        <SelectTrigger id="page-size" className="w-[88px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAGE_SIZE_OPTIONS.map((size) => (
+                            <SelectItem key={size} value={String(size)}>
+                              {size}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 sm:justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="touch-target"
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      disabled={page <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Anterior
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Página {page} de {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="touch-target"
+                      onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      Próxima
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </main>
 
       {/* Dialog de detalhes */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-[600px] h-[90vh] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="left-[50%] top-[50%] w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] max-h-[90dvh] sm:max-w-[600px] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Detalhes da Família: {selectedFamily?.name}</DialogTitle>
           </DialogHeader>
           
           {selectedFamily && (
             <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Nome da Família</p>
                   <p className="font-medium">{selectedFamily.name}</p>
@@ -1336,7 +1411,7 @@ const InstitutionFamilies = () => {
               {(selectedFamily.mother_name || selectedFamily.birth_date || selectedFamily.id_document || selectedFamily.occupation || selectedFamily.work_situation) && (
                 <div className="pt-4 border-t">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Dados Adicionais do Responsável</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedFamily.mother_name && (
                       <div>
                         <p className="text-sm text-gray-600">Nome da Mãe do Titular</p>
@@ -1374,7 +1449,7 @@ const InstitutionFamilies = () => {
               {/* Composição Familiar */}
               <div className="pt-4 border-t">
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Composição Familiar</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Número de Membros</p>
                     <p className="font-medium">{selectedFamily.members_count || 'N/A'}</p>
@@ -1442,7 +1517,7 @@ const InstitutionFamilies = () => {
               {(selectedFamily.registered_in_other_institution || selectedFamily.receives_government_aid || selectedFamily.has_chronic_disease) && (
                 <div className="pt-4 border-t">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Situação Social</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedFamily.registered_in_other_institution && (
                       <div>
                         <p className="text-sm text-gray-600">Cadastro em outra instituição</p>
@@ -1477,7 +1552,7 @@ const InstitutionFamilies = () => {
               {(selectedFamily.housing_type || selectedFamily.construction_type || selectedFamily.has_water_supply || selectedFamily.has_electricity || selectedFamily.has_garbage_collection) && (
                 <div className="pt-4 border-t">
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Condições de Moradia</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedFamily.housing_type && (
                       <div>
                         <p className="text-sm text-gray-600">Tipo de Moradia</p>
@@ -1583,7 +1658,7 @@ const InstitutionFamilies = () => {
 
       {/* Create Family Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] h-[95vh] max-h-[95vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] max-w-none w-full rounded-none sm:max-w-[700px] sm:h-[95vh] sm:max-h-[95vh] sm:rounded-lg flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Cadastrar Nova Família</DialogTitle>
           </DialogHeader>
@@ -2410,7 +2485,7 @@ const InstitutionFamilies = () => {
 
       {/* Search Family Dialog */}
       <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] max-w-none w-full rounded-none sm:max-w-[600px] sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Adicionar Família Existente</DialogTitle>
           </DialogHeader>
@@ -2439,7 +2514,7 @@ const InstitutionFamilies = () => {
           setEditTermSigned(false);
         }
       }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="h-[100dvh] max-h-[100dvh] max-w-none w-full rounded-none sm:max-w-[600px] sm:h-auto sm:max-h-[90vh] sm:rounded-lg flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
             <DialogTitle>Editar Família</DialogTitle>
             <DialogDescription>
@@ -3323,7 +3398,7 @@ const InstitutionFamilies = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </InstitutionLayout>
   );
 };
 
