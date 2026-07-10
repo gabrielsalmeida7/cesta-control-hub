@@ -83,6 +83,18 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+    const { data: targetProfile, error: targetProfileError } = await adminClient
+      .from("profiles")
+      .select("role, institution_id")
+      .eq("id", userId)
+      .single();
+
+    if (targetProfileError || targetProfile?.role !== "institution" || !targetProfile.institution_id) {
+      return new Response(JSON.stringify({ error: "Institution user not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (action === "update-email") {
       if (!email) {
