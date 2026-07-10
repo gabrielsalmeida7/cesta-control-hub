@@ -4,7 +4,8 @@ import type { Database } from './types';
 
 // Get environment variables
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Validate environment variables
 if (!SUPABASE_URL) {
@@ -17,7 +18,7 @@ if (!SUPABASE_URL) {
 
 if (!SUPABASE_PUBLISHABLE_KEY) {
   throw new Error(
-    'Missing VITE_SUPABASE_ANON_KEY environment variable. ' +
+    'Missing VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY environment variable. ' +
     'Please create a .env.local file with your Supabase anon key. ' +
     'See .env.example for reference.'
   );
