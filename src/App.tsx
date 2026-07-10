@@ -25,12 +25,14 @@ import { OfflineBanner } from "./components/pwa/OfflineBanner";
 import { InstallPWA } from "./components/pwa/InstallPWA";
 import { PwaUpdatePrompt } from "./components/pwa/PwaUpdatePrompt";
 import { QueryProvider } from "./components/QueryProvider";
+import { ScrollToTop } from "./components/ScrollToTop";
 
 const App = () => {
   return (
     <React.StrictMode>
       <QueryProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <TooltipProvider>
             <AuthProvider>
               <OfflineBanner />

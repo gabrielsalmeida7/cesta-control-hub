@@ -128,6 +128,10 @@
   .institution-mobile-main {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom));
   }
+
+  .has-pwa-install-banner .institution-mobile-main {
+    padding-bottom: calc(12rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Estilos específicos para a página de login */

@@ -42,7 +42,7 @@ const InstitutionDashboard = () => {
         />
         
         <DashboardCard
-          title="Famílias Atendidas"
+          title="Famílias Bloqueadas"
           value={isLoading ? "..." : ((stats as InstitutionStats)?.blockedByInstitution || 0).toString()}
           description="Bloqueadas por esta instituição"
           icon={<AlertTriangle className="h-6 w-6" />}
