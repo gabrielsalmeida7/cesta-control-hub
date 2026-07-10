@@ -11,8 +11,8 @@ Crie um arquivo chamado `.env.local` na raiz do projeto `cestas/` com o seguinte
 
 ```env
 # Supabase Configuration
-VITE_SUPABASE_URL=https://eslfcjhnaojghzuswpgz.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzbGZjamhuYW9qZ2h6dXN3cGd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4ODcyMzIsImV4cCI6MjA2NDQ2MzIzMn0.NdhfRgC8fvdQ-XxPiVSUkffQiayg0NZnwaixC12Ey5o
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 
 # Supabase Admin API Key (para criação de usuários de instituição)
 # IMPORTANTE: Esta chave deve ser mantida em segredo e não deve ser commitada
