@@ -204,13 +204,7 @@ export const useCreateInstitution = () => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] });
       
       // Handle specific error cases
-      if (errorMessage.includes('VITE_SUPABASE_SERVICE_ROLE_KEY') || errorMessage.includes('Configuração necessária')) {
-        toast({
-          title: "Configuração Necessária",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else if (errorMessage.includes('Email já está em uso') || errorMessage.includes('duplicate') || errorMessage.includes('já está cadastrado')) {
+      if (errorMessage.includes('Email já está em uso') || errorMessage.includes('duplicate') || errorMessage.includes('já está cadastrado')) {
         toast({
           title: "Email Indisponível",
           description: errorMessage,
@@ -359,39 +353,19 @@ export const useUpdateInstitution = () => {
               }
             }
 
-            // Atualizar auth.users.email usando Admin API
-            // Importar supabaseAdmin dinamicamente (pode não estar disponível no frontend)
-            let supabaseAdmin;
-            try {
-              const { supabaseAdmin: admin } = await import('@/integrations/supabase/admin');
-              supabaseAdmin = admin;
-            } catch {
-              // supabaseAdmin não disponível, continuar sem ele
-            }
-            
-            if (!supabaseAdmin) {
-              if (import.meta.env.DEV) {
-                console.warn('[UPDATE_INSTITUTION] supabaseAdmin not available, cannot update auth.users.email. Email de login não será atualizado.');
-              }
-              // Não falhar a atualização, mas avisar que o email de login não foi atualizado
-            } else {
-              const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
-                profile.id,
-                { email: updates.email }
-              );
+            const { error: updateAuthEmailError } = await supabase.functions.invoke(
+              'manage-institution-user',
+              {
+                body: {
+                  action: 'update-email',
+                  userId: profile.id,
+                  email: updates.email,
+                },
+              },
+            );
 
-              if (updateAuthEmailError) {
-                console.error('[UPDATE_INSTITUTION] Error updating auth.users.email:', updateAuthEmailError);
-                // Não falhar a atualização se não conseguir atualizar o auth.users.email
-                // mas logar o erro - o usuário precisará usar o email antigo para login
-                if (import.meta.env.DEV) {
-                  console.warn('[UPDATE_INSTITUTION] Email da instituição foi atualizado, mas o email de login pode não ter sido atualizado. Verifique os logs ou entre em contato com o administrador.');
-                }
-              } else {
-                if (import.meta.env.DEV) {
-                  console.log('[UPDATE_INSTITUTION] Auth users email synchronized successfully');
-                }
-              }
+            if (updateAuthEmailError) {
+              throw new Error(`Erro ao atualizar email de login: ${updateAuthEmailError.message}`);
             }
 
             // Verificar se o usuário atual pertence à instituição que foi atualizada
@@ -582,35 +556,29 @@ export const useDeleteInstitution = () => {
         throw new Error('Erro ao buscar usuário associado: ' + profileError.message);
       }
       
-      // Se houver usuário associado, deletá-lo via Admin API
-      // Nota: supabaseAdmin pode não estar disponível no frontend, mas tentamos usar se disponível
-      let supabaseAdmin;
-      try {
-        const { supabaseAdmin: admin } = await import('@/integrations/supabase/admin');
-        supabaseAdmin = admin;
-      } catch {
-        // supabaseAdmin não disponível, continuar sem ele
-      }
-      
-      if (profile && profile.id && supabaseAdmin) {
+      if (profile && profile.id) {
         if (import.meta.env.DEV) {
           console.log('[DELETE_INSTITUTION] Deleting associated user:', { user_id: profile.id, email: profile.email });
         }
-        
-        const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(profile.id);
-        
+
+        const { error: deleteUserError } = await supabase.functions.invoke(
+          'manage-institution-user',
+          {
+            body: {
+              action: 'delete-user',
+              userId: profile.id,
+            },
+          },
+        );
+
         if (deleteUserError) {
           console.error('[DELETE_INSTITUTION] Error deleting user:', deleteUserError);
-          // Continuar mesmo se não conseguir deletar o usuário (pode não existir mais)
-          // Mas avisar o usuário
           throw new Error('Erro ao excluir usuário associado: ' + deleteUserError.message + '. A instituição não foi excluída.');
         }
         
         if (import.meta.env.DEV) {
           console.log('[DELETE_INSTITUTION] User deleted successfully');
         }
-      } else if (profile && profile.id && !supabaseAdmin) {
-        throw new Error('Configuração necessária: VITE_SUPABASE_SERVICE_ROLE_KEY não está configurada. Não é possível excluir o usuário associado.');
       }
       
       // Deletar a instituição (as associações institution_families serão deletadas automaticamente por CASCADE)
@@ -659,12 +627,6 @@ export const useDeleteInstitution = () => {
       if (errorMessage.includes('entregas registradas')) {
         toast({
           title: "Não é possível excluir",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else if (errorMessage.includes('VITE_SUPABASE_SERVICE_ROLE_KEY')) {
-        toast({
-          title: "Configuração Necessária",
           description: errorMessage,
           variant: "destructive",
         });

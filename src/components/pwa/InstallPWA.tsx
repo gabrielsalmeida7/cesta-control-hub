@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, MoreVertical, Monitor, Share, Smartphone, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,15 @@ export function InstallPWA() {
 
   const isPublicRoute = publicRoutes.some((route) => location.pathname.startsWith(route));
   const isInstitutionMobile = isMobile && isInstitutionRoute(location.pathname);
+  const shouldReserveMobileSpace = Boolean(user && !isPublicRoute && canInstall && isInstitutionMobile);
+
+  useEffect(() => {
+    document.body.classList.toggle("has-pwa-install-banner", shouldReserveMobileSpace);
+
+    return () => {
+      document.body.classList.remove("has-pwa-install-banner");
+    };
+  }, [shouldReserveMobileSpace]);
 
   if (!user || isPublicRoute || !canInstall) {
     return null;
@@ -144,7 +153,7 @@ export function InstallPWA() {
             <ol className="space-y-3 text-sm text-gray-700">
               <li className="flex items-start gap-3">
                 <Share className="mt-0.5 h-4 w-4 shrink-0 text-[#004E64]" aria-hidden="true" />
-                <span>Toque em <strong>Compartilhar</strong> na barra inferior do Safari.</span>
+                <span>Abra o menu de ações do Safari e toque em <strong>Compartilhar</strong>.</span>
               </li>
               <li className="flex items-start gap-3">
                 <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[#004E64]" aria-hidden="true" />

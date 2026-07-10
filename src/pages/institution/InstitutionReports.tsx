@@ -214,7 +214,20 @@ const InstitutionReports = () => {
 
   const totalDeliveries = filteredDeliveries.length;
   const totalFamilies = new Set(filteredDeliveries.map(d => d.family?.id)).size;
-  const totalItems = filteredDeliveries.length; // Assumindo 1 item por entrega (cesta básica)
+  const totalItems = filteredDeliveries.reduce((total, delivery) => {
+    const deliveryItems = (delivery as { stock_movements?: DeliveryMovementItem[] }).stock_movements || [];
+
+    if (deliveryItems.length > 0) {
+      return total + deliveryItems
+        .filter((item) => item.status !== 'CANCELLED')
+        .reduce((itemsTotal, item) => itemsTotal + item.quantity, 0);
+    }
+
+    const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
+    return total + (additionalItems.length > 0
+      ? additionalItems.reduce((itemsTotal, item) => itemsTotal + item.quantity, 0)
+      : 1);
+  }, 0);
 
   const exportReport = () => {
     exportDeliveriesReport(appliedStartDate, appliedEndDate);
