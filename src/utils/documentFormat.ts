@@ -25,6 +25,18 @@ export const formatCpf = (cpf: string | null | undefined): string => {
 };
 
 /**
+ * Mascara CPF para exibição limitada (ex.: instituições não-origem).
+ */
+export const maskCpf = (cpf: string | null | undefined): string => {
+  if (!cpf) return "Não informado";
+
+  const numbers = removeNonNumeric(cpf);
+  if (numbers.length !== 11) return "***.***.***-**";
+
+  return `***.***.${numbers.slice(6, 9)}-**`;
+};
+
+/**
  * Formata CNPJ no padrão XX.XXX.XXX/XXXX-XX
  */
 export const formatCnpj = (cnpj: string | null | undefined): string => {

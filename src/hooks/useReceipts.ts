@@ -258,18 +258,49 @@ const fetchDeliveryForReceipt = async (deliveryId: string): Promise<{
   delivery: Delivery;
   items: ReceiptItem[];
 }> => {
-  // Buscar entrega com família e instituição
   const { data: deliveryData, error: deliveryError } = await supabase
     .from("deliveries")
     .select(`
       *,
-      family:families(id, name, contact_person, cpf, address, phone),
       institution:institutions!deliveries_institution_id_fkey(id, name)
     `)
     .eq("id", deliveryId)
     .single();
 
   if (deliveryError) throw deliveryError;
+
+  const { data: familyData, error: familyError } = await supabase.rpc(
+    "get_family_for_institution",
+    { p_family_id: deliveryData.family_id }
+  );
+
+  if (familyError) throw familyError;
+
+  const familyRecord = familyData as {
+    id: string;
+    name: string;
+    contact_person: string;
+    cpf?: string | null;
+    cpf_masked?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    view_mode?: "full" | "limited";
+  } | null;
+
+  const family = familyRecord
+    ? {
+        id: familyRecord.id,
+        name: familyRecord.name,
+        contact_person: familyRecord.contact_person,
+        cpf:
+          familyRecord.view_mode === "limited"
+            ? familyRecord.cpf_masked ?? null
+            : familyRecord.cpf ?? null,
+        address:
+          familyRecord.view_mode === "limited" ? null : familyRecord.address ?? null,
+        phone: familyRecord.phone ?? null,
+      }
+    : null;
 
   // Buscar todas as movimentações relacionadas a esta entrega
   const { data: movements, error: movementsError } = await supabase
@@ -290,7 +321,7 @@ const fetchDeliveryForReceipt = async (deliveryId: string): Promise<{
   }));
 
   return {
-    delivery: deliveryData as Delivery,
+    delivery: { ...deliveryData, family } as Delivery,
     items,
   };
 };

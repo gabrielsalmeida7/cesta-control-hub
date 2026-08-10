@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { logger } from '@/utils/logger';
 import { getCurrentDateTimeISO } from '@/utils/dateFormat';
+import { enrichDeliveriesWithFamilyDisplay, fetchFamiliesDisplayBatch } from '@/hooks/familyDisplayBatch';
 
 export const useInstitutionDeliveries = (startDate?: string, endDate?: string) => {
   const { profile } = useAuth();
@@ -18,15 +19,11 @@ export const useInstitutionDeliveries = (startDate?: string, endDate?: string) =
         .from('deliveries')
         .select(`
             id,
+            family_id,
             delivery_date,
             blocking_period_days,
             notes,
             blocking_justification,
-            family:families(
-              id,
-              name,
-              contact_person
-            ),
             stock_movements:stock_movements(
               id,
               product_id,
@@ -54,14 +51,16 @@ export const useInstitutionDeliveries = (startDate?: string, endDate?: string) =
       }
 
       const { data, error } = await query;
-      
+
       if (error) {
         console.error('❌ Error fetching institution deliveries:', error);
         throw error;
       }
-      
-      console.log('✅ Institution deliveries fetched:', data?.length || 0, 'records');
-      return data || [];
+
+      const enriched = await enrichDeliveriesWithFamilyDisplay(data ?? []);
+
+      console.log('✅ Institution deliveries fetched:', enriched.length, 'records');
+      return enriched;
     },
     enabled: !!profile?.institution_id,
   });
@@ -138,13 +137,18 @@ export const useCreateDelivery = () => {
           blocking_justification: data.blocking_justification || null,
           delivery_date: getCurrentDateTimeISO(),
         })
-        .select(`
-          *,
-          family:families(id, name, contact_person)
-        `)
+        .select('*')
         .single();
 
       if (error) throw error;
+
+      const familyMap = await fetchFamiliesDisplayBatch([delivery.family_id]);
+      const familyDisplay = familyMap.get(delivery.family_id) ?? null;
+
+      const deliveryWithFamily = {
+        ...delivery,
+        family: familyDisplay ?? null,
+      };
 
       // Log de auditoria
       logger.audit('DELIVERY_CREATE', user?.id || 'unknown', {
@@ -157,7 +161,7 @@ export const useCreateDelivery = () => {
         actionType: 'DELIVERY_CREATE',
         tableName: 'deliveries',
         recordId: delivery.id,
-        description: `Entrega registrada para família ${(delivery.family as any)?.name || delivery.family_id}`,
+        description: `Entrega registrada para família ${familyDisplay?.name || delivery.family_id}`,
         severity: 'INFO',
         newData: {
           id: delivery.id,
@@ -167,7 +171,7 @@ export const useCreateDelivery = () => {
         },
       });
 
-      return delivery;
+      return deliveryWithFamily;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institution-deliveries'] });

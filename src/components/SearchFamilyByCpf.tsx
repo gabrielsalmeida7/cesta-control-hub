@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
-import { searchFamilyByCpf, type FamilySearchResult } from "@/hooks/useFamilies";
+import {
+  searchFamilyByCpf,
+  type FamilySearchResult,
+  type FamilySearchPreview,
+} from "@/hooks/useFamilies";
+import { FamilyInstitutionLinksBlock } from "@/components/institution/FamilyInstitutionLinksBlock";
 import { useAssociateFamilyWithInstitution } from "@/hooks/useFamilies";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -13,14 +18,37 @@ interface SearchFamilyByCpfProps {
   onClose?: () => void;
 }
 
-// Função para formatar CPF com máscara
 const formatCpf = (value: string): string => {
-  const numbers = value.replace(/\D/g, '');
+  const numbers = value.replace(/\D/g, "");
   if (numbers.length <= 3) return numbers;
   if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
-  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  if (numbers.length <= 9) {
+    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  }
   return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
 };
+
+const renderFamilyPreview = (family: FamilySearchPreview) => (
+  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+    <p>
+      <strong>Nome:</strong> {family.name}
+    </p>
+    <p>
+      <strong>Titular:</strong> {family.contact_person}
+    </p>
+    <p>
+      <strong>CPF:</strong> {family.cpf_masked}
+    </p>
+    <p>
+      <strong>Membros:</strong> {family.members_count || 1}
+    </p>
+    {family.phone && (
+      <p>
+        <strong>Telefone:</strong> {family.phone}
+      </p>
+    )}
+  </div>
+);
 
 const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,7 +56,7 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<FamilySearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { profile } = useAuth();
   const associateMutation = useAssociateFamilyWithInstitution();
 
@@ -49,8 +77,10 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
         searchBy
       );
       setSearchResult(result);
-    } catch (err: any) {
-      setError(err.message || "Erro ao buscar família. Tente novamente.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Erro ao buscar família. Tente novamente.";
+      setError(message);
     } finally {
       setIsSearching(false);
     }
@@ -62,47 +92,41 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
     try {
       await associateMutation.mutateAsync({
         familyId: searchResult.family.id,
-        institutionId: profile.institution_id
+        institutionId: profile.institution_id,
       });
-      
-      // Chamar callback se fornecido
+
       if (onFamilyFound) {
-        onFamilyFound(searchResult.family.id, searchResult.family.cpf || undefined);
+        onFamilyFound(searchResult.family.id);
       }
-      
-      // Limpar busca
+
       setSearchTerm("");
       setSearchResult(null);
-    } catch (err) {
+    } catch {
       // Erro já é tratado pelo hook
     }
   };
 
-  const handleAssociateMultiple = async (familyId: string, cpf?: string) => {
+  const handleAssociateMultiple = async (familyId: string) => {
     if (!profile?.institution_id) return;
 
     try {
       await associateMutation.mutateAsync({
-        familyId: familyId,
-        institutionId: profile.institution_id
+        familyId,
+        institutionId: profile.institution_id,
       });
-      
-      // Chamar callback se fornecido
+
       if (onFamilyFound) {
-        onFamilyFound(familyId, cpf);
+        onFamilyFound(familyId);
       }
-      
-      // Limpar busca após vincular
+
       setSearchTerm("");
       setSearchResult(null);
-    } catch (err) {
+    } catch {
       // Erro já é tratado pelo hook
     }
   };
 
   const handleCreateNew = () => {
-    // Chamar callback para criar nova família
-    // No cenário 3, não há família encontrada, então passa string vazia
     if (onFamilyFound) {
       onFamilyFound("", undefined);
     }
@@ -116,7 +140,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
 
   return (
     <div className="space-y-4">
-      {/* Campo de busca */}
       <div className="space-y-2">
         <div className="flex gap-2">
           <div className="flex-1 relative">
@@ -126,16 +149,14 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                 searchBy === "cpf"
                   ? "Digite o CPF (000.000.000-00)"
                   : searchBy === "name"
-                  ? "Digite o nome da família"
-                  : "Digite o nome da mãe"
+                    ? "Digite o nome da família"
+                    : "Digite o nome da mãe"
               }
               value={searchTerm}
               onChange={(e) => {
                 const value = e.target.value;
                 if (searchBy === "cpf") {
-                  // Aplicar máscara de CPF
-                  const formatted = formatCpf(value);
-                  setSearchTerm(formatted);
+                  setSearchTerm(formatCpf(value));
                 } else {
                   setSearchTerm(value);
                 }
@@ -164,7 +185,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
           </Button>
         </div>
 
-        {/* Toggle entre CPF, Nome da Família e Nome da Mãe */}
         <div className="flex gap-2 text-sm flex-wrap">
           <button
             type="button"
@@ -217,7 +237,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
         </div>
       </div>
 
-      {/* Mensagem de erro */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -225,11 +244,9 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
         </Alert>
       )}
 
-      {/* Resultado da busca */}
       {searchResult && (
         <Card>
           <CardContent className="pt-6">
-            {/* Cenário 1: Família encontrada e desvinculada */}
             {searchResult.scenario === 1 && searchResult.family && (
               <div className="space-y-4">
                 <Alert>
@@ -238,18 +255,8 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                     {searchResult.message}
                   </AlertDescription>
                 </Alert>
-                
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <p><strong>Nome:</strong> {searchResult.family.name}</p>
-                  <p><strong>Contato:</strong> {searchResult.family.contact_person}</p>
-                  {searchResult.family.cpf && (
-                    <p><strong>CPF:</strong> {formatCpf(searchResult.family.cpf)}</p>
-                  )}
-                  {searchResult.family.phone && (
-                    <p><strong>Telefone:</strong> {searchResult.family.phone}</p>
-                  )}
-                  <p><strong>Membros:</strong> {searchResult.family.members_count || 1}</p>
-                </div>
+
+                {renderFamilyPreview(searchResult.family)}
 
                 <Button
                   onClick={handleAssociate}
@@ -271,7 +278,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               </div>
             )}
 
-            {/* Cenário 2: Família já vinculada a outra(s) instituição(ões) - mas pode vincular também */}
             {searchResult.scenario === 2 && searchResult.family && (
               <div className="space-y-4">
                 <Alert>
@@ -280,21 +286,15 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                     {searchResult.message}
                   </AlertDescription>
                 </Alert>
-                
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <p><strong>Nome:</strong> {searchResult.family.name}</p>
-                  <p><strong>Contato:</strong> {searchResult.family.contact_person}</p>
-                  {searchResult.family.cpf && (
-                    <p><strong>CPF:</strong> {formatCpf(searchResult.family.cpf)}</p>
-                  )}
-                  {searchResult.family.mother_name && (
-                    <p><strong>Nome da Mãe:</strong> {searchResult.family.mother_name}</p>
-                  )}
-                  {searchResult.family.phone && (
-                    <p><strong>Telefone:</strong> {searchResult.family.phone}</p>
-                  )}
-                  <p><strong>Membros:</strong> {searchResult.family.members_count || 1}</p>
-                </div>
+
+                {renderFamilyPreview(searchResult.family)}
+
+                {searchResult.institutionLinks && (
+                  <FamilyInstitutionLinksBlock
+                    links={searchResult.institutionLinks}
+                    variant="compact"
+                  />
+                )}
 
                 <Button
                   onClick={handleAssociate}
@@ -316,14 +316,11 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               </div>
             )}
 
-            {/* Cenário 3: Família não encontrada */}
             {searchResult.scenario === 3 && (
               <div className="space-y-4">
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    {searchResult.message}
-                  </AlertDescription>
+                  <AlertDescription>{searchResult.message}</AlertDescription>
                 </Alert>
 
                 <Button
@@ -336,7 +333,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               </div>
             )}
 
-            {/* Cenário 4: Família já vinculada à própria instituição */}
             {searchResult.scenario === 4 && (
               <Alert>
                 <CheckCircle className="h-4 w-4 text-blue-600" />
@@ -346,7 +342,6 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
               </Alert>
             )}
 
-            {/* Cenário 5: Múltiplas famílias encontradas */}
             {searchResult.scenario === 5 && searchResult.families && (
               <div className="space-y-4">
                 <Alert>
@@ -355,64 +350,44 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
                     {searchResult.message} ({searchResult.families.length} encontrada(s))
                   </AlertDescription>
                 </Alert>
-                
-                <div className="max-h-96 overflow-y-auto space-y-3">
-                  {searchResult.families.map((family) => {
-                    const associations = family.institution_families || [];
-                    const isLinkedToCurrentInstitution = profile?.institution_id && associations.some(
-                      assoc => assoc.institution_id === profile.institution_id
-                    );
-                    
-                    return (
-                      <Card key={family.id}>
-                        <CardContent className="pt-4">
-                          <div className="space-y-3">
-                            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                              <p><strong>Nome:</strong> {family.name}</p>
-                              <p><strong>Contato:</strong> {family.contact_person}</p>
-                              {family.cpf && (
-                                <p><strong>CPF:</strong> {formatCpf(family.cpf)}</p>
-                              )}
-                              {family.mother_name && (
-                                <p><strong>Nome da Mãe:</strong> {family.mother_name}</p>
-                              )}
-                              {family.phone && (
-                                <p><strong>Telefone:</strong> {family.phone}</p>
-                              )}
-                              <p><strong>Membros:</strong> {family.members_count || 1}</p>
-                            </div>
 
-                            {isLinkedToCurrentInstitution ? (
-                              <Alert>
-                                <CheckCircle className="h-4 w-4 text-blue-600" />
-                                <AlertDescription className="text-blue-800 text-sm">
-                                  Esta família já está vinculada à sua instituição.
-                                </AlertDescription>
-                              </Alert>
-                            ) : (
-                              <Button
-                                onClick={() => handleAssociateMultiple(family.id, family.cpf || undefined)}
-                                disabled={associateMutation.isPending}
-                                className="w-full bg-primary hover:bg-primary/90"
-                              >
-                                {associateMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Vinculando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Link className="mr-2 h-4 w-4" />
-                                    Vincular à Minha Instituição
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                <div className="max-h-96 overflow-y-auto space-y-3">
+                  {searchResult.families.map((family) => (
+                    <Card key={family.id}>
+                      <CardContent className="pt-4">
+                        <div className="space-y-3">
+                          {renderFamilyPreview(family)}
+
+                          {family.is_linked_to_current ? (
+                            <Alert>
+                              <CheckCircle className="h-4 w-4 text-blue-600" />
+                              <AlertDescription className="text-blue-800 text-sm">
+                                Esta família já está vinculada à sua instituição.
+                              </AlertDescription>
+                            </Alert>
+                          ) : (
+                            <Button
+                              onClick={() => handleAssociateMultiple(family.id)}
+                              disabled={associateMutation.isPending}
+                              className="w-full bg-primary hover:bg-primary/90"
+                            >
+                              {associateMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Vinculando...
+                                </>
+                              ) : (
+                                <>
+                                  <Link className="mr-2 h-4 w-4" />
+                                  Vincular à Minha Instituição
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
             )}
@@ -424,4 +399,3 @@ const SearchFamilyByCpf = ({ onFamilyFound, onClose }: SearchFamilyByCpfProps) =
 };
 
 export default SearchFamilyByCpf;
-

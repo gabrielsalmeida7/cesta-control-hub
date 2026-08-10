@@ -3,8 +3,9 @@ import ConsentManagement from '@/components/ConsentManagement';
 import { InstitutionLayout } from '@/components/layout/InstitutionLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { FamilyListMobileCard } from '@/components/institution/FamilyListMobileCard';
+import { FamilyInstitutionLinksBlock } from '@/components/institution/FamilyInstitutionLinksBlock';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Building, Edit, ListFilter, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Eye, Clock, CheckCircle, XCircle, Loader2, UserPlus, Unlink, Link as LinkIcon, Edit, ListFilter, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,8 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { familySchema } from '@/utils/validation';
-import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution, useUpdateFamily } from '@/hooks/useFamilies';
-import { useDeliveries } from '@/hooks/useDeliveries';
+import { useInstitutionFamilies, useCreateFamily, useDisassociateFamilyFromInstitution, useUpdateFamily, useFamilyInstitutionLinks, fetchFamilyInstitutionLinks, fetchFamilyForInstitution, isOriginInstitution } from '@/hooks/useFamilies';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useOfflineAction } from '@/hooks/useOfflineAction';
@@ -29,8 +29,12 @@ import { supabase } from '@/integrations/supabase/client';
 import SearchFamilyByCpf from '@/components/SearchFamilyByCpf';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { formatDateTimeBrasilia, formatDateBrasilia } from '@/utils/dateFormat';
+import { maskCpf } from '@/utils/documentFormat';
 
 type Family = Tables<'families'> & {
+  view_mode?: 'full' | 'limited';
+  is_origin?: boolean;
+  cpf_masked?: string;
   blocked_by_institution?: { name?: string } | null;
   institution_families?: Array<{ institution_id: string }>;
   lastDelivery?: {
@@ -79,7 +83,19 @@ const InstitutionFamilies = () => {
   
   const { profile } = useAuth();
   const { data: familiesData = [], isLoading: familiesLoading, error } = useInstitutionFamilies(profile?.institution_id);
-  const { data: deliveriesFromHook = [] } = useDeliveries(profile?.institution_id);
+  const { data: familyInstitutionLinks = [], isLoading: familyLinksLoading } = useFamilyInstitutionLinks(
+    selectedFamily?.id,
+    isDetailsOpen
+  );
+  const showFullFamilyDetails = useMemo(() => {
+    if (selectedFamily?.view_mode === 'limited') {
+      return false;
+    }
+    if (selectedFamily?.view_mode === 'full' || selectedFamily?.is_origin) {
+      return true;
+    }
+    return isOriginInstitution(familyInstitutionLinks, profile?.institution_id);
+  }, [selectedFamily, familyInstitutionLinks, profile?.institution_id]);
   const createFamilyMutation = useCreateFamily();
   const updateFamilyMutation = useUpdateFamily();
   const disassociateMutation = useDisassociateFamilyFromInstitution();
@@ -290,6 +306,13 @@ const InstitutionFamilies = () => {
     }
   });
 
+  const getFamilyCpfDisplay = (family: Family): string => {
+    if (family.view_mode === 'limited') {
+      return family.cpf_masked ?? maskCpf(family.cpf);
+    }
+    return family.cpf ? formatCpf(family.cpf) : 'Não informado';
+  };
+
   // Map families data and enrich with last delivery info
   const families = useMemo(() => {
     if (import.meta.env.DEV) {
@@ -306,8 +329,10 @@ const InstitutionFamilies = () => {
       return familiesData.map((family) => ({
         ...family,
         family_name: family.name || family.contact_person || 'N/A',
-        main_cpf: family.cpf || '',
-        address: family.address || 'Não informado',
+        main_cpf: family.view_mode === 'limited'
+          ? (family.cpf_masked || '')
+          : (family.cpf || ''),
+        address: family.view_mode === 'limited' ? undefined : (family.address || 'Não informado'),
         members_count: family.members_count || 0,
         is_blocked: family.is_blocked || false,
         blocked_until: family.blocked_until || undefined,
@@ -384,8 +409,10 @@ const InstitutionFamilies = () => {
       return {
         ...family,
         family_name: family.name || family.contact_person || 'N/A',
-        main_cpf: family.cpf || '',
-        address: family.address || 'Não informado',
+        main_cpf: family.view_mode === 'limited'
+          ? (family.cpf_masked || '')
+          : (family.cpf || ''),
+        address: family.view_mode === 'limited' ? undefined : (family.address || 'Não informado'),
         members_count: family.members_count || 0,
         is_blocked: family.is_blocked || false,
         blocked_until: family.blocked_until || undefined,
@@ -526,29 +553,97 @@ const InstitutionFamilies = () => {
     );
   };
 
+  const renderLastDelivery = (family: Family) => {
+    if (!family.deliveries || family.deliveries.length === 0) {
+      return null;
+    }
+
+    const sortedDeliveries = [...family.deliveries].sort((a: any, b: any) => {
+      const dateA = new Date(a.delivery_date).getTime();
+      const dateB = new Date(b.delivery_date).getTime();
+      return dateB - dateA;
+    });
+    const lastDelivery = sortedDeliveries[0];
+    const lastDeliveryInstitution =
+      lastDelivery.institution?.name || "Instituição não identificada";
+
+    return (
+      <div className="p-4 bg-blue-50 rounded-lg">
+        <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
+        <div className="space-y-2 text-sm">
+          <p>
+            <strong>Data:</strong> {formatDateBrasilia(lastDelivery.delivery_date)}
+          </p>
+          <p>
+            <strong>Instituição:</strong> {lastDeliveryInstitution}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const handleViewDetails = (family: Family) => {
     setSelectedFamily(family);
     setIsDetailsOpen(true);
   };
 
   const handleEditFamily = async (family: Family) => {
-    setSelectedFamily(family);
+    try {
+      const links = await fetchFamilyInstitutionLinks(family.id);
+      if (!isOriginInstitution(links, profile?.institution_id)) {
+        toast({
+          title: "Edição não permitida",
+          description:
+            "Apenas a instituição de origem pode editar o cadastro completo desta família.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (linkError) {
+      console.error("Erro ao verificar vínculos da família:", linkError);
+      toast({
+        title: "Erro",
+        description: "Não foi possível verificar os vínculos desta família.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let familyForEdit = family;
+    if (family.view_mode === 'limited' || !family.cpf) {
+      try {
+        const fullFamily = await fetchFamilyForInstitution(family.id);
+        if (fullFamily) {
+          familyForEdit = fullFamily;
+        }
+      } catch (fetchError) {
+        console.error("Erro ao carregar família para edição:", fetchError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados completos da família.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    setSelectedFamily(familyForEdit);
     // Formatar CPF com máscara para exibição no formulário
-    const formattedCpf = family.cpf ? formatCpf(family.cpf) : "";
+    const formattedCpf = familyForEdit.cpf ? formatCpf(familyForEdit.cpf) : "";
     // Formatar data de nascimento se existir
-    const formattedBirthDate = family.birth_date 
-      ? (typeof family.birth_date === 'string' 
-          ? family.birth_date.split('T')[0] 
-          : new Date(family.birth_date).toISOString().split('T')[0])
+    const formattedBirthDate = familyForEdit.birth_date 
+      ? (typeof familyForEdit.birth_date === 'string' 
+          ? familyForEdit.birth_date.split('T')[0] 
+          : new Date(familyForEdit.birth_date).toISOString().split('T')[0])
       : "";
     // Processar children_ages do JSON
     let childrenAges: number[] = [];
-    if (family.children_ages) {
+    if (familyForEdit.children_ages) {
       try {
-        if (typeof family.children_ages === 'string') {
-          childrenAges = JSON.parse(family.children_ages);
-        } else if (Array.isArray(family.children_ages)) {
-          childrenAges = family.children_ages;
+        if (typeof familyForEdit.children_ages === 'string') {
+          childrenAges = JSON.parse(familyForEdit.children_ages);
+        } else if (Array.isArray(familyForEdit.children_ages)) {
+          childrenAges = familyForEdit.children_ages;
         }
       } catch (e) {
         console.error('Erro ao processar children_ages:', e);
@@ -557,52 +652,52 @@ const InstitutionFamilies = () => {
     }
 
     editForm.reset({
-      name: family.name || "",
-      contact_person: family.contact_person || "",
-      phone: family.phone || "",
+      name: familyForEdit.name || "",
+      contact_person: familyForEdit.contact_person || "",
+      phone: familyForEdit.phone || "",
       cpf: formattedCpf,
-      address: family.address || "",
-      members_count: family.members_count || 1,
-      is_blocked: family.is_blocked || false,
-      mother_name: family.mother_name || "",
+      address: familyForEdit.address || "",
+      members_count: familyForEdit.members_count || 1,
+      is_blocked: familyForEdit.is_blocked || false,
+      mother_name: familyForEdit.mother_name || "",
       birth_date: formattedBirthDate,
-      id_document: family.id_document || "",
-      occupation: family.occupation || "",
-      work_situation: family.work_situation || "",
-      children_count: family.children_count || 0,
+      id_document: familyForEdit.id_document || "",
+      occupation: familyForEdit.occupation || "",
+      work_situation: familyForEdit.work_situation || "",
+      children_count: familyForEdit.children_count || 0,
       children_ages: childrenAges,
-      family_composition: family.family_composition || null,
-      working_count: family.working_count || 0,
-      formal_employment: family.formal_employment || false,
-      family_income: family.family_income || null,
-      family_composition_notes: family.family_composition_notes || "",
-      address_reference: family.address_reference || "",
-      registered_in_other_institution: family.registered_in_other_institution || false,
-      other_institution_name: family.other_institution_name || "",
-      receives_government_aid: family.receives_government_aid || false,
-      receives_bolsa_familia: family.receives_bolsa_familia || false,
-      receives_auxilio_gas: family.receives_auxilio_gas || false,
-      receives_bpc: family.receives_bpc || false,
-      receives_loas: family.receives_loas || false,
-      receives_other_aid: family.receives_other_aid || false,
-      other_aid_description: family.other_aid_description || "",
-      has_chronic_disease: family.has_chronic_disease || false,
-      chronic_disease_description: family.chronic_disease_description || "",
-      housing_type: family.housing_type || "",
-      construction_type: family.construction_type || "",
-      has_water_supply: family.has_water_supply || false,
-      has_electricity: family.has_electricity || false,
-      has_garbage_collection: family.has_garbage_collection || false,
-      food_insecurity: family.food_insecurity || false,
-      unemployment: family.unemployment || false,
-      poor_health: family.poor_health || false,
-      substance_abuse: family.substance_abuse || false,
-      other_vulnerabilities: family.other_vulnerabilities || "",
+      family_composition: familyForEdit.family_composition || null,
+      working_count: familyForEdit.working_count || 0,
+      formal_employment: familyForEdit.formal_employment || false,
+      family_income: familyForEdit.family_income || null,
+      family_composition_notes: familyForEdit.family_composition_notes || "",
+      address_reference: familyForEdit.address_reference || "",
+      registered_in_other_institution: familyForEdit.registered_in_other_institution || false,
+      other_institution_name: familyForEdit.other_institution_name || "",
+      receives_government_aid: familyForEdit.receives_government_aid || false,
+      receives_bolsa_familia: familyForEdit.receives_bolsa_familia || false,
+      receives_auxilio_gas: familyForEdit.receives_auxilio_gas || false,
+      receives_bpc: familyForEdit.receives_bpc || false,
+      receives_loas: familyForEdit.receives_loas || false,
+      receives_other_aid: familyForEdit.receives_other_aid || false,
+      other_aid_description: familyForEdit.other_aid_description || "",
+      has_chronic_disease: familyForEdit.has_chronic_disease || false,
+      chronic_disease_description: familyForEdit.chronic_disease_description || "",
+      housing_type: familyForEdit.housing_type || "",
+      construction_type: familyForEdit.construction_type || "",
+      has_water_supply: familyForEdit.has_water_supply || false,
+      has_electricity: familyForEdit.has_electricity || false,
+      has_garbage_collection: familyForEdit.has_garbage_collection || false,
+      food_insecurity: familyForEdit.food_insecurity || false,
+      unemployment: familyForEdit.unemployment || false,
+      poor_health: familyForEdit.poor_health || false,
+      substance_abuse: familyForEdit.substance_abuse || false,
+      other_vulnerabilities: familyForEdit.other_vulnerabilities || "",
     });
     
     // Inicializar estados de consentimento LGPD
-    setEditConsentGiven(family.consent_given_at !== null && family.consent_given_at !== undefined);
-    setEditTermSigned(family.consent_term_signed === true);
+    setEditConsentGiven(familyForEdit.consent_given_at !== null && familyForEdit.consent_given_at !== undefined);
+    setEditTermSigned(familyForEdit.consent_term_signed === true);
     
     // Buscar nome da instituição
     if (profile?.institution_id) {
@@ -792,11 +887,14 @@ const InstitutionFamilies = () => {
           : familyData.cpf;
         
         if (cleanedCpf && cleanedCpf.length === 11) {
-          const { data: existingByCpf, error: cpfCheckError } = await supabase
-            .from("families")
-            .select("id, name, cpf")
-            .eq("cpf", cleanedCpf)
-            .neq("id", selectedFamily.id); // Excluir a própria família
+          const { data: existingByCpf, error: cpfCheckError } = await supabase.rpc(
+            'check_family_field_duplicate',
+            {
+              p_field: 'cpf',
+              p_value: cleanedCpf,
+              p_exclude_family_id: selectedFamily.id,
+            }
+          );
 
           if (cpfCheckError) {
             console.error("Erro ao verificar CPF duplicado:", cpfCheckError);
@@ -818,11 +916,14 @@ const InstitutionFamilies = () => {
           : familyData.mother_name;
         
         if (trimmedMotherName && trimmedMotherName.length > 0) {
-          const { data: existingByMotherName, error: motherNameCheckError } = await supabase
-            .from("families")
-            .select("id, name, mother_name")
-            .ilike("mother_name", trimmedMotherName)
-            .neq("id", selectedFamily.id); // Excluir a própria família
+          const { data: existingByMotherName, error: motherNameCheckError } = await supabase.rpc(
+            'check_family_field_duplicate',
+            {
+              p_field: 'mother_name',
+              p_value: trimmedMotherName,
+              p_exclude_family_id: selectedFamily.id,
+            }
+          );
 
           if (motherNameCheckError) {
             console.error("Erro ao verificar Nome da Mãe duplicado:", motherNameCheckError);
@@ -923,10 +1024,14 @@ const InstitutionFamilies = () => {
 
       // Validação 1: Verificar CPF duplicado
       if (cleanedCpf && cleanedCpf.length === 11) {
-        const { data: existingByCpf, error: cpfCheckError } = await supabase
-          .from("families")
-          .select("id, name, cpf")
-          .eq("cpf", cleanedCpf);
+        const { data: existingByCpf, error: cpfCheckError } = await supabase.rpc(
+          'check_family_field_duplicate',
+          {
+            p_field: 'cpf',
+            p_value: cleanedCpf,
+            p_exclude_family_id: null,
+          }
+        );
 
         if (cpfCheckError) {
           console.error("Erro ao verificar CPF duplicado:", cpfCheckError);
@@ -942,10 +1047,14 @@ const InstitutionFamilies = () => {
 
       // Validação 2: Verificar Nome da Mãe duplicado
       if (trimmedMotherName && trimmedMotherName.length > 0) {
-        const { data: existingByMotherName, error: motherNameCheckError } = await supabase
-          .from("families")
-          .select("id, name, mother_name")
-          .ilike("mother_name", trimmedMotherName);
+        const { data: existingByMotherName, error: motherNameCheckError } = await supabase.rpc(
+          'check_family_field_duplicate',
+          {
+            p_field: 'mother_name',
+            p_value: trimmedMotherName,
+            p_exclude_family_id: null,
+          }
+        );
 
         if (motherNameCheckError) {
           console.error("Erro ao verificar Nome da Mãe duplicado:", motherNameCheckError);
@@ -1370,6 +1479,59 @@ const InstitutionFamilies = () => {
           
           {selectedFamily && (
             <div className="px-6 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
+              {familyLinksLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                </div>
+              ) : !showFullFamilyDetails ? (
+                <>
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-900">
+                    Você está vendo dados limitados. O cadastro completo está disponível apenas na instituição de origem.
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Nome da Família</p>
+                      <p className="font-medium">{selectedFamily.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Titular (Pessoa de Contato)</p>
+                      <p className="font-medium">{selectedFamily.contact_person}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">CPF do Titular</p>
+                      <p className="font-medium">{getFamilyCpfDisplay(selectedFamily)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Número de Membros</p>
+                      <p className="font-medium">{selectedFamily.members_count ?? "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Telefone do Titular</p>
+                      <p className="font-medium">{selectedFamily.phone || "N/A"}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-600">Status Atual</p>
+                    {getStatusBadge(selectedFamily)}
+                  </div>
+
+                  {selectedFamily.is_blocked && (
+                    <div className="p-4 bg-red-50 rounded-lg">
+                      <h4 className="font-medium text-red-800 mb-2">Informações do Bloqueio</h4>
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Motivo:</strong> {selectedFamily.block_reason || 'N/A'}</p>
+                        <p><strong>Bloqueada até:</strong> {selectedFamily.blocked_until ? new Date(selectedFamily.blocked_until).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <FamilyInstitutionLinksBlock links={familyInstitutionLinks} />
+                  {renderLastDelivery(selectedFamily)}
+                </>
+              ) : (
+                <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Nome da Família</p>
@@ -1612,41 +1774,11 @@ const InstitutionFamilies = () => {
               )}
               
               {/* Instituições Vinculadas */}
-              {selectedFamily.institution_families && selectedFamily.institution_families.length > 0 && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-800 mb-2">Instituições Vinculadas</h4>
-                  <div className="space-y-2 text-sm">
-                    {selectedFamily.institution_families.map((assoc: any, index: number) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-gray-500" />
-                        <span>{assoc.institution?.name || 'Instituição não encontrada'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <FamilyInstitutionLinksBlock links={familyInstitutionLinks} />
 
-              {/* Última Entrega Global */}
-              {selectedFamily.deliveries && selectedFamily.deliveries.length > 0 && (() => {
-                // Ordenar entregas por data (mais recente primeiro)
-                const sortedDeliveries = [...selectedFamily.deliveries].sort((a: any, b: any) => {
-                  const dateA = new Date(a.delivery_date).getTime();
-                  const dateB = new Date(b.delivery_date).getTime();
-                  return dateB - dateA;
-                });
-                const lastDelivery = sortedDeliveries[0];
-                const lastDeliveryInstitution = lastDelivery.institution?.name || 'Instituição não identificada';
-                
-                return (
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium text-blue-800 mb-2">Última Entrega</h4>
-                    <div className="space-y-2 text-sm">
-                      <p><strong>Data:</strong> {formatDateBrasilia(lastDelivery.delivery_date)}</p>
-                      <p><strong>Instituição:</strong> {lastDeliveryInstitution}</p>
-                    </div>
-                  </div>
-                );
-              })()}
+              {renderLastDelivery(selectedFamily)}
+                </>
+              )}
             </div>
           )}
           

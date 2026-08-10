@@ -4,6 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { logger } from "@/utils/logger";
+import {
+  enrichDeliveriesWithFamilyDisplay,
+  fetchFamiliesDisplayBatch,
+} from "@/hooks/familyDisplayBatch";
 import type {
   Tables,
   TablesInsert,
@@ -14,6 +18,15 @@ type Delivery = Tables<"deliveries">;
 type DeliveryInsert = TablesInsert<"deliveries">;
 type DeliveryUpdate = TablesUpdate<"deliveries">;
 
+const deliveryInstitutionSelect = `
+  institution:institution_id(
+    id,
+    name,
+    address,
+    phone
+  )
+`;
+
 export const useDeliveries = (institutionId?: string) => {
   return useQuery({
     queryKey: ["deliveries", institutionId],
@@ -23,22 +36,7 @@ export const useDeliveries = (institutionId?: string) => {
         .select(
           `
           *,
-          family:family_id(
-            id,
-            name,
-            contact_person,
-            members_count,
-            is_blocked,
-            blocked_until,
-            block_reason,
-            blocked_by_institution:blocked_by_institution_id(name)
-          ),
-          institution:institution_id(
-            id,
-            name,
-            address,
-            phone
-          )
+          ${deliveryInstitutionSelect}
         `
         )
         .order("delivery_date", { ascending: false });
@@ -50,7 +48,7 @@ export const useDeliveries = (institutionId?: string) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data;
+      return enrichDeliveriesWithFamilyDisplay(data ?? []);
     },
     enabled: true
   });
@@ -73,7 +71,6 @@ export const useCreateDelivery = () => {
         throw new Error('Período de bloqueio inválido. Informe um número inteiro entre 1 e 999 dias.');
       }
 
-      // Validar entrega antes de inserir usando função do backend
       const { data: validationResult, error: validationError } = await supabase
         .rpc('validate_delivery', {
           p_family_id: delivery.family_id,
@@ -86,11 +83,9 @@ export const useCreateDelivery = () => {
         throw validationError;
       }
 
-      // Verificar resultado da validação
       if (validationResult && typeof validationResult === 'object') {
         const validation = validationResult as any;
         if (!validation.valid) {
-          // Se erro é de justificativa obrigatória, não mostrar toast genérico
           if (validation.error === 'BLOCKING_JUSTIFICATION_REQUIRED') {
             const error = new Error(validation.message || 'Justificativa obrigatória');
             (error as any).validationError = validation.error;
@@ -98,7 +93,6 @@ export const useCreateDelivery = () => {
             throw error;
           }
           
-          // Criar erro customizado com mensagem do backend
           const error = new Error(validation.message || 'Validação falhou');
           (error as any).validationError = validation.error;
           (error as any).blockedByInstitutionName = validation.blocked_by_institution_name;
@@ -107,36 +101,22 @@ export const useCreateDelivery = () => {
         }
       }
 
-      // Se validação passou, inserir entrega
       const { data, error } = await supabase
         .from("deliveries")
         .insert(delivery)
-        .select(
-          `
-          *,
-          family:family_id(
-            id,
-            name,
-            contact_person,
-            members_count,
-            is_blocked,
-            blocked_until,
-            block_reason,
-            blocked_by_institution:blocked_by_institution_id(name)
-          ),
-          institution:institution_id(
-            id,
-            name,
-            address,
-            phone
-          )
-        `
-        )
+        .select(`*, ${deliveryInstitutionSelect}`)
         .single();
 
       if (error) throw error;
 
-      // Log de auditoria
+      const familyMap = await fetchFamiliesDisplayBatch([data.family_id]);
+      const familyDisplay = familyMap.get(data.family_id) ?? null;
+
+      const deliveryWithFamily = {
+        ...data,
+        family: familyDisplay,
+      };
+
       logger.audit('DELIVERY_CREATE', user?.id || 'unknown', {
         delivery_id: data.id,
         family_id: data.family_id,
@@ -147,7 +127,7 @@ export const useCreateDelivery = () => {
         actionType: 'DELIVERY_CREATE',
         tableName: 'deliveries',
         recordId: data.id,
-        description: `Entrega registrada para família ${(data.family as any)?.name || data.family_id}`,
+        description: `Entrega registrada para família ${familyDisplay?.name || data.family_id}`,
         severity: 'INFO',
         newData: {
           id: data.id,
@@ -157,7 +137,7 @@ export const useCreateDelivery = () => {
         },
       });
 
-      return data;
+      return deliveryWithFamily;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
@@ -173,7 +153,6 @@ export const useCreateDelivery = () => {
       });
     },
     onError: (error: any) => {
-      // Tratar erros específicos de validação
       if (error.validationError === 'FAMILY_BLOCKED') {
         const institutionName = error.blockedByInstitutionName || "outra instituição";
         const blockedUntil = error.blockedUntil ? new Date(error.blockedUntil).toLocaleDateString('pt-BR') : "data não definida";
@@ -221,31 +200,16 @@ export const useUpdateDelivery = () => {
         .from("deliveries")
         .update(updates)
         .eq("id", id)
-        .select(
-          `
-          *,
-          family:family_id(
-            id,
-            name,
-            contact_person,
-            members_count,
-            is_blocked,
-            blocked_until,
-            block_reason,
-            blocked_by_institution:blocked_by_institution_id(name)
-          ),
-          institution:institution_id(
-            id,
-            name,
-            address,
-            phone
-          )
-        `
-        )
+        .select(`*, ${deliveryInstitutionSelect}`)
         .single();
 
       if (error) throw error;
-      return data;
+
+      const familyMap = await fetchFamiliesDisplayBatch([data.family_id]);
+      return {
+        ...data,
+        family: familyMap.get(data.family_id) ?? null,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });

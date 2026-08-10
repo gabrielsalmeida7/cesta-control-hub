@@ -425,6 +425,7 @@ export type Database = {
           mother_name: string | null
           name: string
           occupation: string | null
+          origin_institution_id: string | null
           other_aid_description: string | null
           other_institution_name: string | null
           other_vulnerabilities: string | null
@@ -485,6 +486,7 @@ export type Database = {
           mother_name?: string | null
           name: string
           occupation?: string | null
+          origin_institution_id?: string | null
           other_aid_description?: string | null
           other_institution_name?: string | null
           other_vulnerabilities?: string | null
@@ -545,6 +547,7 @@ export type Database = {
           mother_name?: string | null
           name?: string
           occupation?: string | null
+          origin_institution_id?: string | null
           other_aid_description?: string | null
           other_institution_name?: string | null
           other_vulnerabilities?: string | null
@@ -570,6 +573,13 @@ export type Database = {
           {
             foreignKeyName: "families_blocked_by_institution_id_fkey"
             columns: ["blocked_by_institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_origin_institution_id_fkey"
+            columns: ["origin_institution_id"]
             isOneToOne: false
             referencedRelation: "institutions"
             referencedColumns: ["id"]
@@ -1196,6 +1206,75 @@ export type Database = {
         Returns: string
       }
       auto_unblock_expired_families: { Args: never; Returns: number }
+      get_family_institution_links: {
+        Args: { p_family_id: string }
+        Returns: {
+          institution_id: string
+          institution_name: string
+          created_at: string
+          is_origin: boolean
+        }[]
+      }
+      get_families_for_institution: {
+        Args: { p_institution_id: string }
+        Returns: Json
+      }
+      get_family_for_institution: {
+        Args: { p_family_id: string }
+        Returns: Json
+      }
+      count_institution_blocked_families: {
+        Args: { p_institution_id: string }
+        Returns: number
+      }
+      get_institution_dashboard_stats: {
+        Args: { p_institution_id: string }
+        Returns: Json
+      }
+      get_families_display_batch: {
+        Args: { p_family_ids: string[] }
+        Returns: {
+          id: string
+          name: string
+          contact_person: string
+          members_count: number
+          is_blocked: boolean
+          blocked_until: string | null
+          block_reason: string | null
+          blocked_by_institution_name: string | null
+        }[]
+      }
+      get_families_multi_institution: {
+        Args: { p_institution_id?: string | null }
+        Returns: Json
+      }
+      check_family_field_duplicate: {
+        Args: {
+          p_field: string
+          p_value: string
+          p_exclude_family_id?: string | null
+        }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
+      search_family_for_linking: {
+        Args: {
+          p_search_term: string
+          p_search_by?: string
+          p_current_institution_id?: string | null
+        }
+        Returns: {
+          id: string
+          name: string
+          contact_person: string
+          cpf_masked: string
+          phone: string | null
+          members_count: number
+          is_linked_to_current: boolean
+        }[]
+      }
       bootstrap_admin: { Args: { admin_email: string }; Returns: boolean }
       can_deliver_to_family: {
         Args: { p_family_id: string; p_institution_id: string }
@@ -1261,6 +1340,7 @@ export type Database = {
           mother_name: string | null
           name: string
           occupation: string | null
+          origin_institution_id: string | null
           other_aid_description: string | null
           other_institution_name: string | null
           other_vulnerabilities: string | null

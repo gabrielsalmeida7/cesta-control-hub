@@ -138,63 +138,24 @@ export const useInstitutionFamilies = (institutionId?: string) => {
       }
 
       if (import.meta.env.DEV) {
-        console.log('🔍 Fetching families for institution:', institutionId);
+        console.log('🔍 Fetching families for institution via RPC:', institutionId);
       }
 
-      // Primeiro, buscar os IDs das famílias vinculadas à instituição
-      const { data: associations, error: assocError } = await supabase
-        .from('institution_families')
-        .select('family_id')
-        .eq('institution_id', institutionId);
+      const { data, error } = await supabase.rpc('get_families_for_institution', {
+        p_institution_id: institutionId,
+      });
 
-      if (assocError) {
-        console.error('❌ Error fetching associations:', assocError);
-        throw assocError;
-      }
-
-      if (import.meta.env.DEV) {
-        console.log('✅ Found', associations?.length || 0, 'associations');
-      }
-
-      if (!associations || associations.length === 0) {
-        if (import.meta.env.DEV) {
-          console.log('⚠️ No families associated with this institution');
-        }
-        return [];
-      }
-
-      const familyIds = associations.map(a => a.family_id);
-
-      // Agora buscar as famílias com seus dados completos
-      const { data, error } = await supabase
-        .from("families")
-        .select(
-          `
-          *,
-          blocked_by_institution:blocked_by_institution_id(name),
-          institution_families(
-            institution_id,
-            institution:institution_id(id, name)
-          ),
-          deliveries(
-            delivery_date, 
-            blocking_period_days, 
-            notes,
-            institution:institution_id(id, name)
-          )
-        `)
-        .in('id', familyIds)
-        .order('name');
-      
       if (error) {
         console.error('❌ Error fetching families:', error);
         throw error;
       }
 
+      const families = (Array.isArray(data) ? data : []) as InstitutionFamilyView[];
+
       if (import.meta.env.DEV) {
-        console.log('✅ Families fetched:', data?.length || 0, 'records');
+        console.log('✅ Families fetched:', families.length, 'records');
       }
-      return data || [];
+      return families;
     },
     enabled: !!institutionId
   });
@@ -214,10 +175,13 @@ export const useCreateFamily = () => {
       family: FamilyInsert;
       institutionId?: string;
     }) => {
-      // Criar família
+      const insertPayload: FamilyInsert = institutionId
+        ? { ...family, origin_institution_id: institutionId }
+        : family;
+
       const { data: createdFamily, error: createError } = await supabase
         .from("families")
-        .insert(family)
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -608,29 +572,110 @@ export const useDisassociateFamilyFromInstitution = () => {
   });
 };
 
+export type InstitutionFamilyDelivery = {
+  delivery_date: string;
+  blocking_period_days?: number | null;
+  notes?: string | null;
+  institution_id?: string;
+  institution?: { id?: string; name?: string } | null;
+};
+
+export type InstitutionFamilyView = Family & {
+  view_mode: 'full' | 'limited';
+  is_origin: boolean;
+  cpf_masked?: string;
+  blocked_by_institution?: { name?: string } | null;
+  institution_families?: Array<{
+    institution_id: string;
+    institution?: { id?: string; name?: string } | null;
+  }>;
+  deliveries?: InstitutionFamilyDelivery[];
+};
+
+export const fetchFamilyForInstitution = async (
+  familyId: string
+): Promise<InstitutionFamilyView | null> => {
+  const { data, error } = await supabase.rpc('get_family_for_institution', {
+    p_family_id: familyId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as InstitutionFamilyView | null) ?? null;
+};
+
+export type FamilyInstitutionLink = {
+  institution_id: string;
+  institution_name: string;
+  created_at: string;
+  is_origin: boolean;
+};
+
+export const fetchFamilyInstitutionLinks = async (
+  familyId: string
+): Promise<FamilyInstitutionLink[]> => {
+  const { data, error } = await supabase.rpc("get_family_institution_links", {
+    p_family_id: familyId,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as FamilyInstitutionLink[];
+};
+
+export const getOriginInstitutionId = (
+  links: FamilyInstitutionLink[]
+): string | null => {
+  return links.find((link) => link.is_origin)?.institution_id ?? null;
+};
+
+export const isOriginInstitution = (
+  links: FamilyInstitutionLink[],
+  institutionId?: string
+): boolean => {
+  if (!institutionId || links.length <= 1) {
+    return true;
+  }
+
+  return links.some(
+    (link) => link.is_origin && link.institution_id === institutionId
+  );
+};
+
+export const useFamilyInstitutionLinks = (
+  familyId?: string,
+  enabled = true
+) => {
+  return useQuery({
+    queryKey: ["family-institution-links", familyId],
+    queryFn: () => fetchFamilyInstitutionLinks(familyId!),
+    enabled: !!familyId && enabled,
+    staleTime: 60_000,
+  });
+};
+
+export type FamilySearchPreview = {
+  id: string;
+  name: string;
+  contact_person: string;
+  cpf_masked: string;
+  phone: string | null;
+  members_count: number | null;
+  is_linked_to_current?: boolean;
+};
+
 // Tipo para resultado da busca de família
 export type FamilySearchResult = {
   scenario: 1 | 2 | 3 | 4 | 5;
-  family: Family & {
-    institution_families?: Array<{
-      institution_id: string;
-      institution: {
-        id: string;
-        name: string;
-      };
-    }>;
-  } | null;
-  families?: Array<Family & {
-    institution_families?: Array<{
-      institution_id: string;
-      institution: {
-        id: string;
-        name: string;
-      };
-    }>;
-  }>; // Para múltiplos resultados (cenário 5)
+  family: FamilySearchPreview | null;
+  families?: FamilySearchPreview[];
   message: string;
   institutionName?: string;
+  institutionLinks?: FamilyInstitutionLink[];
 };
 
 /**
@@ -647,184 +692,133 @@ export const searchFamilyByCpf = async (
   currentInstitutionId?: string,
   searchBy: "cpf" | "name" | "mother_name" = "cpf"
 ): Promise<FamilySearchResult> => {
-  // Limpar CPF (remover caracteres não numéricos)
-  const cleanCpf = searchTerm.replace(/\D/g, '');
   const trimmedSearch = searchTerm.trim();
-  
-  // Determinar se deve buscar múltiplos resultados (apenas para Nome da Mãe)
-  const allowMultiple = searchBy === "mother_name";
-  
-  // Buscar família por CPF, nome da família ou nome da mãe
-  let query = supabase
-    .from("families")
-    .select(`
-      *,
-      institution_families(
-        institution_id,
-        institution:institution_id(id, name)
-      )
-    `);
-  
-  // Aplicar limit apenas se não for busca por Nome da Mãe
-  if (!allowMultiple) {
-    query = query.limit(1);
-  }
 
-  // Determinar tipo de busca baseado no parâmetro searchBy
   if (searchBy === "cpf") {
-    // Se tem 11 dígitos, buscar por CPF (sem máscara no banco)
-    if (cleanCpf.length === 11) {
-      query = query.eq("cpf", cleanCpf);
-    } else {
-      // CPF inválido
+    const cleanCpf = searchTerm.replace(/\D/g, "");
+    if (cleanCpf.length !== 11) {
       return {
         scenario: 3,
         family: null,
-        message: "CPF deve conter 11 dígitos."
+        message: "CPF deve conter 11 dígitos.",
       };
     }
-  } else if (searchBy === "name") {
-    // Buscar por nome da família
-    if (trimmedSearch.length > 0) {
-      query = query.ilike("name", `%${trimmedSearch}%`);
-    } else {
-      return {
-        scenario: 3,
-        family: null,
-        message: "Digite o nome da família para buscar."
-      };
-    }
-  } else if (searchBy === "mother_name") {
-    // Buscar por nome da mãe
-    if (trimmedSearch.length > 0) {
-      query = query.ilike("mother_name", `%${trimmedSearch}%`);
-    } else {
-      return {
-        scenario: 3,
-        family: null,
-        message: "Digite o nome da mãe para buscar."
-      };
-    }
-  } else {
-    // Tipo de busca inválido
+  } else if (trimmedSearch.length === 0) {
+    const message =
+      searchBy === "name"
+        ? "Digite o nome da família para buscar."
+        : "Digite o nome da mãe para buscar.";
     return {
       scenario: 3,
       family: null,
-      message: "Tipo de busca inválido."
+      message,
     };
   }
 
-  const { data: families, error } = await query;
+  const { data: families, error } = await supabase.rpc(
+    "search_family_for_linking",
+    {
+      p_search_term: trimmedSearch || searchTerm,
+      p_search_by: searchBy,
+      p_current_institution_id: currentInstitutionId ?? null,
+    }
+  );
 
   if (error) {
+    if (error.message.includes("CPF deve conter 11 dígitos")) {
+      return {
+        scenario: 3,
+        family: null,
+        message: "CPF deve conter 11 dígitos.",
+      };
+    }
+    if (
+      error.message.includes("pgcrypto") ||
+      error.details?.includes("pgcrypto")
+    ) {
+      throw new Error(
+        "Busca por CPF temporariamente indisponível. Tente buscar pelo nome da família ou aplique a migration de correção no Supabase."
+      );
+    }
     throw error;
   }
 
-  // Cenário 3: Família não encontrada
-  if (!families || families.length === 0) {
+  const results = (families ?? []) as FamilySearchPreview[];
+
+  if (results.length === 0) {
     let searchTypeText = "";
     if (searchBy === "cpf") {
       searchTypeText = "este CPF";
     } else if (searchBy === "name") {
       searchTypeText = "este nome da família";
-    } else if (searchBy === "mother_name") {
+    } else {
       searchTypeText = "este nome da mãe";
     }
-    
+
     return {
       scenario: 3,
       family: null,
-      message: `Nenhuma família encontrada com ${searchTypeText}.`
+      message: `Nenhuma família encontrada com ${searchTypeText}.`,
     };
   }
 
-  // Cenário 5: Múltiplas famílias encontradas (apenas para busca por Nome da Mãe)
-  if (allowMultiple && families.length > 1) {
+  if (searchBy === "mother_name" && results.length > 1) {
     return {
       scenario: 5,
       family: null,
-      families: families as Array<Family & {
-        institution_families?: Array<{
-          institution_id: string;
-          institution: {
-            id: string;
-            name: string;
-          };
-        }>;
-      }>,
-      message: `Foram encontradas ${families.length} famílias com este Nome da Mãe.`
+      families: results,
+      message: `Foram encontradas ${results.length} famílias com este Nome da Mãe.`,
     };
   }
 
-  // Processar resultado único (cenários 1, 2 ou 4)
-  const family = families[0];
-  const associations = family.institution_families || [];
+  const family = results[0];
+  let institutionLinks: FamilyInstitutionLink[] = [];
 
-  // Verificar se está vinculada à própria instituição
-  if (currentInstitutionId) {
-    const isLinkedToCurrentInstitution = associations.some(
-      assoc => assoc.institution_id === currentInstitutionId
-    );
-    
-    if (isLinkedToCurrentInstitution) {
-      // Cenário 4: Família já vinculada à própria instituição
-      const currentInstitutionAssociation = associations.find(
-        assoc => assoc.institution_id === currentInstitutionId
+  try {
+    institutionLinks = await fetchFamilyInstitutionLinks(family.id);
+  } catch (linkError) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        "⚠️ get_family_institution_links indisponível durante busca:",
+        linkError
       );
-      const institutionName = currentInstitutionAssociation?.institution?.name || "sua instituição";
-      
-      return {
-        scenario: 4,
-        family: family as Family & {
-          institution_families?: Array<{
-            institution_id: string;
-            institution: {
-              id: string;
-              name: string;
-            };
-          }>;
-        },
-        message: `A família '${family.name}' já está na lista de famílias da sua instituição.`,
-        institutionName: institutionName
-      };
     }
   }
 
-  // Verificar se família tem vínculo com outras instituições
-  if (associations.length === 0) {
-    // Cenário 1: Família encontrada e desvinculada
+  if (family.is_linked_to_current) {
+    const currentInstitutionLink = institutionLinks.find(
+      (link) => link.institution_id === currentInstitutionId
+    );
+    const institutionName =
+      currentInstitutionLink?.institution_name ?? "sua instituição";
+
     return {
-      scenario: 1,
-      family: family as Family & {
-        institution_families?: Array<{
-          institution_id: string;
-          institution: {
-            id: string;
-            name: string;
-          };
-        }>;
-      },
-      message: `Família '${family.name}' encontrada e sem vínculo. Deseja vincular esta família à sua instituição?`
+      scenario: 4,
+      family,
+      institutionLinks,
+      message: `A família '${family.name}' já está na lista de famílias da sua instituição.`,
+      institutionName,
     };
   }
 
-  // Cenário 2: Família encontrada e já vinculada a outra(s) instituição(ões) - mas agora pode vincular também
-  const otherInstitutions = associations
-    .map(assoc => assoc.institution?.name || "outra instituição")
+  if (institutionLinks.length === 0) {
+    return {
+      scenario: 1,
+      family,
+      institutionLinks,
+      message: `Família '${family.name}' encontrada e sem vínculo. Deseja vincular esta família à sua instituição?`,
+    };
+  }
+
+  const otherInstitutions = institutionLinks
+    .map((link) => link.institution_name)
     .join(", ");
-  
+
   return {
     scenario: 2,
-    family: family as Family & {
-      institution_families?: Array<{
-        institution_id: string;
-        institution: {
-          id: string;
-          name: string;
-        };
-      }>;
-    },
+    family,
+    institutionLinks,
     message: `A família '${family.name}' já está vinculada à(s) instituição(ões): ${otherInstitutions}. Você pode vincular esta família à sua instituição também.`,
-    institutionName: otherInstitutions
+    institutionName: otherInstitutions,
   };
 };

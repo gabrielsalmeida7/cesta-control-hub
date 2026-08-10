@@ -340,8 +340,12 @@ const Reports = () => {
                   <AlertDescription className="mt-2">
                     <div className="space-y-2">
                       <p><strong>Contato:</strong> {family.contact_person}</p>
-                      {family.cpf && (
-                        <p><strong>CPF:</strong> {family.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</p>
+                      {(family.cpf_masked || family.cpf) && (
+                        <p>
+                          <strong>CPF:</strong>{' '}
+                          {family.cpf_masked ??
+                            family.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
+                        </p>
                       )}
                       <div>
                         <strong>Instituições vinculadas:</strong>

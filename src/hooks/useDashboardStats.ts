@@ -2,7 +2,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { startOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 export interface AdminStats {
   totalInstitutions: number;
@@ -93,81 +92,29 @@ export const useDashboardStats = () => {
           return stats;
         }
 
-        // Stats para Instituição
+        // Stats para Instituição (via RPC — evita SELECT direto bloqueado por RLS)
         if (profile.role === 'institution' && profile.institution_id) {
           if (import.meta.env.DEV) {
             console.log('🏢 Fetching institution stats for:', profile.institution_id);
           }
-          
-          // Test each institution query individually
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing institution families query...');
-          }
-          const famResult = await supabase
-            .from('institution_families')
-            .select('*', { count: 'exact', head: true })
-            .eq('institution_id', profile.institution_id);
-          if (import.meta.env.DEV) {
-            console.log('📝 Institution families result:', famResult);
+
+          const { data: statsJson, error: statsError } = await supabase.rpc(
+            'get_institution_dashboard_stats',
+            { p_institution_id: profile.institution_id }
+          );
+
+          if (statsError) {
+            throw statsError;
           }
 
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing institution deliveries query...');
-          }
-          const delResult = await supabase
-            .from('deliveries')
-            .select('*', { count: 'exact', head: true })
-            .eq('institution_id', profile.institution_id);
-          if (import.meta.env.DEV) {
-            console.log('📝 Institution deliveries result:', delResult);
-          }
-
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing blocked by institution query...');
-          }
-          const blockResult = await supabase
-            .from('families')
-            .select('*', { count: 'exact', head: true })
-            .eq('blocked_by_institution_id', profile.institution_id)
-            .eq('is_blocked', true);
-          if (import.meta.env.DEV) {
-            console.log('📝 Blocked by institution result:', blockResult);
-          }
-
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing recent deliveries query...');
-          }
-          const recentResult = await supabase
-            .from('deliveries')
-            .select('*')
-            .eq('institution_id', profile.institution_id)
-            .gte('delivery_date', startOfMonth(new Date()).toISOString());
-          if (import.meta.env.DEV) {
-            console.log('📝 Recent deliveries result:', recentResult);
-          }
-
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing deliveries this year query...');
-          }
-          const now = new Date();
-          const yearStart = startOfYear(now).toISOString(); // 1 de janeiro
-          const yearEnd = endOfYear(now).toISOString(); // 31 de dezembro
-          const yearDeliveriesResult = await supabase
-            .from('deliveries')
-            .select('*', { count: 'exact', head: true })
-            .eq('institution_id', profile.institution_id)
-            .gte('delivery_date', yearStart)
-            .lte('delivery_date', yearEnd);
-          if (import.meta.env.DEV) {
-            console.log('📝 Deliveries this year result:', yearDeliveriesResult);
-          }
+          const payload = (statsJson ?? {}) as Record<string, number | string | null>;
 
           const stats: InstitutionStats = {
-            associatedFamilies: famResult.count || 0,
-            institutionDeliveries: delResult.count || 0,
-            institutionDeliveriesThisYear: yearDeliveriesResult.count || 0,
-            blockedByInstitution: blockResult.count || 0,
-            recentDeliveries: recentResult.data?.length || 0,
+            associatedFamilies: Number(payload.associated_families ?? 0),
+            institutionDeliveries: Number(payload.institution_deliveries ?? 0),
+            institutionDeliveriesThisYear: Number(payload.institution_deliveries_this_year ?? 0),
+            blockedByInstitution: Number(payload.blocked_by_institution ?? 0),
+            recentDeliveries: Number(payload.recent_deliveries ?? 0),
           };
 
           if (import.meta.env.DEV) {

@@ -1,12 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, Download, Package, Users, BarChart3, Loader2, Eye } from 'lucide-react';
+import { Search, Download, Package, Users, BarChart3, Loader2, Eye, FileText, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import DashboardCard from '@/components/DashboardCard';
 import { InstitutionLayout } from '@/components/layout/InstitutionLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,67 +21,28 @@ import {
   DeliveryReportMobileCard,
   DeliveryReportItemsFallback,
 } from '@/components/institution/DeliveryReportMobileCard';
+import {
+  FamilyReportSelector,
+  slugifyFamilyName,
+} from '@/components/institution/FamilyReportSelector';
 import { useInstitutionDeliveries } from '@/hooks/useInstitutionDeliveries';
-import { useReportExport } from '@/hooks/useReportExport';
+import { useInstitutionReportExport } from '@/hooks/useInstitutionReportExport';
+import { useInstitutionData } from '@/hooks/useInstitutions';
+import { useInstitutionFamilies } from '@/hooks/useFamilies';
 import { useFamiliesWithMultipleInstitutions } from '@/hooks/useAlerts';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateBrasilia, formatDateTimeBrasilia } from '@/utils/dateFormat';
+import {
+  countDeliveryItems,
+  parseDeliveryNotes,
+  type DeliveryMovementItem,
+} from '@/utils/deliveryItems';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
-
-// Função para parsear itens adicionais e observações do campo notes
-const parseDeliveryNotes = (notes: string | null | undefined) => {
-  if (!notes) return { items: [], observations: null };
-  
-  const itemsStartIndex = notes.indexOf('__ITEMS_START__');
-  const itemsEndIndex = notes.indexOf('__ITEMS_END__');
-  
-  if (itemsStartIndex !== -1 && itemsEndIndex !== -1) {
-    // Extrair itens
-    const itemsSection = notes.substring(
-      itemsStartIndex + '__ITEMS_START__'.length,
-      itemsEndIndex
-    ).trim();
-    
-    const items = itemsSection
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const [name, quantity, unit] = line.split('|');
-        return {
-          name: name?.trim() || '',
-          quantity: parseInt(quantity?.trim() || '1'),
-          unit: unit?.trim() || 'unidade'
-        };
-      })
-      .filter(item => item.name);
-    
-    // Extrair observações (tudo depois de __ITEMS_END__)
-    const observations = notes.substring(itemsEndIndex + '__ITEMS_END__'.length).trim();
-    
-    return {
-      items,
-      observations: observations || null
-    };
-  }
-  
-  // Se não há itens estruturados, tudo é observação
-  return {
-    items: [],
-    observations: notes
-  };
-};
-
-type DeliveryMovementItem = {
-  status?: string;
-  quantity: number;
-  product?: { name?: string; unit?: string } | null;
-  cancellation_reason?: string | null;
-};
+type ReportType = 'deliveries-summary' | 'family-items-by-date';
 
 const renderDeliveryMovementBadges = (deliveryItems: DeliveryMovementItem[]) =>
   deliveryItems.map((movement, index) => {
@@ -153,12 +121,27 @@ const parseBrDateToIso = (value: string): string | null => {
   return `${match[3]}-${match[2]}-${match[1]}`;
 };
 
+const buildPeriodLabel = (startDate: string, endDate: string): string => {
+  if (startDate && endDate) {
+    return `${formatDateBrasilia(startDate)} a ${formatDateBrasilia(endDate)}`;
+  }
+  if (startDate) {
+    return `A partir de ${formatDateBrasilia(startDate)}`;
+  }
+  if (endDate) {
+    return `Até ${formatDateBrasilia(endDate)}`;
+  }
+  return 'Todos os períodos';
+};
+
 const InstitutionReports = () => {
   const [draftStartDate, setDraftStartDate] = useState('');
   const [draftEndDate, setDraftEndDate] = useState('');
   const [appliedStartDate, setAppliedStartDate] = useState('');
   const [appliedEndDate, setAppliedEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [reportType, setReportType] = useState<ReportType>('family-items-by-date');
+  const [selectedFamilyId, setSelectedFamilyId] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { profile } = useAuth();
@@ -166,19 +149,49 @@ const InstitutionReports = () => {
   const isMobile = useIsMobile();
 
   const { data: deliveries = [], isLoading, error } = useInstitutionDeliveries(appliedStartDate, appliedEndDate);
-  const { data: familiesWithMultiple = [], isLoading: familiesLoading } = useFamiliesWithMultipleInstitutions(profile?.institution_id);
-  const { exportDeliveriesReport } = useReportExport();
+  const { data: institutionFamilies = [] } = useInstitutionFamilies(profile?.institution_id);
+  const { data: familiesWithMultiple = [] } = useFamiliesWithMultipleInstitutions(profile?.institution_id);
+  const { data: institutionData } = useInstitutionData();
+  const {
+    exportDeliveriesSummary,
+    exportFamilyItemsByDateCSV,
+    exportFamilyItemsByDatePDF,
+  } = useInstitutionReportExport();
 
   const filteredDeliveries = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return deliveries;
+    let result = deliveries;
 
-    return deliveries.filter((delivery) => {
+    if (selectedFamilyId && selectedFamilyId !== 'all') {
+      result = result.filter((delivery) => {
+        const familyId = delivery.family?.id ?? (delivery as { family_id?: string }).family_id;
+        return String(familyId) === selectedFamilyId;
+      });
+    }
+
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return result;
+
+    return result.filter((delivery) => {
       const familyName = (delivery.family?.name ?? '').toLowerCase();
       const contactPerson = (delivery.family?.contact_person ?? '').toLowerCase();
       return familyName.includes(q) || contactPerson.includes(q);
     });
-  }, [deliveries, searchTerm]);
+  }, [deliveries, searchTerm, selectedFamilyId]);
+
+  const selectedFamily = useMemo(
+    () => institutionFamilies.find((family) => family.id === selectedFamilyId),
+    [institutionFamilies, selectedFamilyId]
+  );
+
+  const familyReportOptions = useMemo(
+    () =>
+      institutionFamilies.map((family) => ({
+        id: family.id,
+        name: family.name,
+        contact_person: family.contact_person,
+      })),
+    [institutionFamilies]
+  );
 
   const applyDateFilters = () => {
     if (draftStartDate.trim()) {
@@ -214,23 +227,89 @@ const InstitutionReports = () => {
 
   const totalDeliveries = filteredDeliveries.length;
   const totalFamilies = new Set(filteredDeliveries.map(d => d.family?.id)).size;
-  const totalItems = filteredDeliveries.reduce((total, delivery) => {
-    const deliveryItems = (delivery as { stock_movements?: DeliveryMovementItem[] }).stock_movements || [];
+  const totalItems = filteredDeliveries.reduce(
+    (total, delivery) => total + countDeliveryItems(delivery),
+    0
+  );
 
-    if (deliveryItems.length > 0) {
-      return total + deliveryItems
-        .filter((item) => item.status !== 'CANCELLED')
-        .reduce((itemsTotal, item) => itemsTotal + item.quantity, 0);
+  const periodLabel = buildPeriodLabel(appliedStartDate, appliedEndDate);
+  const institutionName = institutionData?.name || 'Instituição';
+
+  const getFamilyExportMeta = () => {
+    if (!selectedFamily) {
+      return { familyLabel: undefined, filenamePrefix: 'relatorio_itens_por_familia' };
     }
 
-    const { items: additionalItems } = parseDeliveryNotes(delivery.notes);
-    return total + (additionalItems.length > 0
-      ? additionalItems.reduce((itemsTotal, item) => itemsTotal + item.quantity, 0)
-      : 1);
-  }, 0);
+    const contactSuffix = selectedFamily.contact_person
+      ? ` (${selectedFamily.contact_person})`
+      : '';
 
-  const exportReport = () => {
-    exportDeliveriesReport(appliedStartDate, appliedEndDate);
+    return {
+      familyLabel: `${selectedFamily.name}${contactSuffix}`,
+      filenamePrefix: `relatorio_itens_${slugifyFamilyName(selectedFamily.name)}`,
+    };
+  };
+
+  const canExportFamilyItemsPdf =
+    reportType === 'family-items-by-date' &&
+    Boolean(selectedFamilyId && selectedFamilyId !== 'all');
+
+  const pdfDisabledReason = (() => {
+    if (reportType === 'deliveries-summary') {
+      return 'PDF disponível apenas no relatório "Itens por família e data".';
+    }
+    if (!selectedFamilyId || selectedFamilyId === 'all') {
+      return 'Selecione uma família no campo acima para exportar PDF.';
+    }
+    return null;
+  })();
+
+  const handleExportCSV = () => {
+    if (reportType === 'family-items-by-date' && !selectedFamilyId) {
+      toast({
+        title: 'Família não selecionada',
+        description: 'Selecione uma família para exportar o relatório de itens.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (reportType === 'deliveries-summary') {
+      exportDeliveriesSummary(filteredDeliveries);
+      return;
+    }
+
+    const { filenamePrefix } = getFamilyExportMeta();
+    exportFamilyItemsByDateCSV(filteredDeliveries, { filenamePrefix });
+  };
+
+  const handleExportPDF = () => {
+    if (!selectedFamilyId) {
+      toast({
+        title: 'Família não selecionada',
+        description: 'Selecione uma família para exportar o relatório de itens.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const { familyLabel, filenamePrefix } = getFamilyExportMeta();
+    exportFamilyItemsByDatePDF(filteredDeliveries, {
+      institutionName,
+      periodLabel,
+      familyLabel,
+      filenamePrefix,
+    });
+  };
+
+  const handleReportTypeChange = (value: ReportType) => {
+    setReportType(value);
+    if (value === 'family-items-by-date' && selectedFamilyId === 'all') {
+      setSelectedFamilyId('');
+    }
+    if (value === 'deliveries-summary' && !selectedFamilyId) {
+      setSelectedFamilyId('all');
+    }
   };
 
   const renderDeliveryItems = (delivery: (typeof filteredDeliveries)[number]) => {
@@ -310,7 +389,7 @@ const InstitutionReports = () => {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="start-date" className="text-sm font-medium mb-2 block">
                     Data Inicial
@@ -346,11 +425,58 @@ const InstitutionReports = () => {
                     Filtrar
                   </Button>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FamilyReportSelector
+                  families={familyReportOptions}
+                  value={selectedFamilyId}
+                  onValueChange={setSelectedFamilyId}
+                  allowAll={reportType === 'deliveries-summary'}
+                  required={reportType === 'family-items-by-date'}
+                />
+                <div>
+                  <Label htmlFor="report-type" className="text-sm font-medium mb-2 block">
+                    Tipo de relatório
+                  </Label>
+                  <Select
+                    value={reportType}
+                    onValueChange={(value) => handleReportTypeChange(value as ReportType)}
+                  >
+                    <SelectTrigger id="report-type">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="family-items-by-date">
+                        Itens por família e data
+                      </SelectItem>
+                      <SelectItem value="deliveries-summary">
+                        Entregas (resumo)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-end">
-                  <Button onClick={exportReport} variant="outline" className="w-full">
+                  <Button onClick={handleExportCSV} variant="outline" className="w-full">
                     <Download className="h-4 w-4 mr-2" />
-                    Exportar Relatório
+                    Exportar CSV
                   </Button>
+                </div>
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleExportPDF}
+                    variant="outline"
+                    className="w-full"
+                    disabled={!canExportFamilyItemsPdf}
+                    title={pdfDisabledReason ?? undefined}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar PDF
+                  </Button>
+                  {pdfDisabledReason ? (
+                    <p className="text-xs text-muted-foreground">{pdfDisabledReason}</p>
+                  ) : null}
                 </div>
               </div>
             </CardContent>
@@ -381,8 +507,12 @@ const InstitutionReports = () => {
                       <AlertDescription className="mt-2">
                         <div className="space-y-1 text-sm">
                           <p><strong>Contato:</strong> {family.contact_person}</p>
-                          {family.cpf && (
-                            <p><strong>CPF:</strong> {family.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</p>
+                          {(family.cpf_masked || family.cpf) && (
+                            <p>
+                              <strong>CPF:</strong>{' '}
+                              {family.cpf_masked ??
+                                family.cpf?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
+                            </p>
                           )}
                           <div>
                             <strong>Instituições:</strong>
