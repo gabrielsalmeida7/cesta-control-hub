@@ -142,3 +142,42 @@ export const formatDateBrasilia = (dateString: string | Date | undefined | null)
   });
 };
 
+const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+
+function getBrasiliaDateParts(date: Date | string): { year: number; month: number } {
+  const parsedDate = typeof date === 'string' ? new Date(date) : date;
+
+  if (isNaN(parsedDate.getTime())) {
+    return { year: 0, month: 0 };
+  }
+
+  return {
+    year: Number(parsedDate.toLocaleString('en-US', { timeZone: BRASILIA_TIMEZONE, year: 'numeric' })),
+    month: Number(parsedDate.toLocaleString('en-US', { timeZone: BRASILIA_TIMEZONE, month: 'numeric' })),
+  };
+}
+
+export function getCurrentBrasiliaDateParts(): { year: number; month: number } {
+  return getBrasiliaDateParts(new Date());
+}
+
+export function isSameMonthInBrasilia(date: Date | string, reference = new Date()): boolean {
+  const target = getBrasiliaDateParts(date);
+  const current = getBrasiliaDateParts(reference);
+
+  return target.year === current.year && target.month === current.month;
+}
+
+export function isSameYearInBrasilia(date: Date | string, reference = new Date()): boolean {
+  return getBrasiliaDateParts(date).year === getBrasiliaDateParts(reference).year;
+}
+
+export function getEffectiveDeliveryDate(
+  deliveryDate: string | null | undefined,
+  createdAt: string | null | undefined
+): string | null {
+  if (deliveryDate) return deliveryDate;
+  if (createdAt) return createdAt;
+  return null;
+}
+

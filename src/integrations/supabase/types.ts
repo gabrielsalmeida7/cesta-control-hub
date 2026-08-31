@@ -1231,6 +1231,10 @@ export type Database = {
         Args: { p_institution_id: string }
         Returns: Json
       }
+      get_admin_dashboard_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_families_display_batch: {
         Args: { p_family_ids: string[] }
         Returns: {

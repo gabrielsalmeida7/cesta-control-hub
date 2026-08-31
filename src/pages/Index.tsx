@@ -9,7 +9,7 @@ import RecentDeliveriesTable from '@/components/RecentDeliveriesTable';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardStats, type AdminStats } from '@/hooks/useDashboardStats';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Building2, Package, AlertTriangle, Loader2 } from 'lucide-react';
+import { Users, Building2, Package, AlertTriangle, Loader2, Calendar, PieChart } from 'lucide-react';
 
 const Index = () => {
   const { user, profile, loading } = useAuth();
@@ -59,9 +59,11 @@ const Index = () => {
           </div>
 
           {/* Cards de estatísticas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mb-6 md:mb-8">
             {statsLoading ? (
               <>
+                <Skeleton className="h-[120px] w-full" />
+                <Skeleton className="h-[120px] w-full" />
                 <Skeleton className="h-[120px] w-full" />
                 <Skeleton className="h-[120px] w-full" />
                 <Skeleton className="h-[120px] w-full" />
@@ -85,9 +87,16 @@ const Index = () => {
                 
                 <DashboardCard
                   title="Entregas Este Mês"
-                  value={(stats as AdminStats)?.totalDeliveries || 0}
-                  description="Cestas entregues"
+                  value={(stats as AdminStats)?.deliveriesThisMonth || 0}
+                  description="Cestas entregues no mês"
                   icon={<Package className="h-6 w-6" />}
+                />
+
+                <DashboardCard
+                  title="Entregas Este Ano"
+                  value={(stats as AdminStats)?.deliveriesThisYear || 0}
+                  description="Cestas entregues no ano"
+                  icon={<Calendar className="h-6 w-6" />}
                 />
                 
                 <DashboardCard
@@ -95,6 +104,13 @@ const Index = () => {
                   value={(stats as AdminStats)?.blockedFamilies || 0}
                   description="Aguardando liberação"
                   icon={<AlertTriangle className="h-6 w-6" />}
+                />
+
+                <DashboardCard
+                  title="Taxa de Cobertura Mensal"
+                  value={`${(stats as AdminStats)?.monthlyCoverageRate ?? 0}%`}
+                  description="Famílias atendidas no mês"
+                  icon={<PieChart className="h-6 w-6" />}
                 />
               </>
             )}

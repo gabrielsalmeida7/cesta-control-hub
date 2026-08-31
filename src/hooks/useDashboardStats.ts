@@ -6,8 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 export interface AdminStats {
   totalInstitutions: number;
   totalFamilies: number;
-  totalDeliveries: number;
+  deliveriesThisMonth: number;
+  deliveriesThisYear: number;
   blockedFamilies: number;
+  monthlyCoverageRate: number;
 }
 
 export interface InstitutionStats {
@@ -18,13 +20,23 @@ export interface InstitutionStats {
   recentDeliveries: number;
 }
 
+function mapAdminStatsPayload(payload: Record<string, number | string | null>): AdminStats {
+  return {
+    totalInstitutions: Number(payload.total_institutions ?? 0),
+    totalFamilies: Number(payload.total_families ?? 0),
+    deliveriesThisMonth: Number(payload.deliveries_this_month ?? 0),
+    deliveriesThisYear: Number(payload.deliveries_this_year ?? 0),
+    blockedFamilies: Number(payload.blocked_families ?? 0),
+    monthlyCoverageRate: Number(payload.monthly_coverage_rate ?? 0),
+  };
+}
+
 export const useDashboardStats = () => {
-  const { profile, user, session } = useAuth();
+  const { profile } = useAuth();
 
   return useQuery({
     queryKey: ['dashboard-stats', profile?.role, profile?.institution_id],
     queryFn: async (): Promise<AdminStats | InstitutionStats | null> => {
-      
       if (!profile) {
         if (import.meta.env.DEV) {
           console.log('❌ No profile available, returning null');
@@ -33,66 +45,28 @@ export const useDashboardStats = () => {
       }
 
       try {
-        // Stats para Admin
         if (profile.role === 'admin') {
           if (import.meta.env.DEV) {
-            console.log('🔑 Fetching admin stats...');
-          }
-          
-          // Test each query individually
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing institutions query...');
-          }
-          const { data: allInstitutions, count: totalCount } = await supabase
-            .from('institutions')
-            .select('*', { count: 'exact', head: false });
-          
-          const instResult = { 
-            count: totalCount || 0,
-            data: allInstitutions 
-          };
-          if (import.meta.env.DEV) {
-            console.log('📝 Institutions result:', instResult);
+            console.log('🔑 Fetching admin stats via RPC...');
           }
 
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing families query...');
-          }
-          const famResult = await supabase.from('families').select('*', { count: 'exact', head: true });
-          if (import.meta.env.DEV) {
-            console.log('📝 Families result:', famResult);
+          const { data: statsJson, error: statsError } = await supabase.rpc(
+            'get_admin_dashboard_stats'
+          );
+
+          if (statsError) {
+            throw statsError;
           }
 
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing deliveries query...');
-          }
-          const delResult = await supabase.from('deliveries').select('*', { count: 'exact', head: true });
-          if (import.meta.env.DEV) {
-            console.log('📝 Deliveries result:', delResult);
-          }
-
-          if (import.meta.env.DEV) {
-            console.log('📝 Testing blocked families query...');
-          }
-          const blockResult = await supabase.from('families').select('*', { count: 'exact', head: true }).eq('is_blocked', true);
-          if (import.meta.env.DEV) {
-            console.log('📝 Blocked families result:', blockResult);
-          }
-
-          const stats: AdminStats = {
-            totalInstitutions: instResult.count || 0,
-            totalFamilies: famResult.count || 0,
-            totalDeliveries: delResult.count || 0,
-            blockedFamilies: blockResult.count || 0,
-          };
+          const stats = mapAdminStatsPayload((statsJson ?? {}) as Record<string, number | string | null>);
 
           if (import.meta.env.DEV) {
             console.log('✅ Final admin stats:', stats);
           }
+
           return stats;
         }
 
-        // Stats para Instituição (via RPC — evita SELECT direto bloqueado por RLS)
         if (profile.role === 'institution' && profile.institution_id) {
           if (import.meta.env.DEV) {
             console.log('🏢 Fetching institution stats for:', profile.institution_id);
@@ -120,12 +94,14 @@ export const useDashboardStats = () => {
           if (import.meta.env.DEV) {
             console.log('✅ Final institution stats:', stats);
           }
+
           return stats;
         }
 
         if (import.meta.env.DEV) {
           console.log('❌ No matching role or missing institution_id');
         }
+
         return null;
       } catch (error) {
         console.error('💥 Error in dashboard stats:', error);
@@ -134,6 +110,6 @@ export const useDashboardStats = () => {
     },
     enabled: !!profile,
     retry: 1,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
   });
 };
