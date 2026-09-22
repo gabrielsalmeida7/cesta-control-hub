@@ -797,6 +797,27 @@ export type Database = {
           },
         ]
       }
+      public_impact_stats: {
+        Row: {
+          deliveries_count: number
+          families_count: number
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          deliveries_count?: number
+          families_count?: number
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          deliveries_count?: number
+          families_count?: number
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       receipts: {
         Row: {
           file_path: string | null

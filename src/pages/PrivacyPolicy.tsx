@@ -99,6 +99,11 @@ const PrivacyPolicy = () => {
                 <strong>Importante:</strong> Não vendemos, alugamos ou compartilhamos seus dados pessoais com terceiros 
                 para fins comerciais ou publicitários.
               </p>
+              <p className="text-gray-700 mt-3">
+                <strong>Estatísticas agregadas:</strong> Totais não identificáveis — quantidade de famílias
+                cadastradas e de cestas entregues — podem ser exibidos na tela de login. Esses números não
+                incluem nome, CPF, endereço, instituição ou qualquer outro dado pessoal.
+              </p>
             </section>
 
             {/* Direitos do Titular */}

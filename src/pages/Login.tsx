@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineAction } from "@/hooks/useOfflineAction";
 import { supabase } from "@/integrations/supabase/client";
+import PublicImpactStats from "@/components/PublicImpactStats";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -229,6 +230,7 @@ const Login = () => {
               <p className="max-w-md text-lg text-white/90 md:text-xl">
                 Gestão responsável e transparente para garantir acesso digno à alimentação.
               </p>
+              <PublicImpactStats variant="onDark" />
             </div>
           </div>
           <div className="mt-auto w-full flex-shrink-0 pt-6 md:pt-8">
@@ -256,6 +258,9 @@ const Login = () => {
           </CardHeader>
           
           <CardContent className="px-6 sm:px-8 flex-1">
+            <div className="md:hidden">
+              <PublicImpactStats variant="onLight" />
+            </div>
             <form onSubmit={handleLogin} className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
