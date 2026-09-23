@@ -214,9 +214,8 @@ const Login = () => {
         {/* Overlay escuro para legibilidade */}
         <div className="absolute inset-0 bg-black/50"></div>
         
-        {/* Conteúdo sobreposto: texto centralizado na área útil; logo institucional embaixo */}
         <div className="relative z-10 flex h-full w-full flex-col p-8 md:p-12 text-white">
-          <div className="flex min-h-0 flex-1 flex-col items-start justify-center">
+          <div className="flex min-h-0 flex-1 flex-col items-start justify-center overflow-y-auto">
             <div className="mb-6">
               <div className="mb-4">
                 <img
@@ -225,8 +224,8 @@ const Login = () => {
                   className="h-12 w-auto"
                 />
               </div>
-              <h1 className="mb-4 text-4xl font-bold md:text-5xl">Cesta Justa</h1>
-              <h2 className="mb-4 text-xl font-semibold md:text-2xl">Sistema de Controle de Alimentos</h2>
+              <h1 className="text-4xl font-bold md:text-5xl">Banco de Alimentos</h1>
+              <p className="mb-4 mt-2 text-sm text-white/90">Inaugurado em 27 de agosto de 2021</p>
               <p className="max-w-md text-lg text-white/90 md:text-xl">
                 Gestão responsável e transparente para garantir acesso digno à alimentação.
               </p>
@@ -235,8 +234,8 @@ const Login = () => {
           </div>
           <div className="mt-auto w-full flex-shrink-0 pt-6 md:pt-8">
             <img
-              src="/LogoBranca.png"
-              alt="Prefeitura Municipal de Araguari"
+              src="/BancoDeAlimentos.png"
+              alt="Banco de Alimentos de Araguari — Rivalino de Sousa Pereira"
               className="h-auto w-full max-w-lg object-contain object-left"
             />
           </div>
